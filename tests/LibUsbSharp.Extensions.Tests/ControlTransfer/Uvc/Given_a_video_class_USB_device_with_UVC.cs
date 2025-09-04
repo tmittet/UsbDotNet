@@ -29,6 +29,10 @@ public sealed class Given_a_video_class_USB_device_with_UVC : IDisposable
     [SkippableFact]
     public void ControlReadUvc_Brightness_should_complete_successfully()
     {
+        if (OperatingSystem.IsWindows())
+        {
+            throw new SkipException("The UVC control interface is inaccessible on the Windows OS.");
+        }
         using var device = _deviceSource.OpenUsbDeviceOrSkip();
         var serial = device.GetSerialNumber();
         var uvcInterfaces = device.GetInterfaceDescriptors(UsbClass.Video, UvcInterfaceSubClass);
@@ -58,6 +62,10 @@ public sealed class Given_a_video_class_USB_device_with_UVC : IDisposable
     [SkippableFact]
     public void ControlWriteUvc_Brightness_should_successfully_write_provided_value_to_device()
     {
+        if (OperatingSystem.IsWindows())
+        {
+            throw new SkipException("The UVC control interface is inaccessible on the Windows OS.");
+        }
         using var device = _deviceSource.OpenUsbDeviceOrSkip();
         var serial = device.GetSerialNumber();
         var uvcInterface = device.GetInterfaceDescriptors(UsbClass.Video, UvcInterfaceSubClass).First();
