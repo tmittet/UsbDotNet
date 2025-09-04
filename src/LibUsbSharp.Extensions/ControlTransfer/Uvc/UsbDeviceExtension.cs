@@ -5,7 +5,7 @@ namespace LibUsbSharp.Extensions.ControlTransfer.Uvc;
 public static class UsbDeviceExtension
 {
     /// <summary>
-    /// Send a standard ControlRead request. Data is read Device -> Host.
+    /// Send a UVC ControlRead request. Data is read Device -> Host.
     /// </summary>
     /// <param name="device">A UsbDevice instance</param>
     /// <param name="destination">A destination span for read bytes</param>
@@ -28,7 +28,7 @@ public static class UsbDeviceExtension
     /// Interrupted = The read operation was canceled.<br />
     /// NotSupported = The transfer flags are not supported by the operating system.<br />
     /// </returns>
-    public static LibUsbResult ControlRead(
+    public static LibUsbResult ControlReadUvc(
         this IUsbDevice device,
         Span<byte> destination,
         out ushort bytesRead,
@@ -51,7 +51,7 @@ public static class UsbDeviceExtension
         );
 
     /// <summary>
-    /// Send a standard ControlWrite request. Data is written Host -> Device.
+    /// Send a UVC ControlWrite request. Data is written Host -> Device.
     /// </summary>
     /// <param name="device">A UsbDevice instance</param>
     /// <param name="source">The payload to send to the device (max. 65.535 bytes)</param>
@@ -74,7 +74,7 @@ public static class UsbDeviceExtension
     /// Interrupted = The write operation was canceled.<br />
     /// NotSupported = The transfer flags are not supported by the operating system.<br />
     /// </returns>
-    public static LibUsbResult ControlWrite(
+    public static LibUsbResult ControlWriteUvc(
         this IUsbDevice device,
         ReadOnlySpan<byte> source,
         out int bytesWritten,
