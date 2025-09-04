@@ -79,10 +79,7 @@ public sealed class Given_a_video_class_USB_device_with_UVC : IDisposable
             ControlSelector,
             timeout: 500
         );
-        if (initialReadResult != LibUsbResult.Success)
-        {
-            throw new SkipException($"ControlRead result '{initialReadResult}', {initialBytesRead} bytes read.");
-        }
+        initialReadResult.Should().Be(LibUsbResult.Success, "The write test can't continue when read is unsuccessful.");
 
         var initialValue = BitConverter.ToInt16(initialValueBuffer);
         var newValue = (short)(initialValue > 400 ? -600 : initialValue + 150);
