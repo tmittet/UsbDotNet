@@ -1,5 +1,4 @@
-﻿using LibUsbSharp.Extensions.ControlTransfer;
-using LibUsbSharp.Extensions.ControlTransfer.Uvc;
+﻿using LibUsbSharp.Extensions.ControlTransfer.Uvc;
 
 namespace LibUsbSharp.Extensions.Tests.ControlTransfer.Uvc;
 
@@ -28,7 +27,7 @@ public sealed class Given_a_video_class_USB_device_with_UVC : IDisposable
     }
 
     [SkippableFact]
-    public void ControUvcRead_Brightness_should_complete_successfully()
+    public void ControlReadUvc_Brightness_should_complete_successfully()
     {
         using var device = _deviceSource.OpenUsbDeviceOrSkip();
         var serial = device.GetSerialNumber();
@@ -57,7 +56,7 @@ public sealed class Given_a_video_class_USB_device_with_UVC : IDisposable
     }
 
     [SkippableFact]
-    public void ControUvcWrite_Brightness_should_complete_successfully()
+    public void ControlWriteUvc_Brightness_should_successfully_write_provided_value_to_device()
     {
         using var device = _deviceSource.OpenUsbDeviceOrSkip();
         var serial = device.GetSerialNumber();
