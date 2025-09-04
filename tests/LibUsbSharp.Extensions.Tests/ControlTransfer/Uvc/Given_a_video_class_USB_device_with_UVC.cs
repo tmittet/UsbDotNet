@@ -43,7 +43,7 @@ public sealed class Given_a_video_class_USB_device_with_UVC : IDisposable
             uvcInterface.InterfaceNumber
         );
         var readBuffer = new Span<byte>(new byte[2]);
-        var result = device.ControlRead(
+        var result = device.ControlReadUvc(
             readBuffer,
             out var readLength,
             ControlRequestUvc.GetCurrent,
@@ -71,7 +71,7 @@ public sealed class Given_a_video_class_USB_device_with_UVC : IDisposable
             uvcInterface.InterfaceNumber
         );
         var initialValueBuffer = new Span<byte>(new byte[2]);
-        var initialReadResult = device.ControlRead(
+        var initialReadResult = device.ControlReadUvc(
             initialValueBuffer,
             out var initialBytesRead,
             ControlRequestUvc.GetCurrent,
@@ -88,7 +88,7 @@ public sealed class Given_a_video_class_USB_device_with_UVC : IDisposable
         var initialValue = BitConverter.ToInt16(initialValueBuffer);
         var newValue = (short)(initialValue > 400 ? -600 : initialValue + 150);
         var writeBuffer = new Span<byte>(BitConverter.GetBytes(newValue));
-        var writeResult = device.ControlWrite(
+        var writeResult = device.ControlWriteUvc(
             writeBuffer,
             out var bytesWritten,
             ControlRequestUvc.SetCurrent,
@@ -101,7 +101,7 @@ public sealed class Given_a_video_class_USB_device_with_UVC : IDisposable
         bytesWritten.Should().Be(2);
 
         var newValueBuffer = new Span<byte>(new byte[2]);
-        var newReadResult = device.ControlRead(
+        var newReadResult = device.ControlReadUvc(
             newValueBuffer,
             out var newBytesRead,
             ControlRequestUvc.GetCurrent,
