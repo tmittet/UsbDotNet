@@ -78,38 +78,38 @@ jobs:
       run: |
         dotnet restore --runtime ${{ matrix.config.runtime }}
 
-    - name: Build LibUsbSharp.Native
+    - name: Build UsbDotNet.LibUsbNative
       shell: bash
       run: |
-        dotnet build src/LibUsbSharp.Native/LibUsbSharp.Native.csproj \
+        dotnet build src/UsbDotNet.LibUsbNative/UsbDotNet.LibUsbNative.csproj \
           --no-restore \
           --runtime ${{ matrix.config.runtime }}
 
-    - name: Build LibUsbSharp
+    - name: Build UsbDotNet
       shell: bash
       run: |
-        dotnet build src/LibUsbSharp/LibUsbSharp.csproj \
+        dotnet build src/UsbDotNet/UsbDotNet.csproj \
           --no-restore \
           --runtime ${{ matrix.config.runtime }}
 
-    - name: Build LibUsbSharp.Native.Tests
+    - name: Build UsbDotNet.LibUsbNative.Tests
       shell: bash
       run: |
-        dotnet build tests/LibUsbSharp.Native.Tests/LibUsbSharp.Native.Tests.csproj \
+        dotnet build tests/UsbDotNet.LibUsbNative.Tests/UsbDotNet.LibUsbNative.Tests.csproj \
           --no-restore \
           --runtime ${{ matrix.config.runtime }}
 
-    - name: Build LibUsbSharp.Tests
+    - name: Build UsbDotNet.Tests
       shell: bash
       run: |
-        dotnet build tests/LibUsbSharp.Tests/LibUsbSharp.Tests.csproj \
+        dotnet build tests/UsbDotNet.Tests/UsbDotNet.Tests.csproj \
           --no-restore \
           --runtime ${{ matrix.config.runtime }}
 
-    - name: Build LibUsbSharp.Extensions.Tests
+    - name: Build UsbDotNet.Extensions.Tests
       shell: bash
       run: |
-        dotnet build tests/LibUsbSharp.Extensions.Tests/LibUsbSharp.Extensions.Tests.csproj \
+        dotnet build tests/UsbDotNet.Extensions.Tests/UsbDotNet.Extensions.Tests.csproj \
           --no-restore \
           --runtime ${{ matrix.config.runtime }}
 
@@ -120,28 +120,28 @@ jobs:
         sudo apt-get update
         sudo apt-get install -y libusb-1.0-0-dev
 
-    - name: Run LibUsbSharp.Native.Tests
+    - name: Run UsbDotNet.LibUsbNative.Tests
       shell: bash
       run: |
-        dotnet test tests/LibUsbSharp.Native.Tests/LibUsbSharp.Native.Tests.csproj \
+        dotnet test tests/UsbDotNet.LibUsbNative.Tests/UsbDotNet.LibUsbNative.Tests.csproj \
           --no-build \
           --runtime ${{ matrix.config.runtime }} \
           --logger "junit;LogFilePath=TestResults/results.xml" \
           --verbosity normal
 
-    - name: Run LibUsbSharp.Tests
+    - name: Run UsbDotNet.Tests
       shell: bash
       run: |
-        dotnet test tests/LibUsbSharp.Tests/LibUsbSharp.Tests.csproj \
+        dotnet test tests/UsbDotNet.Tests/UsbDotNet.Tests.csproj \
           --no-build \
           --runtime ${{ matrix.config.runtime }} \
           --logger "junit;LogFilePath=TestResults/results.xml" \
           --verbosity normal
 
-    - name: Run LibUsbSharp.Extensions.Tests
+    - name: Run UsbDotNet.Extensions.Tests
       shell: bash
       run: |
-        dotnet test tests/LibUsbSharp.Extensions.Tests/LibUsbSharp.Extensions.Tests.csproj \
+        dotnet test tests/UsbDotNet.Extensions.Tests/UsbDotNet.Extensions.Tests.csproj \
           --no-build \
           --runtime ${{ matrix.config.runtime }} \
           --logger "junit;LogFilePath=TestResults/results.xml" \

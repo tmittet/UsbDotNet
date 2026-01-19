@@ -1,0 +1,44 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+    <PropertyGroup>
+        <TargetFramework>net8.0</TargetFramework>
+        <Platforms>AnyCPU;x64;arm64</Platforms>
+        <RuntimeIdentifiers>linux-arm64;linux-x64;maccatalyst-arm64;maccatalyst-x64;osx-arm64;osx-x64;win-arm64;win-x64</RuntimeIdentifiers>
+        <ImplicitUsings>enable</ImplicitUsings>
+        <IsPackable>false</IsPackable>
+        <IsTestProject>true</IsTestProject>
+        <Nullable>enable</Nullable>
+        <Authors>Thomas Mittet</Authors>
+        <CurrentYear>2025</CurrentYear>
+        <Copyright>Copyright (c) $(CurrentYear) $(Authors)</Copyright>
+        <EnableNETAnalyzers>true</EnableNETAnalyzers>
+        <AnalysisLevel>latest-recommended</AnalysisLevel>
+        <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+        <UseXunitV3>false</UseXunitV3>
+    </PropertyGroup>
+    <ItemGroup>
+        <Content Include="xunit.runner.json">
+            <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+        </Content>
+    </ItemGroup>
+    <ItemGroup>
+        <PackageReference Include="FluentAssertions" />
+        <PackageReference Include="FluentAssertions.Analyzers">
+            <PrivateAssets>all</PrivateAssets>
+            <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+        </PackageReference>
+        <PackageReference Include="JunitXml.TestLogger" />
+        <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" />
+        <PackageReference Include="Microsoft.NET.Test.Sdk" />
+        <PackageReference Include="xunit" />
+        <PackageReference Include="xunit.runner.visualstudio">
+            <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+            <PrivateAssets>all</PrivateAssets>
+        </PackageReference>
+        <PackageReference Include="Xunit.SkippableFact" />
+    </ItemGroup>
+    <ItemGroup>
+        <ProjectReference Include="..\..\src\UsbDotNet.Extensions\UsbDotNet.Extensions.csproj" />
+        <ProjectReference Include="..\..\src\UsbDotNet\UsbDotNet.csproj" />
+        <ProjectReference Include="..\UsbDotNet.TestInfrastructure\UsbDotNet.TestInfrastructure.csproj" />
+    </ItemGroup>
+</Project>
