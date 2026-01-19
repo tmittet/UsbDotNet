@@ -1,6 +1,7 @@
-﻿using LibUsbSharp.Transfer;
+﻿using UsbDotNet.Core;
+using UsbDotNet.Transfer;
 
-namespace LibUsbSharp.Extensions.ControlTransfer.Uvc;
+namespace UsbDotNet.Extensions.ControlTransfer.Uvc;
 
 public static class UsbDeviceExtension
 {
@@ -28,7 +29,7 @@ public static class UsbDeviceExtension
     /// Interrupted = The read operation was canceled.<br />
     /// NotSupported = The transfer flags are not supported by the operating system.<br />
     /// </returns>
-    public static LibUsbResult ControlReadUvc(
+    public static UsbResult ControlReadUvc(
         this IUsbDevice device,
         Span<byte> destination,
         out ushort bytesRead,
@@ -74,7 +75,7 @@ public static class UsbDeviceExtension
     /// Interrupted = The write operation was canceled.<br />
     /// NotSupported = The transfer flags are not supported by the operating system.<br />
     /// </returns>
-    public static LibUsbResult ControlWriteUvc(
+    public static UsbResult ControlWriteUvc(
         this IUsbDevice device,
         ReadOnlySpan<byte> source,
         out int bytesWritten,

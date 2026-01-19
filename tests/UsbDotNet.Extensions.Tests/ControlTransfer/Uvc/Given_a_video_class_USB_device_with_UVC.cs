@@ -1,6 +1,7 @@
-﻿using LibUsbSharp.Extensions.ControlTransfer.Uvc;
+﻿using UsbDotNet.Core;
+using UsbDotNet.Extensions.ControlTransfer.Uvc;
 
-namespace LibUsbSharp.Extensions.Tests.ControlTransfer.Uvc;
+namespace UsbDotNet.Extensions.Tests.ControlTransfer.Uvc;
 
 [Trait("Category", "UsbVideoControl")]
 public sealed class Given_a_video_class_USB_device_with_UVC : IDisposable
@@ -11,16 +12,16 @@ public sealed class Given_a_video_class_USB_device_with_UVC : IDisposable
 
     private readonly ILoggerFactory _loggerFactory;
     private readonly ILogger<Given_a_video_class_USB_device_with_UVC> _logger;
-    private readonly LibUsb _libUsb;
+    private readonly Usb _usb;
     private readonly TestDeviceSource _deviceSource;
 
     public Given_a_video_class_USB_device_with_UVC(ITestOutputHelper output)
     {
         _loggerFactory = new TestLoggerFactory(output);
         _logger = _loggerFactory.CreateLogger<Given_a_video_class_USB_device_with_UVC>();
-        _libUsb = new LibUsb(_loggerFactory);
-        _libUsb.Initialize(LogLevel.Information);
-        _deviceSource = new TestDeviceSource(_logger, _libUsb);
+        _usb = new Usb(loggerFactory: _loggerFactory);
+        _usb.Initialize(LogLevel.Information);
+        _deviceSource = new TestDeviceSource(_logger, _usb);
         _deviceSource.SetPreferredVendorId(0x2BD9);
         _deviceSource.SetRequiredInterfaceClass(UsbClass.Video, TestDeviceAccess.Control);
         _deviceSource.SetRequiredInterfaceSubClass(UvcInterfaceSubClass);
@@ -35,7 +36,7 @@ public sealed class Given_a_video_class_USB_device_with_UVC : IDisposable
         }
         using var device = _deviceSource.OpenUsbDeviceOrSkip();
         var serial = device.GetSerialNumber();
-        var uvcInterfaces = device.GetInterfaceDescriptors(UsbClass.Video, UvcInterfaceSubClass);
+        var uvcInterfaces = device.GetInterfaceDescriptorList(UsbClass.Video, UvcInterfaceSubClass);
         var uvcInterface = uvcInterfaces.First();
         _logger.LogInformation(
             "Video device open: VID=0x{VID:X4}, PID=0x{PID:X4}, "
@@ -56,7 +57,7 @@ public sealed class Given_a_video_class_USB_device_with_UVC : IDisposable
             timeout: 500
         );
         var readValue = BitConverter.ToInt16(readBuffer);
-        result.Should().Be(LibUsbResult.Success);
+        result.Should().Be(UsbResult.Success);
     }
 
     [SkippableFact]
@@ -68,7 +69,9 @@ public sealed class Given_a_video_class_USB_device_with_UVC : IDisposable
         }
         using var device = _deviceSource.OpenUsbDeviceOrSkip();
         var serial = device.GetSerialNumber();
-        var uvcInterface = device.GetInterfaceDescriptors(UsbClass.Video, UvcInterfaceSubClass).First();
+        var uvcInterface = device
+            .GetInterfaceDescriptorList(UsbClass.Video, UvcInterfaceSubClass)
+            .First();
         _logger.LogInformation(
             "Video device open: VID=0x{VID:X4}, PID=0x{PID:X4}, "
                 + "SerialNumber={SerialNumber}, UVC interface: {Interface}.",
@@ -87,7 +90,9 @@ public sealed class Given_a_video_class_USB_device_with_UVC : IDisposable
             ControlSelector,
             timeout: 500
         );
-        initialReadResult.Should().Be(LibUsbResult.Success, "The write test can't continue when read is unsuccessful.");
+        initialReadResult
+            .Should()
+            .Be(UsbResult.Success, "The write test can't continue when read is unsuccessful.");
 
         var initialValue = BitConverter.ToInt16(initialValueBuffer);
         var newValue = (short)(initialValue > 400 ? -600 : initialValue + 150);
@@ -101,7 +106,7 @@ public sealed class Given_a_video_class_USB_device_with_UVC : IDisposable
             ControlSelector,
             timeout: 500
         );
-        writeResult.Should().Be(LibUsbResult.Success);
+        writeResult.Should().Be(UsbResult.Success);
         bytesWritten.Should().Be(2);
 
         var newValueBuffer = new Span<byte>(new byte[2]);
@@ -114,13 +119,13 @@ public sealed class Given_a_video_class_USB_device_with_UVC : IDisposable
             ControlSelector,
             timeout: 500
         );
-        newReadResult.Should().Be(LibUsbResult.Success);
+        newReadResult.Should().Be(UsbResult.Success);
         newBytesRead.Should().Be(2);
         BitConverter.ToInt16(newValueBuffer).Should().Be(newValue);
     }
 
     public void Dispose()
     {
-        _libUsb.Dispose();
+        _usb.Dispose();
     }
 }
