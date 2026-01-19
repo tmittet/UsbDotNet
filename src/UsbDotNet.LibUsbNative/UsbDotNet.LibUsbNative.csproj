@@ -1,6 +1,7 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
     <PropertyGroup>
         <Authors>Stian Myhre, Thomas Mittet</Authors>
+        <CurrentYear>2026</CurrentYear>
         <Copyright>Copyright (c) $(CurrentYear) $(Authors)</Copyright>
         <RootNamespace>UsbDotNet.LibUsbNative</RootNamespace>
         <PackageId>UsbDotNet.LibUsbNative</PackageId>
