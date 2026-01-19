@@ -111,9 +111,9 @@ internal sealed class FakeLibusbApi : ILibUsbApi
         Marshal.StructureToPtr(verNative, _versionPtr, false);
 
         _strErrorPtrs = [];
-        foreach (libusb_error e in Enum.GetValues(typeof(libusb_error)))
+        foreach (var error in Enum.GetValues<libusb_error>())
         {
-            _strErrorPtrs[e] = AllocAnsi(e.ToString());
+            _strErrorPtrs[error] = AllocAnsi(error.ToString());
         }
     }
 
@@ -251,10 +251,12 @@ internal sealed class FakeLibusbApi : ILibUsbApi
     {
         desc = default;
         if (
-            MaybeFail(nameof(libusb_get_device_descriptor), out var err)
+            MaybeFail(nameof(libusb_get_device_descriptor), out var error)
             != libusb_error.LIBUSB_SUCCESS
         )
-            return err;
+        {
+            return error;
+        }
         desc = Device;
         return libusb_error.LIBUSB_SUCCESS;
     }
@@ -266,10 +268,12 @@ internal sealed class FakeLibusbApi : ILibUsbApi
     {
         config = IntPtr.Zero;
         if (
-            MaybeFail(nameof(libusb_get_config_descriptor), out var err)
+            MaybeFail(nameof(libusb_get_config_descriptor), out var error)
             != libusb_error.LIBUSB_SUCCESS
         )
-            return err;
+        {
+            return error;
+        }
         if (index != 0)
             return libusb_error.LIBUSB_ERROR_NOT_FOUND;
 
@@ -424,11 +428,12 @@ internal sealed class FakeLibusbApi : ILibUsbApi
     )
     {
         if (
-            MaybeFail(nameof(libusb_get_string_descriptor_ascii), out var err)
+            MaybeFail(nameof(libusb_get_string_descriptor_ascii), out var error)
             != libusb_error.LIBUSB_SUCCESS
         )
-            return err;
-
+        {
+            return error;
+        }
         if (idx == 3)
         {
             var n = Math.Min(length, SerialAscii.Length);
@@ -468,11 +473,12 @@ internal sealed class FakeLibusbApi : ILibUsbApi
     {
         callbackHandle = 0;
         if (
-            MaybeFail(nameof(libusb_hotplug_register_callback), out var err)
+            MaybeFail(nameof(libusb_hotplug_register_callback), out var error)
             != libusb_error.LIBUSB_SUCCESS
         )
-            return err;
-
+        {
+            return error;
+        }
         LastCb = cb;
         callbackHandle = LastCbHandle;
         return libusb_error.LIBUSB_SUCCESS;
