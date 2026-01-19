@@ -1,29 +1,8 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
     <PropertyGroup>
-        <TargetFrameworks>net8.0;net6.0</TargetFrameworks>
-        <Platforms>AnyCPU;x64;arm64</Platforms>
-        <RuntimeIdentifiers>
-            linux-arm64;linux-x64;maccatalyst-arm64;maccatalyst-x64;osx-arm64;osx-x64;win-arm64;win-x64</RuntimeIdentifiers>
         <RootNamespace>UsbDotNet.Core</RootNamespace>
-        <ImplicitUsings>enable</ImplicitUsings>
-        <Nullable>enable</Nullable>
-        <Authors>Thomas Mittet</Authors>
-        <CurrentYear>2025</CurrentYear>
-        <Copyright>Copyright (c) $(CurrentYear) $(Authors)</Copyright>
         <PackageId>UsbDotNet.Core</PackageId>
-        <Version>0.0.1</Version>
         <Description>UsbDotNet core types</Description>
-        <PackageLicenseExpression>MIT</PackageLicenseExpression>
-        <PackageTags>USB;libusb;dotnet</PackageTags>
-        <PackageProjectUrl>https://github.com/tmittet/UsbDotNet</PackageProjectUrl>
-        <RepositoryUrl>https://github.com/tmittet/UsbDotNet</RepositoryUrl>
-        <PublishRepositoryUrl>true</PublishRepositoryUrl>
-        <EmbedUntrackedSources>true</EmbedUntrackedSources>
-        <DebugType>portable</DebugType>
         <GenerateDocumentationFile>true</GenerateDocumentationFile>
-        <EnableNETAnalyzers>true</EnableNETAnalyzers>
-        <AnalysisLevel>latest-recommended</AnalysisLevel>
-        <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
-        <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
     </PropertyGroup>
 </Project>
