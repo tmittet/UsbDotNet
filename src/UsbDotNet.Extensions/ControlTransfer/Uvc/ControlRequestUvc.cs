@@ -1,4 +1,4 @@
-﻿namespace LibUsbSharp.Extensions.ControlTransfer.Uvc;
+﻿namespace UsbDotNet.Extensions.ControlTransfer.Uvc;
 
 /// <summary>
 /// USB Video Class (UVC) control request codes. These are used in class-specific
