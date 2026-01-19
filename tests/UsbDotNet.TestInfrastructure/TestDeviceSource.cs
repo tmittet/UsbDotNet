@@ -1,7 +1,6 @@
 using System.Diagnostics.CodeAnalysis;
+using UsbDotNet.Core;
 using UsbDotNet.Descriptor;
-using UsbDotNet.LibUsbNative;
-using UsbDotNet.LibUsbNative.Enums;
 
 namespace UsbDotNet.TestInfrastructure;
 
@@ -82,20 +81,19 @@ public sealed class TestDeviceSource(ILogger _logger, IUsb _usb)
             {
                 device = _usb.OpenDevice(deviceDescriptor);
             }
-            catch (LibUsbException ex)
-                when (ex.Error
-                        is libusb_error.LIBUSB_ERROR_ACCESS
-                            or libusb_error.LIBUSB_ERROR_IO
-                            or libusb_error.LIBUSB_ERROR_NOT_SUPPORTED
+            catch (UsbException ex)
+                when (ex.Code
+                        is UsbResult.AccessDenied
+                            or UsbResult.IoError
+                            or UsbResult.NotSupported
                 )
             {
                 if (i > 0)
                     Thread.Sleep(10);
                 _logger.LogInformation(
-                    "Device '{DeviceKey}' not accessible on attempt #{Attempt}. {ErrorCode}: {ErrorMessage}",
+                    "Device '{DeviceKey}' not accessible on attempt #{Attempt}: {ErrorMessage}",
                     deviceDescriptor.DeviceKey,
                     i + 1,
-                    ex.Error,
                     ex.Message
                 );
             }
@@ -169,10 +167,10 @@ public sealed class TestDeviceSource(ILogger _logger, IUsb _usb)
             );
             return true;
         }
-        catch (LibUsbException ex)
+        catch (UsbException ex)
         {
             _logger.LogInformation(
-                "Device '{DeviceKey}' serial number not readable. {ErrorMessage}",
+                "Device '{DeviceKey}' serial number not readable: {ErrorMessage}",
                 device.Descriptor.DeviceKey,
                 ex.Message
             );

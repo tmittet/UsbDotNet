@@ -98,7 +98,7 @@ internal static class LibUsbTransfer
                 {
                     logger.LogError(
                         "Failed to cancel LibUsb transfer. {ErrorMessage}.",
-                        cancelResult.GetString()
+                        cancelResult.GetMessage()
                     );
                 }
                 // We should not free the transfer or handle if there is still a chance

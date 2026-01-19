@@ -1,5 +1,5 @@
+using UsbDotNet.Core;
 using UsbDotNet.Descriptor;
-using UsbDotNet.LibUsbNative;
 using UsbDotNet.Transfer;
 
 namespace UsbDotNet;
@@ -69,7 +69,7 @@ public interface IUsbDevice : IDisposable
     /// Interrupted = The read operation was canceled.<br />
     /// NotSupported = The transfer flags are not supported by the operating system.<br />
     /// </returns>
-    LibUsbResult ControlRead(
+    UsbResult ControlRead(
         Span<byte> destination,
         out ushort bytesRead,
         ControlRequestRecipient recipient,
@@ -103,7 +103,7 @@ public interface IUsbDevice : IDisposable
     /// Interrupted = The write operation was canceled.<br />
     /// NotSupported = The transfer flags are not supported by the operating system.<br />
     /// </returns>
-    LibUsbResult ControlWrite(
+    UsbResult ControlWrite(
         ReadOnlySpan<byte> source,
         out int bytesWritten,
         ControlRequestRecipient recipient,
@@ -120,7 +120,7 @@ public interface IUsbDevice : IDisposable
     /// <exception cref="ArgumentException">
     /// Thrown when the USB interface is already claimed.
     /// </exception>
-    /// <exception cref="LibUsbException">
+    /// <exception cref="UsbException">
     /// Thrown when the USB interface claim operation fails.
     /// </exception>
     /// <exception cref="ObjectDisposedException">

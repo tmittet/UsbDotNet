@@ -32,6 +32,9 @@
         <InternalsVisibleTo Include="UsbDotNet.LibUsbNative.Tests" />
     </ItemGroup>
     <ItemGroup>
+        <ProjectReference Include="..\UsbDotNet.Core\UsbDotNet.Core.csproj" />
+    </ItemGroup>
+    <ItemGroup>
         <EditorConfigFiles Update=".editorconfig">
             <CopyToOutputDirectory>Never</CopyToOutputDirectory>
         </EditorConfigFiles>

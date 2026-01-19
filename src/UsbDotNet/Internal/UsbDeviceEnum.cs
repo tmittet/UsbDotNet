@@ -1,10 +1,7 @@
 ﻿using Microsoft.Extensions.Logging;
+using UsbDotNet.Core;
 using UsbDotNet.Descriptor;
-using UsbDotNet.LibUsbNative;
-using UsbDotNet.LibUsbNative.Enums;
-using UsbDotNet.LibUsbNative.Extensions;
 using UsbDotNet.LibUsbNative.SafeHandles;
-using UsbDotNet.LibUsbNative.Structs;
 
 namespace UsbDotNet.Internal;
 
@@ -18,7 +15,7 @@ internal static class UsbDeviceEnum
     /// <param name="vendorId">Optional vendor ID filter; only return matching devices.</param>
     /// <param name="productIds">Optional product ID filter; only return matching devices.</param>
     /// <exception cref="ObjectDisposedException">Thrown when context is disposed.</exception>
-    /// <exception cref="LibUsbException">Thrown when the get device list operation fails.</exception>
+    /// <exception cref="UsbException">Thrown when the get device list operation fails.</exception>
     internal static List<IUsbDeviceDescriptor> GetDeviceList(
         ILogger logger,
         ISafeContext libusbContext,
@@ -44,55 +41,43 @@ internal static class UsbDeviceEnum
     /// <param name="logger">A logger.</param>
     /// <param name="devices">Pointer to device list returned by libusb_get_device_list.</param>
     /// <exception cref="ObjectDisposedException">Thrown when device is disposed.</exception>
-    internal static IEnumerable<(
-        ISafeDevice device,
-        UsbDeviceDescriptor Descriptor
-    )> GetDeviceDescriptors(ILogger logger, IReadOnlyList<ISafeDevice> devices)
+    internal static List<(ISafeDevice device, UsbDeviceDescriptor Descriptor)> GetDeviceDescriptors(
+        ILogger logger,
+        IReadOnlyList<ISafeDevice> devices
+    )
     {
+        var result = new List<(ISafeDevice device, UsbDeviceDescriptor Descriptor)>();
         foreach (var device in devices)
         {
-            var result = TryGetDeviceDescriptor(device, out var descriptor);
-            // NOTE: Should always be LIBUSB_SUCCESS; since libusb-1.0.16 libusb_get_device_descriptor always succeeds.
-            if (result != libusb_error.LIBUSB_SUCCESS)
+            try
             {
-                logger.LogWarning(
-                    "Get device descriptor failed: {ErrorMessage}.",
-                    result.GetString()
-                );
+                var descriptor = GetDeviceDescriptor(device);
+                if (descriptor.BcdUsb > 0)
+                {
+                    result.Add((device, descriptor));
+                }
             }
-            else if (descriptor!.Value.BcdUsb > 0)
+            // NOTE: Never throws; since libusb-1.0.16 libusb_get_device_descriptor always succeeds
+            catch (UsbException ex)
             {
-                yield return (device, descriptor!.Value);
+                logger.LogWarning(ex, "Get device descriptor failed: {ErrorMessage}.", ex.Message);
             }
         }
+        return result;
     }
 
     /// <summary>
     /// Get the cached USB device descriptor for a given, already in memory, device descriptor.
+    /// <para>
     /// NOTE: since libusb-1.0.16, LIBUSBX_API_VERSION >= 0x01000102, this function always succeeds.
+    /// </para>
     /// </summary>
     /// <exception cref="ObjectDisposedException">Thrown when device is disposed.</exception>
-    internal static libusb_error TryGetDeviceDescriptor(
-        ISafeDevice device,
-        out UsbDeviceDescriptor? descriptor
-    )
-    {
-        libusb_device_descriptor partialDescriptor;
-        try
-        {
-            partialDescriptor = device.GetDeviceDescriptor();
-        }
-        catch (LibUsbException ex)
-        {
-            descriptor = null;
-            return ex.Error;
-        }
-        descriptor = new UsbDeviceDescriptor(
-            partialDescriptor,
+    internal static UsbDeviceDescriptor GetDeviceDescriptor(ISafeDevice device) =>
+        new(
+            device.GetDeviceDescriptor(),
             device.GetBusNumber(),
             device.GetDeviceAddress(),
             device.GetPortNumber()
         );
-        return libusb_error.LIBUSB_SUCCESS;
-    }
 }

@@ -1,6 +1,6 @@
 using System.Collections.Immutable;
+using UsbDotNet.Core;
 using UsbDotNet.Descriptor;
-using UsbDotNet.LibUsbNative;
 
 namespace UsbDotNet;
 
@@ -23,7 +23,7 @@ public static class UsbDeviceExtension
     /// <exception cref="InvalidOperationException">
     /// Thrown when a USB interface of the provided class or optional protocol is not found.
     /// </exception>
-    /// <exception cref="LibUsbException">
+    /// <exception cref="UsbException">
     /// Thrown when the USB interface claim operation fails.
     /// </exception>
     /// <exception cref="ObjectDisposedException">

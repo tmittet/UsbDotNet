@@ -1,5 +1,5 @@
+using UsbDotNet.Core;
 using UsbDotNet.Descriptor;
-using UsbDotNet.LibUsbNative;
 
 namespace UsbDotNet;
 
@@ -12,7 +12,7 @@ public static class UsbExtension
     /// <param name="usb">Usb type instance.</param>
     /// <param name="vendorId">Optional vendor ID filter.</param>
     /// <param name="productId">Optional product ID filter.</param>
-    /// <exception cref="LibUsbException">Thrown when the get device list operation fails.</exception>
+    /// <exception cref="UsbException">Thrown when the get device list operation fails.</exception>
     /// <exception cref="ObjectDisposedException">Thrown when the Usb type is disposed.</exception>
     /// <exception cref="InvalidOperationException">Thrown when the Usb type is not initialized.</exception>
     public static List<IUsbDeviceDescriptor> GetDeviceList(
@@ -25,8 +25,8 @@ public static class UsbExtension
     /// Get the device serial number. To read the serial the device must be opened for a brief
     /// moment; unless already open. If the device is open in another process the read will fail.
     /// </summary>
-    /// <exception cref="LibUsbException">
-    /// LibUsbException ErrorCode AccessDenied or IO is typically an indication that the device
+    /// <exception cref="UsbException">
+    /// UsbException.Code AccessDenied or IoError is typically an indication that the device
     /// is inaccessible because it's open in another process or due to lacking permissions.
     /// </exception>
     /// <exception cref="InvalidOperationException">
@@ -40,8 +40,8 @@ public static class UsbExtension
     /// Opens the USB device without claiming any device interfaces or reading device serial.
     /// This is a non-blocking function; no requests are sent over the USB bus.
     /// </summary>
-    /// <exception cref="LibUsbException">
-    /// LibUsbException ErrorCode AccessDenied or IO is typically an indication that the device
+    /// <exception cref="UsbException">
+    /// UsbException.Code AccessDenied or IoError is typically an indication that the device
     /// is inaccessible because it's open in another process or due to lacking permissions.
     /// </exception>
     /// <exception cref="InvalidOperationException">

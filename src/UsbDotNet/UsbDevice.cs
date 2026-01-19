@@ -1,11 +1,12 @@
 using System.Collections.Concurrent;
 using System.Runtime.InteropServices;
 using Microsoft.Extensions.Logging;
+using UsbDotNet.Core;
 using UsbDotNet.Descriptor;
 using UsbDotNet.Internal;
 using UsbDotNet.Internal.Transfer;
-using UsbDotNet.LibUsbNative;
 using UsbDotNet.LibUsbNative.Enums;
+using UsbDotNet.LibUsbNative.Extensions;
 using UsbDotNet.LibUsbNative.SafeHandles;
 using UsbDotNet.Transfer;
 
@@ -95,7 +96,7 @@ public sealed class UsbDevice : IUsbDevice
     }
 
     /// <inheritdoc />
-    public LibUsbResult ControlRead(
+    public UsbResult ControlRead(
         Span<byte> destination,
         out ushort bytesRead,
         ControlRequestRecipient recipient,
@@ -143,10 +144,10 @@ public sealed class UsbDevice : IUsbDevice
             bytesRead = (ushort)bytesReadInt;
             if (result != libusb_error.LIBUSB_SUCCESS || bytesRead <= 0)
             {
-                return result.ToLibUsbResult();
+                return result.ToUsbResult();
             }
             buffer.AsSpan(ControlRequestPacket.SetupSize, bytesRead).CopyTo(destination);
-            return result.ToLibUsbResult();
+            return result.ToUsbResult();
         }
         finally
         {
@@ -155,7 +156,7 @@ public sealed class UsbDevice : IUsbDevice
     }
 
     /// <inheritdoc />
-    public LibUsbResult ControlWrite(
+    public UsbResult ControlWrite(
         ReadOnlySpan<byte> source,
         out int bytesWritten,
         ControlRequestRecipient recipient,
@@ -205,7 +206,7 @@ public sealed class UsbDevice : IUsbDevice
                     out bytesWritten, // Length of data only (not setup)
                     _disposeCts.Token
                 )
-                .ToLibUsbResult();
+                .ToUsbResult();
         }
         finally
         {
@@ -241,9 +242,6 @@ public sealed class UsbDevice : IUsbDevice
     /// </summary>
     /// <exception cref="InvalidOperationException">
     /// Thrown when the USB interface is not claimed.
-    /// </exception>
-    /// <exception cref="LibUsbException">
-    /// Thrown when the USB interface release operation fails.
     /// </exception>
     /// <exception cref="ObjectDisposedException">
     /// Thrown when the UsbDevice is disposed.

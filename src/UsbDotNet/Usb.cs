@@ -2,11 +2,11 @@ using System.Collections.Concurrent;
 using System.Diagnostics;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
+using UsbDotNet.Core;
 using UsbDotNet.Descriptor;
 using UsbDotNet.Internal;
 using UsbDotNet.LibUsbNative;
 using UsbDotNet.LibUsbNative.Enums;
-using UsbDotNet.LibUsbNative.Extensions;
 using UsbDotNet.LibUsbNative.SafeHandles;
 
 namespace UsbDotNet;
@@ -99,12 +99,9 @@ public sealed class Usb : IUsb
         {
             context.RegisterLogCallback((level, message) => LibUsbLogHandler(level, message));
         }
-        catch (LibUsbException ex)
+        catch (UsbException ex)
         {
-            _logger.LogWarning(
-                "Failed to register log callback. {ErrorMessage}.",
-                ex.Error.GetString()
-            );
+            _logger.LogWarning("Failed to register log callback. {ErrorMessage}.", ex.Message);
             return; // Only attempt to set log level if callback registration succeeded
         }
 
@@ -113,12 +110,9 @@ public sealed class Usb : IUsb
         {
             context.SetOption(libusb_option.LIBUSB_OPTION_LOG_LEVEL, (int)libUsbLogLevel);
         }
-        catch (LibUsbException ex)
+        catch (UsbException ex)
         {
-            _logger.LogWarning(
-                "Failed to set LIBUSB_OPTION_LOG_LEVEL: {ErrorMessage}",
-                ex.Error.GetString()
-            );
+            _logger.LogWarning("Failed to set LIBUSB_OPTION_LOG_LEVEL: {ErrorMessage}", ex.Message);
         }
     }
 
@@ -179,22 +173,21 @@ public sealed class Usb : IUsb
         ArgumentNullException.ThrowIfNull(device);
 
         // TODO: Test on macOS and Linux; "most functions that take a device handle are not safe"
-        var result = UsbDeviceEnum.TryGetDeviceDescriptor(device, out var deviceDescriptor);
-        if (result != libusb_error.LIBUSB_SUCCESS)
+        try
         {
-            _logger.LogWarning(
-                "Failed to get device descriptor. {ErrorMessage}.",
-                result.GetString()
+            var descriptor = UsbDeviceEnum.GetDeviceDescriptor(device);
+            _logger.LogInformation(
+                "Hotplug '{EventType}'. Class: {DeviceClass}. Key: {DeviceKey}.",
+                eventType,
+                descriptor.DeviceClass,
+                descriptor.DeviceKey
             );
-            return libusb_hotplug_return.REARM;
         }
-        var descriptor = deviceDescriptor!.Value;
-        _logger.LogInformation(
-            "Hotplug '{EventType}'. Class: {DeviceClass}. Key: {DeviceKey}.",
-            eventType,
-            descriptor.DeviceClass,
-            descriptor.DeviceKey
-        );
+        // NOTE: Never throws; since libusb-1.0.16 libusb_get_device_descriptor always succeeds
+        catch (UsbException ex)
+        {
+            _logger.LogWarning("Hotplug event handling failed. {ErrorMessage}.", ex.Message);
+        }
         device.Dispose();
         return libusb_hotplug_return.REARM;
     }
@@ -255,8 +248,8 @@ public sealed class Usb : IUsb
         if (!_openDevices.TryAdd(deviceKey, device))
         {
             device.Dispose();
-            throw LibUsbException.FromError(
-                libusb_error.LIBUSB_ERROR_OTHER,
+            throw new UsbException(
+                UsbResult.OtherError,
                 $"Device with key '{deviceKey}' is already open."
             );
         }
@@ -274,9 +267,9 @@ public sealed class Usb : IUsb
             .GetDeviceDescriptors(_logger, deviceList)
             .FirstOrDefault(d => d.Descriptor.DeviceKey == deviceKey);
         return device is null
-            ? throw LibUsbException.FromError(
-                libusb_error.LIBUSB_ERROR_NOT_FOUND,
-                "Failed to get device from list."
+            ? throw new UsbException(
+                UsbResult.NotFound,
+                "Failed to get device from list; the device could not be found."
             )
             : new UsbDevice(
                 _loggerFactory,

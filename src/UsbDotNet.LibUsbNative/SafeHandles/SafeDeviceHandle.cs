@@ -2,6 +2,7 @@
 using System.Runtime.InteropServices;
 using System.Text;
 using UsbDotNet.LibUsbNative.Enums;
+using UsbDotNet.LibUsbNative.Extensions;
 
 namespace UsbDotNet.LibUsbNative.SafeHandles;
 
@@ -54,8 +55,7 @@ internal sealed class SafeDeviceHandle : SafeHandle, ISafeDeviceHandle
     {
         return TryGetStringDescriptorAscii(index, out var value, out var error)
             ? value
-            : throw LibUsbException.FromApiError(
-                error.Value,
+            : throw error.Value.ToLibUsbExceptionForApi(
                 nameof(_context.Api.libusb_get_string_descriptor_ascii)
             );
     }
@@ -94,8 +94,7 @@ internal sealed class SafeDeviceHandle : SafeHandle, ISafeDeviceHandle
         SafeHelper.ThrowIfClosed(this);
 
         var result = _context.Api.libusb_claim_interface(handle, interfaceNumber);
-        LibUsbException.ThrowIfApiError(
-            result,
+        result.ThrowLibUsbExceptionForApi(
             nameof(_context.Api.libusb_claim_interface),
             $"Interface {interfaceNumber}."
         );
@@ -107,7 +106,7 @@ internal sealed class SafeDeviceHandle : SafeHandle, ISafeDeviceHandle
     {
         SafeHelper.ThrowIfClosed(this);
         var result = _context.Api.libusb_reset_device(handle);
-        LibUsbException.ThrowIfApiError(result, nameof(_context.Api.libusb_reset_device));
+        result.ThrowLibUsbExceptionForApi(nameof(_context.Api.libusb_reset_device));
     }
 
     /// <inheritdoc />
@@ -121,8 +120,7 @@ internal sealed class SafeDeviceHandle : SafeHandle, ISafeDeviceHandle
 
         var ptr = _context.Api.libusb_alloc_transfer(isoPackets);
         return ptr == IntPtr.Zero
-            ? throw new LibUsbException(
-                libusb_error.LIBUSB_ERROR_NO_MEM,
+            ? throw libusb_error.LIBUSB_ERROR_NO_MEM.ToLibUsbException(
                 $"LibUsbApi '{nameof(_context.Api.libusb_alloc_transfer)}' failed."
             )
             : (ISafeTransfer)new SafeTransfer(_context, ptr);

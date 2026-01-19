@@ -1,3 +1,4 @@
+using UsbDotNet.Core;
 using UsbDotNet.Descriptor;
 using UsbDotNet.LibUsbNative;
 using UsbDotNet.Transfer;
@@ -55,15 +56,13 @@ public sealed class Given_any_USB_device : IDisposable
     }
 
     [SkippableFact]
-    public void OpenDevice_throws_LibUsbException_given_invalid_device_key()
+    public void OpenDevice_throws_UsbException_given_invalid_device_key()
     {
         var invalidDeviceKey = UsbDeviceDescriptor.GetKey(0xFFFF, 0xFFFF, 255, 255);
         var act = () => _usb.OpenDevice(invalidDeviceKey);
         act.Should()
-            .Throw<LibUsbException>()
-            .WithMessage(
-                "Failed to get device from list. LIBUSB_ERROR_NOT_FOUND: Entity not found."
-            );
+            .Throw<UsbException>()
+            .WithMessage("Failed to get device from list; the device could not be found.");
     }
 
     [SkippableFact]
@@ -215,7 +214,7 @@ public sealed class Given_any_USB_device : IDisposable
         );
 
         using var scope = new AssertionScope();
-        result.Should().Be(LibUsbResult.Success);
+        result.Should().Be(UsbResult.Success);
 
         // USB Descriptor is always 18 bytes
         bytesRead.Should().Be(18);
@@ -253,7 +252,7 @@ public sealed class Given_any_USB_device : IDisposable
         );
         readResult
             .Should()
-            .Be(LibUsbResult.Success, "The write test can't continue when read is unsuccessful.");
+            .Be(UsbResult.Success, "The write test can't continue when read is unsuccessful.");
         bytesRead
             .Should()
             .Be(1, "The write test can't continue when an invalid number of bytes are read.");
@@ -270,7 +269,7 @@ public sealed class Given_any_USB_device : IDisposable
         );
 
         using var scope = new AssertionScope();
-        writeResult.Should().Be(LibUsbResult.Success);
+        writeResult.Should().Be(UsbResult.Success);
         // We did not provide a payload, expect zero bytes written
         bytesWritten.Should().Be(0);
     }

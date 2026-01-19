@@ -1,10 +1,11 @@
 using System.Diagnostics.CodeAnalysis;
 using System.Runtime.InteropServices;
 using Microsoft.Extensions.Logging;
+using UsbDotNet.Core;
 using UsbDotNet.Descriptor;
-using UsbDotNet.Internal;
 using UsbDotNet.Internal.Transfer;
 using UsbDotNet.LibUsbNative.Enums;
+using UsbDotNet.LibUsbNative.Extensions;
 using UsbDotNet.LibUsbNative.SafeHandles;
 
 namespace UsbDotNet;
@@ -113,7 +114,7 @@ public sealed class UsbInterface : IUsbInterface
     }
 
     /// <inheritdoc />
-    public LibUsbResult BulkRead(Span<byte> destination, out int bytesRead, int timeout)
+    public UsbResult BulkRead(Span<byte> destination, out int bytesRead, int timeout)
     {
         CheckTransferTimeout(timeout);
         _disposeLock.EnterReadLock(); // Use read lock for reads and writes, to support duplex
@@ -141,7 +142,7 @@ public sealed class UsbInterface : IUsbInterface
                 {
                     _bulkReadBuffer.AsSpan(0, bytesRead).CopyTo(destination);
                 }
-                return result.ToLibUsbResult();
+                return result.ToUsbResult();
             }
         }
         catch (ObjectDisposedException ex)
@@ -152,7 +153,7 @@ public sealed class UsbInterface : IUsbInterface
                 ex.Message
             );
             bytesRead = 0;
-            return LibUsbResult.Interrupted;
+            return UsbResult.Interrupted;
         }
         finally
         {
@@ -161,7 +162,7 @@ public sealed class UsbInterface : IUsbInterface
     }
 
     /// <inheritdoc />
-    public LibUsbResult BulkWrite(ReadOnlySpan<byte> source, out int bytesWritten, int timeout)
+    public UsbResult BulkWrite(ReadOnlySpan<byte> source, out int bytesWritten, int timeout)
     {
         CheckTransferTimeout(timeout);
         _disposeLock.EnterReadLock(); // Use read lock for reads and writes, to support duplex
@@ -187,7 +188,7 @@ public sealed class UsbInterface : IUsbInterface
                         out bytesWritten,
                         _disposeCts.Token
                     )
-                    .ToLibUsbResult();
+                    .ToUsbResult();
             }
         }
         catch (ObjectDisposedException ex)
@@ -198,7 +199,7 @@ public sealed class UsbInterface : IUsbInterface
                 ex.Message
             );
             bytesWritten = 0;
-            return LibUsbResult.Interrupted;
+            return UsbResult.Interrupted;
         }
         finally
         {
@@ -261,7 +262,7 @@ public sealed class UsbInterface : IUsbInterface
             _disposeLock.EnterWriteLock();
             try
             {
-                // Ask UsbDevice to close interface and remove it from list of open interfaces
+                // Ask UsbDevice to remove it from list of open interfaces
                 _device.ReleaseInterface(_descriptor.InterfaceNumber);
                 _claimedInterface.Dispose();
                 // Free read and write buffers

@@ -1,6 +1,7 @@
 ﻿using System.Diagnostics;
 using System.Runtime.InteropServices;
 using UsbDotNet.LibUsbNative.Enums;
+using UsbDotNet.LibUsbNative.Extensions;
 using UsbDotNet.LibUsbNative.SafeHandles;
 using UsbDotNet.LibUsbNative.Structs;
 
@@ -34,8 +35,7 @@ public class LibUsb : ILibUsb
         var p = _api.libusb_get_version();
         if (p == IntPtr.Zero)
         {
-            throw new LibUsbException(
-                libusb_error.LIBUSB_ERROR_OTHER,
+            throw libusb_error.LIBUSB_ERROR_OTHER.ToLibUsbException(
                 $"LibUsbApi '{nameof(_api.libusb_get_version)}' returned a null pointer."
             );
         }

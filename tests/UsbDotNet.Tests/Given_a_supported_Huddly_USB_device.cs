@@ -1,4 +1,5 @@
 ﻿using System.Text;
+using UsbDotNet.Core;
 using UsbDotNet.Descriptor;
 using UsbDotNet.LibUsbNative;
 
@@ -144,11 +145,11 @@ public sealed class Given_a_supported_Huddly_USB_device : IDisposable
         using var device = _deviceSource.OpenUsbDeviceOrSkip();
         using var usbInterface = device.ClaimInterface(UsbClass.VendorSpecific);
         // Send Huddly "reset"
-        usbInterface.BulkWrite([], 0, out _, 200).Should().Be(LibUsbResult.Success);
-        usbInterface.BulkWrite([], 0, out _, 200).Should().Be(LibUsbResult.Success);
+        usbInterface.BulkWrite([], 0, out _, 200).Should().Be(UsbResult.Success);
+        usbInterface.BulkWrite([], 0, out _, 200).Should().Be(UsbResult.Success);
         // Send Huddly "salute"
         var writeError = usbInterface.BulkWrite([0x00], 1, out var writeLength, 200);
-        writeError.Should().Be(LibUsbResult.Success);
+        writeError.Should().Be(UsbResult.Success);
         writeLength.Should().Be(1);
     }
 
@@ -163,18 +164,18 @@ public sealed class Given_a_supported_Huddly_USB_device : IDisposable
         using var device = _deviceSource.OpenUsbDeviceOrSkip();
         using var usbInterface = device.ClaimInterface(UsbClass.VendorSpecific);
         // Send Huddly "reset"
-        usbInterface.BulkWrite([], 0, out _, 200).Should().Be(LibUsbResult.Success);
-        usbInterface.BulkWrite([], 0, out _, 200).Should().Be(LibUsbResult.Success);
+        usbInterface.BulkWrite([], 0, out _, 200).Should().Be(UsbResult.Success);
+        usbInterface.BulkWrite([], 0, out _, 200).Should().Be(UsbResult.Success);
         // Send Huddly "salute"
         var writeError = usbInterface.BulkWrite([0x00], 1, out var writeLength, 200);
-        writeError.Should().Be(LibUsbResult.Success);
+        writeError.Should().Be(UsbResult.Success);
         writeLength.Should().Be(1);
         // Wait for salute response
         const string expectedSaluteResponse = "HLink v0";
         var expectedSaluteBytes = Encoding.UTF8.GetBytes(expectedSaluteResponse);
         var buffer = new byte[8];
         var readError = usbInterface.BulkRead(buffer, out var readLength, 1000);
-        readError.Should().Be(LibUsbResult.Success);
+        readError.Should().Be(UsbResult.Success);
         readLength.Should().Be(expectedSaluteBytes.Length);
         buffer.Should().BeEquivalentTo(expectedSaluteBytes);
     }

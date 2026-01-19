@@ -67,7 +67,7 @@ internal sealed class LibUsbEventLoop : IDisposable
                 {
                     _logger.LogWarning(
                         "LibUsb HandleEvents failed; exiting event loop: {ErrorMessage}.",
-                        result.GetString()
+                        result.GetMessage()
                     );
                     break;
                 }

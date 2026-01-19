@@ -1,4 +1,5 @@
 ﻿using System.Runtime.InteropServices;
+using UsbDotNet.LibUsbNative.Extensions;
 
 namespace UsbDotNet.LibUsbNative.SafeHandles;
 
@@ -31,8 +32,7 @@ internal sealed class SafeDeviceInterface : SafeHandle, ISafeDeviceInterface
             _deviceHandle.DangerousGetHandle(),
             _interfaceNumber
         );
-        LibUsbException.ThrowIfApiError(
-            result,
+        result.ThrowLibUsbExceptionForApi(
             nameof(_deviceHandle.Api.libusb_release_interface),
             $"Interface {_interfaceNumber}."
         );

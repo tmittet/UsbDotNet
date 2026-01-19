@@ -1,6 +1,6 @@
-namespace UsbDotNet;
+namespace UsbDotNet.Core;
 
-public enum LibUsbResult : int
+public enum UsbResult : int
 {
     Success = 0,
 

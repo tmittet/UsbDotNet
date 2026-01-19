@@ -1,3 +1,4 @@
+using UsbDotNet.Core;
 using UsbDotNet.Extensions.ControlTransfer;
 using UsbDotNet.LibUsbNative;
 using UsbDotNet.Transfer;
@@ -45,7 +46,7 @@ public sealed class Given_any_USB_device : IDisposable
         );
 
         using var scope = new AssertionScope();
-        result.Should().Be(LibUsbResult.Success);
+        result.Should().Be(UsbResult.Success);
 
         // USB Descriptor is always 18 bytes
         bytesRead.Should().Be(18);
@@ -78,7 +79,7 @@ public sealed class Given_any_USB_device : IDisposable
         );
         readResult
             .Should()
-            .Be(LibUsbResult.Success, "The write test can't continue when read is unsuccessful.");
+            .Be(UsbResult.Success, "The write test can't continue when read is unsuccessful.");
         bytesRead
             .Should()
             .Be(1, "The write test can't continue when an invalid number of bytes are read.");
@@ -93,7 +94,7 @@ public sealed class Given_any_USB_device : IDisposable
         );
 
         using var scope = new AssertionScope();
-        writeResult.Should().Be(LibUsbResult.Success);
+        writeResult.Should().Be(UsbResult.Success);
         // We did not provide a payload, expect zero bytes written
         bytesWritten.Should().Be(0);
     }

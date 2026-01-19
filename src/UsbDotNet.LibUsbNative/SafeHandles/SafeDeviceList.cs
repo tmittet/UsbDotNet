@@ -1,6 +1,7 @@
 ﻿using System.Collections;
 using System.Runtime.InteropServices;
 using UsbDotNet.LibUsbNative.Enums;
+using UsbDotNet.LibUsbNative.Extensions;
 
 namespace UsbDotNet.LibUsbNative.SafeHandles;
 
@@ -39,8 +40,7 @@ internal sealed class SafeDeviceList : SafeHandle, ISafeDeviceList
             context.DangerousAddRef(ref success);
             yield return success
                 ? new SafeDevice(context, Marshal.ReadIntPtr(handle, i * IntPtr.Size))
-                : throw LibUsbException.FromError(
-                    libusb_error.LIBUSB_ERROR_OTHER,
+                : throw libusb_error.LIBUSB_ERROR_OTHER.ToLibUsbException(
                     "Failed to ref SafeHandle."
                 );
         }

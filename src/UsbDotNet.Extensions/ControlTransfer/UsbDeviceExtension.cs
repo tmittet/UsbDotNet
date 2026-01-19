@@ -1,4 +1,5 @@
-﻿using UsbDotNet.Transfer;
+﻿using UsbDotNet.Core;
+using UsbDotNet.Transfer;
 
 namespace UsbDotNet.Extensions.ControlTransfer;
 
@@ -27,7 +28,7 @@ public static class UsbDeviceExtension
     /// Interrupted = The read operation was canceled.<br />
     /// NotSupported = The transfer flags are not supported by the operating system.<br />
     /// </returns>
-    public static LibUsbResult ControlRead(
+    public static UsbResult ControlRead(
         this IUsbDevice device,
         Span<byte> destination,
         out ushort bytesRead,
@@ -71,7 +72,7 @@ public static class UsbDeviceExtension
     /// Interrupted = The write operation was canceled.<br />
     /// NotSupported = The transfer flags are not supported by the operating system.<br />
     /// </returns>
-    public static LibUsbResult ControlWrite(
+    public static UsbResult ControlWrite(
         this IUsbDevice device,
         ReadOnlySpan<byte> source,
         out int bytesWritten,
