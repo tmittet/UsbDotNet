@@ -15,19 +15,22 @@
         NOTE: Do not update FluentAssertions beyond 7.x.x.
         FluentAssertions 8+ has a paid commercial license.
         -->
-        <PackageVersion Include="FluentAssertions" Version="7.1.0" />
+        <PackageVersion Include="FluentAssertions" Version="7.2.0" />
         <PackageVersion Include="FluentAssertions.Analyzers" Version="0.34.1" />
-        <PackageVersion Include="JunitXml.TestLogger" Version="6.1.0" />
-        <PackageVersion Include="Microsoft.NET.Test.Sdk" Version="17.12.0" />
+        <PackageVersion Include="JunitXml.TestLogger" Version="8.0.0" />
+        <PackageVersion Include="Microsoft.NET.Test.Sdk" Version="18.0.1" />
         <PackageVersion Include="xunit" Version="2.9.3" />
         <PackageVersion Include="xunit.core" Version="2.9.3" />
-        <PackageVersion Include="xunit.runner.visualstudio" Version="3.0.2" />
-        <PackageVersion Include="Xunit.SkippableFact" Version="1.5.23" />
+        <PackageVersion Include="xunit.runner.visualstudio" Version="3.1.5" />
+        <PackageVersion Include="Xunit.SkippableFact" Version="1.5.61" />
     </ItemGroup>
     <ItemGroup Condition="'$(TargetFramework)' == 'net6.0'">
         <PackageVersion Include="Microsoft.Extensions.Logging.Abstractions" Version="8.0.3" />
     </ItemGroup>
     <ItemGroup Condition="'$(TargetFramework)' == 'net8.0'">
-        <PackageVersion Include="Microsoft.Extensions.Logging.Abstractions" Version="9.0.4" />
+        <PackageVersion Include="Microsoft.Extensions.Logging.Abstractions" Version="10.0.2" />
+    </ItemGroup>
+    <ItemGroup Condition="'$(TargetFramework)' == 'net10.0'">
+        <PackageVersion Include="Microsoft.Extensions.Logging.Abstractions" Version="10.0.2" />
     </ItemGroup>
 </Project>

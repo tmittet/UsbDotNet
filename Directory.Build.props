@@ -1,0 +1,25 @@
+<Project>
+    <PropertyGroup>
+        <TargetFrameworks>net10.0;net8.0;net6.0</TargetFrameworks>
+        <Platforms>AnyCPU;x64;arm64</Platforms>
+        <RuntimeIdentifiers>linux-arm64;linux-x64;maccatalyst-arm64;maccatalyst-x64;osx-arm64;osx-x64;win-arm64;win-x64</RuntimeIdentifiers>
+        <Authors>Thomas Mittet</Authors>
+        <CurrentYear>2026</CurrentYear>
+        <Copyright>Copyright (c) $(CurrentYear) $(Authors)</Copyright>
+        <Version>0.0.1</Version>
+        <DebugType>portable</DebugType>
+        <EmbedUntrackedSources>true</EmbedUntrackedSources>
+        <ImplicitUsings>enable</ImplicitUsings>
+        <Nullable>enable</Nullable>
+        <PackageLicenseExpression>MIT</PackageLicenseExpression>
+        <PackageTags>USB;libusb;dotnet</PackageTags>
+        <PackageProjectUrl>https://github.com/tmittet/UsbDotNet</PackageProjectUrl>
+        <RepositoryUrl>https://github.com/tmittet/UsbDotNet</RepositoryUrl>
+        <PublishRepositoryUrl>true</PublishRepositoryUrl>
+        <EnableNETAnalyzers>true</EnableNETAnalyzers>
+        <AnalysisLevel>latest-recommended</AnalysisLevel>
+        <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
+        <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+        <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    </PropertyGroup>
+</Project>
