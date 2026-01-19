@@ -1,4 +1,4 @@
-<Project Sdk="Microsoft.NET.Sdk">
+﻿<Project Sdk="Microsoft.NET.Sdk">
     <PropertyGroup>
         <TargetFramework>net8.0</TargetFramework>
         <Platforms>AnyCPU;x64;arm64</Platforms>
@@ -12,6 +12,7 @@
         <Copyright>Copyright (c) $(CurrentYear) $(Authors)</Copyright>
         <EnableNETAnalyzers>true</EnableNETAnalyzers>
         <AnalysisLevel>latest-recommended</AnalysisLevel>
+        <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
         <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
         <UseXunitV3>false</UseXunitV3>
     </PropertyGroup>

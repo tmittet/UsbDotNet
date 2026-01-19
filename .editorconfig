@@ -242,3 +242,5 @@ dotnet_diagnostic.CA1805.severity = suggestion # Do not initialize unnecessarily
 dotnet_diagnostic.CA1848.severity = none # Use LoggerMessage Delegates
 dotnet_diagnostic.CS1591.severity = none # XML-Comment warnings
 dotnet_diagnostic.CS8524.severity = none # Missing default switch case. NOTE: Enabling this mutes CS8509
+
+dotnet_diagnostic.IDE0005.severity = warning # Unnecessary using directive

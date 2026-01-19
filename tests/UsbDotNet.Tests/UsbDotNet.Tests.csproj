@@ -12,6 +12,7 @@
         <Copyright>Copyright (c) $(CurrentYear) $(Authors)</Copyright>
         <EnableNETAnalyzers>true</EnableNETAnalyzers>
         <AnalysisLevel>latest-recommended</AnalysisLevel>
+        <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
         <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
         <UseXunitV3>false</UseXunitV3>
     </PropertyGroup>

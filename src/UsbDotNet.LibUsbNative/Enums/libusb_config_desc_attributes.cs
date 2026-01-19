@@ -1,4 +1,6 @@
-﻿using System.Text.Json.Serialization;
+﻿#if NET8_0_OR_GREATER
+using System.Text.Json.Serialization;
+#endif
 
 namespace UsbDotNet.LibUsbNative.Enums;
 
