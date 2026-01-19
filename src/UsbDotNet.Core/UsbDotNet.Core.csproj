@@ -3,6 +3,5 @@
         <RootNamespace>UsbDotNet.Core</RootNamespace>
         <PackageId>UsbDotNet.Core</PackageId>
         <Description>UsbDotNet core types</Description>
-        <GenerateDocumentationFile>true</GenerateDocumentationFile>
     </PropertyGroup>
 </Project>

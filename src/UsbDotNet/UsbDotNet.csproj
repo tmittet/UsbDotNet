@@ -3,7 +3,6 @@
         <RootNamespace>UsbDotNet</RootNamespace>
         <PackageId>UsbDotNet</PackageId>
         <Description>USB library for .NET</Description>
-        <GenerateDocumentationFile>true</GenerateDocumentationFile>
     </PropertyGroup>
     <ItemGroup>
         <InternalsVisibleTo Include="UsbDotNet.Tests" />

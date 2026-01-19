@@ -3,7 +3,6 @@
         <RootNamespace>UsbDotNet.Extensions</RootNamespace>
         <PackageId>UsbDotNet.Extensions</PackageId>
         <Description>UsbDotNet device class specific extensions</Description>
-        <GenerateDocumentationFile>true</GenerateDocumentationFile>
     </PropertyGroup>
     <ItemGroup>
         <InternalsVisibleTo Include="UsbDotNet.Tests" />

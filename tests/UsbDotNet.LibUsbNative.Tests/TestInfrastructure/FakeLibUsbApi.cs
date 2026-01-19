@@ -10,7 +10,7 @@ namespace UsbDotNet.LibUsbNative.Tests.TestInfrastructure;
 /// Enhanced in-memory fake of libusb for tests.
 /// Provides:
 /// - Deterministic mocked data for every API call
-/// - Realistic unmanaged allocations for device lists & configuration descriptors
+/// - Realistic unmanaged allocations for device lists and configuration descriptors
 /// - Error injection per API (first-in-first-consumed)
 /// - Proper unmanaged resource cleanup (IDisposable + finalizer)
 /// </summary>

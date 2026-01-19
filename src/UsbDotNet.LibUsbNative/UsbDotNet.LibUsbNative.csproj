@@ -5,6 +5,7 @@
         <RootNamespace>UsbDotNet.LibUsbNative</RootNamespace>
         <PackageId>UsbDotNet.LibUsbNative</PackageId>
         <Description>.NET wrapper for the libusb library</Description>
+        <NoWarn>$(NoWarn);1591</NoWarn>
     </PropertyGroup>
     <PropertyGroup Condition="'$(Configuration)' == 'Debug'">
         <EmitCompilerGeneratedFiles>true</EmitCompilerGeneratedFiles>
