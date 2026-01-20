@@ -11,6 +11,7 @@ on:
 permissions:
   contents: read
   checks: write
+  packages: write
 
 jobs:
   validate-code-style:
@@ -216,8 +217,8 @@ jobs:
         path: |
           out/nuget/UsbDotNet.*.nupkg
 
-  publish-to-nuget:
-    name: Publish NuGet packages
+  publish-to-github:
+    name: Publish NuGet packages to GitHub
     runs-on: ubuntu-latest
     needs: build
     if: github.event_name == 'release' && github.event.action == 'published'
@@ -236,16 +237,57 @@ jobs:
         name: usbdotnet-nuget-${{ github.run_id }}
         path: out/nuget
 
-    - name: Push packages to NuGet.org 📤
+    - name: Add GitHub packages source
+      run: |
+        dotnet nuget add source \
+          --username "${{ github.actor }}" \
+          --password "${{ secrets.GITHUB_TOKEN }}" \
+          --store-password-in-clear-text \
+          --name github_write_packages \
+          "https://nuget.pkg.github.com/tmittet/index.json"
+
+    - name: Push packages to github.com 📤
       shell: bash
-      env:
-        NUGET_API_KEY: ${{ secrets.USBDOTNET_NUGET_API_KEY }}
       run: |
         set -euo pipefail
         while IFS= read -r -d '' pkg; do
           echo "Pushing $pkg"
           dotnet nuget push "$pkg" \
-            --skip-duplicate \
-            --source "https://api.nuget.org/v3/index.json" \
-            --api-key "$NUGET_API_KEY"
+            --api-key "${{ secrets.GITHUB_TOKEN }}" \
+            --source github_write_packages \
+            --skip-duplicate
         done < <(find ./out/nuget -type f -name '*.nupkg' -print0)
+
+  # publish-to-nuget:
+  #   name: Publish NuGet packages to nuget.org
+  #   runs-on: ubuntu-latest
+  #   needs: build
+  #   if: github.event_name == 'release' && github.event.action == 'published'
+
+  #   steps:
+  #   - uses: actions/checkout@v4
+
+  #   - name: Setup .NET
+  #     uses: actions/setup-dotnet@v4
+  #     with:
+  #       global-json-file: ./global.json
+
+  #   - name: Download UsbDotNet NuGet packages 📥
+  #     uses: actions/download-artifact@v7
+  #     with:
+  #       name: usbdotnet-nuget-${{ github.run_id }}
+  #       path: out/nuget
+
+  #   - name: Push packages to nuget.org 📤
+  #     shell: bash
+  #     env:
+  #       NUGET_API_KEY: ${{ secrets.USBDOTNET_NUGET_API_KEY }}
+  #     run: |
+  #       set -euo pipefail
+  #       while IFS= read -r -d '' pkg; do
+  #         echo "Pushing $pkg"
+  #         dotnet nuget push "$pkg" \
+  #           --api-key "$NUGET_API_KEY" \
+  #           --source "nuget.org" \
+  #           --skip-duplicate
+  #       done < <(find ./out/nuget -type f -name '*.nupkg' -print0)
