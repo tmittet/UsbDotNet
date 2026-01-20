@@ -24,6 +24,9 @@
     </ItemGroup>
     <!-- Always include all native binaries; to support platform "Any CPU" -->
     <ItemGroup Label="Include Native Libraries">
+        <None Include="..\..\LICENSE.libusb" Pack="true" PackagePath="license/">
+            <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+        </None>
         <!-- linux-arm64 - NOTE: Rely on included libusb (apt-get) on Linux -->
         <!-- linux-x64 - NOTE: Rely on included libusb (apt-get) on Linux -->
         <!-- maccatalyst-arm64 - NOTE: Not tested -->
