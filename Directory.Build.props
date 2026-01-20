@@ -23,10 +23,10 @@
         <GenerateDocumentationFile>true</GenerateDocumentationFile>
     </PropertyGroup>
     <ItemGroup>
-        <None Include="..\..\LICENSE" Pack="true" PackagePath="license/">
+        <None Include="..\..\README.md" Pack="true" PackagePath="docs/">
             <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
         </None>
-        <None Include="..\..\README.md" Pack="true" PackagePath="license/">
+        <None Include="..\..\LICENSE" Pack="true" PackagePath="license/">
             <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
         </None>
     </ItemGroup>
