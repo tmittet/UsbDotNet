@@ -162,7 +162,7 @@ jobs:
         include_time_in_summary: true
 
     - name: Get Release Version
-      if: matrix.config.runtime == 'linux-x64' #&& github.event_name == 'release'
+      if: matrix.config.runtime == 'linux-x64' && github.event_name == 'release'
       id: get-version
       shell: bash
       run: |
@@ -186,7 +186,7 @@ jobs:
         echo "version=${file_version}" >> "$GITHUB_OUTPUT"
 
     - name: Pack NuGet packages 📦
-      if: matrix.config.runtime == 'linux-x64' #&& github.event_name == 'release'
+      if: matrix.config.runtime == 'linux-x64' && github.event_name == 'release'
       shell: bash
       run: |
         set -euo pipefail
@@ -209,7 +209,7 @@ jobs:
         )
 
     - name: Upload NuGet packages 📤
-      if: matrix.config.runtime == 'linux-x64' #&& github.event_name == 'release'
+      if: matrix.config.runtime == 'linux-x64' && github.event_name == 'release'
       uses: actions/upload-artifact@v6
       with:
         name: usbdotnet-nuget-${{ github.run_id }}
