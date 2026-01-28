@@ -38,20 +38,25 @@ internal sealed class SafeDeviceInterface : SafeHandle, ISafeDeviceInterface
             _deviceHandle.DangerousGetHandle(),
             _interfaceNumber
         );
-        // Throwing exceptions in ReleaseHandle is not allowed. Log error and return false.
-        if (result != libusb_error.LIBUSB_SUCCESS)
+        if (result == libusb_error.LIBUSB_SUCCESS)
         {
-            var logLevel =
-                result == libusb_error.LIBUSB_ERROR_NO_DEVICE
-                    ? libusb_log_level.LIBUSB_LOG_LEVEL_INFO
-                    : libusb_log_level.LIBUSB_LOG_LEVEL_WARNING;
-            Log(
-                logLevel,
-                $"LibUsbApi '{nameof(_deviceHandle.Api.libusb_release_interface)}' failed; "
-                    + $"interface {_interfaceNumber}. {result}: {result.GetMessage()}."
-            );
-            return result == libusb_error.LIBUSB_ERROR_NO_DEVICE;
+            return true;
         }
-        return true;
+        if (result == libusb_error.LIBUSB_ERROR_NO_DEVICE)
+        {
+            Log(
+                libusb_log_level.LIBUSB_LOG_LEVEL_INFO,
+                $"LibUsbApi '{nameof(_deviceHandle.Api.libusb_release_interface)}' returned result 'NO_DEVICE'; "
+                    + $"it may have been disconnected."
+            );
+            return true;
+        }
+        // Throwing exceptions in ReleaseHandle is not allowed. Log error and return false.
+        Log(
+            libusb_log_level.LIBUSB_LOG_LEVEL_WARNING,
+            $"LibUsbApi '{nameof(_deviceHandle.Api.libusb_release_interface)}' failed; "
+                + $"interface {_interfaceNumber}. {result}: {result.GetMessage()}."
+        );
+        return false;
     }
 }
