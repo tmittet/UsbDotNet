@@ -125,4 +125,9 @@ internal sealed class SafeDeviceHandle : SafeHandle, ISafeDeviceHandle
             )
             : (ISafeTransfer)new SafeTransfer(_context, ptr);
     }
+
+    /// <summary>
+    /// Attempt to log a message using the registered log handler; if there is one.
+    /// </summary>
+    internal void Log(libusb_log_level level, string message) => _context.Log(level, message);
 }

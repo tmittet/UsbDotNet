@@ -8,6 +8,7 @@ namespace UsbDotNet.LibUsbNative.SafeHandles;
 internal sealed class SafeContext : SafeHandle, ISafeContext
 {
     private int _logCallbackRegistered;
+    private Action<libusb_log_level, string>? _logHandler;
     private GCHandle? _logCallbackHandle;
 
     internal ILibUsbApi Api { get; init; }
@@ -78,12 +79,21 @@ internal sealed class SafeContext : SafeHandle, ISafeContext
         if (Interlocked.CompareExchange(ref _logCallbackRegistered, 1, 0) != 0)
             throw new InvalidOperationException("Log callback is already registered.");
 
-        var callback = new libusb_log_cb((_, level, message) => logHandler(level, message));
+        _logHandler = logHandler;
+        var callback = new libusb_log_cb((_, level, message) => _logHandler(level, message));
         _logCallbackHandle = GCHandle.Alloc(callback);
         SetOption(
             libusb_option.LIBUSB_OPTION_LOG_CB,
             Marshal.GetFunctionPointerForDelegate(callback)
         );
+    }
+
+    /// <summary>
+    /// Attempt to log a message using the registered log handler; if there is one.
+    /// </summary>
+    internal void Log(libusb_log_level level, string message)
+    {
+        _logHandler?.Invoke(level, message);
     }
 
     /// <inheritdoc />
