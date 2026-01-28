@@ -50,7 +50,7 @@ internal sealed class SafeDeviceInterface : SafeHandle, ISafeDeviceInterface
                 $"LibUsbApi '{nameof(_deviceHandle.Api.libusb_release_interface)}' failed; "
                     + $"interface {_interfaceNumber}. {result}: {result.GetMessage()}."
             );
-            return false;
+            return result == libusb_error.LIBUSB_ERROR_NO_DEVICE;
         }
         return true;
     }
