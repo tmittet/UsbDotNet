@@ -314,10 +314,8 @@ public sealed class Usb : IUsb
     /// <summary>
     /// Throw InvalidOperationException when the Usb type is not initialized.
     /// </summary>
-    private ISafeContext GetInitializedContextOrThrow()
-    {
-        return _context is null ? throw new InvalidOperationException("No context.") : _context;
-    }
+    private ISafeContext GetInitializedContextOrThrow() =>
+        _context is null ? throw new InvalidOperationException("No context.") : _context;
 
     /// <summary>
     /// Disposes this Usb context and closes associated devices that remain open. Ongoing

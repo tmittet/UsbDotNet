@@ -191,7 +191,7 @@ internal sealed class FakeLibusbApi : ILibUsbApi
     {
         if (MaybeFail(nameof(libusb_set_option), out var err) != libusb_error.LIBUSB_SUCCESS)
             return err;
-        _options[option] = (IntPtr)value;
+        _options[option] = value;
         return libusb_error.LIBUSB_SUCCESS;
     }
 

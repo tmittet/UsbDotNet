@@ -113,10 +113,12 @@ internal sealed class SafeDeviceHandle : SafeHandle, ISafeDeviceHandle
     public ISafeTransfer AllocateTransfer(int isoPackets = 0)
     {
         if (isoPackets < 0)
+        {
             throw new ArgumentOutOfRangeException(
                 nameof(isoPackets),
                 "Must be greater than or equal to zero."
             );
+        }
 
         var ptr = _context.Api.libusb_alloc_transfer(isoPackets);
         return ptr == IntPtr.Zero

@@ -117,9 +117,8 @@ public static class UsbDeviceExtension
     /// </summary>
     private static ImmutableDictionary<byte, IDictionary<byte, IUsbInterfaceDescriptor>> Regroup(
         this IEnumerable<IUsbInterfaceDescriptor> descriptors
-    )
-    {
-        return descriptors
+    ) =>
+        descriptors
             // Regroup by interface number
             .GroupBy(i => i.InterfaceNumber)
             // Create the nested dictionary
@@ -130,5 +129,4 @@ public static class UsbDeviceExtension
                         g.ToDictionary(i => i.AlternateSetting, i => i).ToImmutableDictionary()
             )
             .ToImmutableDictionary();
-    }
 }

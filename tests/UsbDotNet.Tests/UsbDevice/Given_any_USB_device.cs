@@ -66,9 +66,9 @@ public sealed class Given_any_USB_device : IDisposable
     [SkippableFact]
     public void ControlRead_returns_expected_descriptor_given_correct_Device_GetDescriptor_params()
     {
-        const byte GetDescriptorRequest = 0x06;
-        const byte DeviceDescriptorType = 0x01;
-        const ushort DescriptorIndex = 0x00;
+        const byte getDescriptorRequest = 0x06;
+        const byte deviceDescriptorType = 0x01;
+        const ushort descriptorIndex = 0x00;
 
         using var device = _deviceSource.OpenUsbDeviceOrSkip();
 
@@ -81,8 +81,8 @@ public sealed class Given_any_USB_device : IDisposable
             out var bytesRead,
             ControlRequestRecipient.Device,
             ControlRequestType.Standard,
-            GetDescriptorRequest,
-            (DeviceDescriptorType << 8) | DescriptorIndex,
+            getDescriptorRequest,
+            (deviceDescriptorType << 8) | descriptorIndex,
             0 // Always zero for Device, GetDescriptor
         );
 
@@ -107,8 +107,8 @@ public sealed class Given_any_USB_device : IDisposable
     [SkippableFact]
     public void ControlWrite_is_successful_given_params_to_set_current_Configuration()
     {
-        const byte GetConfigurationRequest = 0x08;
-        const byte SetConfigurationRequest = 0x09;
+        const byte getConfigurationRequest = 0x08;
+        const byte setConfigurationRequest = 0x09;
 
         using var device = _deviceSource.OpenUsbDeviceOrSkip();
 
@@ -119,7 +119,7 @@ public sealed class Given_any_USB_device : IDisposable
             out var bytesRead,
             ControlRequestRecipient.Device,
             ControlRequestType.Standard,
-            GetConfigurationRequest,
+            getConfigurationRequest,
             0, // Always zero for Device, GetConfigurationRequest
             0 // Always zero for Device, GetConfigurationRequest
         );
@@ -136,7 +136,7 @@ public sealed class Given_any_USB_device : IDisposable
             out var bytesWritten,
             ControlRequestRecipient.Device,
             ControlRequestType.Standard,
-            SetConfigurationRequest,
+            setConfigurationRequest,
             readBuffer[0],
             0 // Always zero for Device, SetConfigurationRequest
         );

@@ -28,8 +28,8 @@ public sealed class Given_any_USB_device : IDisposable
     [SkippableFact]
     public void ControlRead_returns_expected_descriptor_given_Standard_GetDescriptor_request()
     {
-        const byte DescriptorTypeDevice = 0x01;
-        const ushort DescriptorIndex = 0x00;
+        const byte descriptorTypeDevice = 0x01;
+        const ushort descriptorIndex = 0x00;
 
         using var device = _deviceSource.OpenUsbDeviceOrSkip();
 
@@ -42,7 +42,7 @@ public sealed class Given_any_USB_device : IDisposable
             out var bytesRead,
             ControlRequestRecipient.Device,
             StandardRequest.GetDescriptor,
-            (DescriptorTypeDevice << 8) | DescriptorIndex
+            (descriptorTypeDevice << 8) | descriptorIndex
         );
 
         using var scope = new AssertionScope();

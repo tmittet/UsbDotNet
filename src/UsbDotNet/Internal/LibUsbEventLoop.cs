@@ -63,7 +63,7 @@ internal sealed class LibUsbEventLoop : IDisposable
                 var result = _context.HandleEventsCompleted(_completedPtr);
                 // libusb_handle_events can return LIBUSB_ERROR_INTERRUPTED transiently;
                 // do not exit the loop on LIBUSB_ERROR_INTERRUPTED.
-                if (result != 0 && result != libusb_error.LIBUSB_ERROR_INTERRUPTED)
+                if (result is not 0 and not libusb_error.LIBUSB_ERROR_INTERRUPTED)
                 {
                     _logger.LogWarning(
                         "LibUsb HandleEvents failed; exiting event loop: {ErrorMessage}.",

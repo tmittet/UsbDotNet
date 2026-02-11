@@ -7,7 +7,6 @@ namespace UsbDotNet.LibUsbNative.SafeHandles;
 
 internal sealed class SafeDeviceList : SafeHandle, ISafeDeviceList
 {
-    private readonly int _count;
     private readonly Lazy<IReadOnlyList<SafeDevice>> _lazyDevices;
     private readonly SafeContext _context;
 
@@ -19,13 +18,15 @@ internal sealed class SafeDeviceList : SafeHandle, ISafeDeviceList
         if (listHandle == IntPtr.Zero)
             throw new ArgumentNullException(nameof(listHandle));
         if (count < 0)
+        {
             throw new ArgumentOutOfRangeException(
                 nameof(count),
                 "Must be greater than or equal to zero."
             );
+        }
 
         _context = context;
-        _count = count;
+        Count = count;
         handle = listHandle;
         _lazyDevices = new Lazy<IReadOnlyList<SafeDevice>>(() =>
             GetDevices(context, handle, count).ToArray()
@@ -48,14 +49,7 @@ internal sealed class SafeDeviceList : SafeHandle, ISafeDeviceList
 
     public ISafeDevice this[int index] => _lazyDevices.Value[index];
 
-    public int Count
-    {
-        get
-        {
-            SafeHelper.ThrowIfClosed(this);
-            return _count;
-        }
-    }
+    public int Count { get; }
 
     public IEnumerator<ISafeDevice> GetEnumerator()
     {
