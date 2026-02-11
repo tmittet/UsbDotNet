@@ -46,7 +46,7 @@ internal static class LibUsbTransfer
             {
                 var transfer = Marshal.PtrToStructure<libusb_transfer>(ptr);
                 Volatile.Write(ref transferStatus, (int)transfer.status);
-                Volatile.Write(ref transferLength, (int)transfer.actual_length);
+                Volatile.Write(ref transferLength, transfer.actual_length);
                 _ = transferCompleteEvent.Set();
             };
             callbackHandle = GCHandle.Alloc(nativeCallback);

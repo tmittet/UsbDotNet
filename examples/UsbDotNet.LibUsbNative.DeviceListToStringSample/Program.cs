@@ -30,7 +30,7 @@ foreach (var device in deviceList)
     idx++;
 }
 
-static class SamplePrinter
+internal static class SamplePrinter
 {
     public static void PrintDevice(ISafeDevice device)
     {
@@ -52,10 +52,10 @@ static class SamplePrinter
         }
 
         // Use existing descriptor helper
-        string tree = configs.Count == 0 ? devDesc.ToTreeString() : devDesc.ToTreeString(configs);
+        var tree = configs.Count == 0 ? devDesc.ToTreeString() : devDesc.ToTreeString(configs);
 
         // Remap indentation from internal 2-space steps to requested 4-space steps
-        string remapped = RemapIndent(tree);
+        var remapped = RemapIndent(tree);
         Console.WriteLine(remapped);
 
         // Read all referenced string descriptors
@@ -63,7 +63,7 @@ static class SamplePrinter
         {
             using var handle = device.Open();
             var sb = new StringBuilder();
-            bool any = false;
+            var any = false;
 
             void AddStringLine(string label, byte index, string extraContext = "")
             {
@@ -93,7 +93,7 @@ static class SamplePrinter
                     $"(bWOOPConfigurationValue={cfg.bConfigurationValue})"
                 );
                 // Interface + alt setting strings
-                for (int i = 0; i < cfg.interfaces.Count; i++)
+                for (var i = 0; i < cfg.interfaces.Count; i++)
                 {
                     var iface = cfg.interfaces[i];
                     foreach (var alt in iface.altsetting)
@@ -135,20 +135,20 @@ static class SamplePrinter
     private static string RemapIndent(string input)
     {
         var lines = input.Split(["\r\n", "\n"], StringSplitOptions.None);
-        for (int i = 0; i < lines.Length; i++)
+        for (var i = 0; i < lines.Length; i++)
         {
-            int count = 0;
+            var count = 0;
             while (count < lines[i].Length && lines[i][count] == ' ')
                 count++;
             if (count == 0)
                 continue;
-            int logicalLevels = count / 2; // original uses 2 spaces per logical level
+            var logicalLevels = count / 2; // original uses 2 spaces per logical level
             lines[i] = new string(' ', logicalLevels * 4) + lines[i][count..];
         }
         return string.Join(Environment.NewLine, lines);
     }
 
-    private static string Indent(int level) => new string(' ', level * 4);
+    private static string Indent(int level) => new(' ', level * 4);
 }
 
 /*

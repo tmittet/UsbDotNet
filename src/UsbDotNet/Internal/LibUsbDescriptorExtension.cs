@@ -44,7 +44,7 @@ internal static class LibUsbDescriptorExtension
             InterfaceProtocol: descriptor.bInterfaceProtocol,
             StringDescriptionIndex: descriptor.iInterface,
             ExtraBytes: descriptor.extra,
-            Endpoints: descriptor.endpoints.Select(e => e.ToUsbEndpointDescriptor()).ToList()
+            Endpoints: [.. descriptor.endpoints.Select(e => e.ToUsbEndpointDescriptor())]
         );
 
     internal static IUsbEndpointDescriptor ToUsbEndpointDescriptor(

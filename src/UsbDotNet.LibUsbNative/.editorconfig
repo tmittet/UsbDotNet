@@ -1,5 +1,5 @@
 # C# files
-[**/*.cs]
+[*.cs]
 
 dotnet_diagnostic.CA1707.severity = none # Identifiers should not contain underscores
 dotnet_diagnostic.CA1712.severity = none # Do not prefix enum values with type name

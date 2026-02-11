@@ -369,10 +369,7 @@ internal class RundownGuard : IDisposable
             _owner = owner;
         }
 
-        public void Dispose()
-        {
-            _owner.ReleaseShared();
-        }
+        public void Dispose() => _owner.ReleaseShared();
     }
 
     /// <summary>
@@ -387,9 +384,6 @@ internal class RundownGuard : IDisposable
             _owner = owner;
         }
 
-        public void Dispose()
-        {
-            _owner.ReleaseExclusive();
-        }
+        public void Dispose() => _owner.ReleaseExclusive();
     }
 }
