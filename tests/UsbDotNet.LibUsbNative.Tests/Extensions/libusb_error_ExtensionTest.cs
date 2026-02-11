@@ -1,4 +1,5 @@
 ﻿using System.Runtime.InteropServices;
+using UsbDotNet.Core;
 using UsbDotNet.LibUsbNative.Enums;
 using UsbDotNet.LibUsbNative.Extensions;
 
@@ -50,5 +51,28 @@ public class libusb_error_ExtensionTest
                 value.GetMessage().Should().Be(Marshal.PtrToStringAnsi(ptr));
             }
         }
+    }
+
+    [Fact]
+    public void ToUsbResult_successfully_maps_all_defined_libusb_error_enum_value_to_UsbResult()
+    {
+        foreach (var libUsbError in Enum.GetValues<libusb_error>())
+        {
+            var usbResult = libUsbError.ToUsbResult();
+            usbResult.Should().NotBe(UsbResult.UnknownError);
+        }
+    }
+
+    [Theory]
+    [InlineData(1337)]
+    [InlineData(123456789)]
+    [InlineData(0x7FFFFFFF)]
+    public void ToUsbResult_successfully_maps_undefined_libusb_error_enum_value_to_UsbResult(
+        int undefinedError
+    )
+    {
+        var libUsbError = (libusb_error)undefinedError;
+        var usbResult = libUsbError.ToUsbResult();
+        usbResult.Should().Be(UsbResult.UnknownError);
     }
 }
