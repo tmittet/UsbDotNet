@@ -15,7 +15,7 @@
         NOTE: Do not update FluentAssertions beyond 7.x.x.
         FluentAssertions 8+ has a paid commercial license.
         -->
-        <PackageVersion Include="FluentAssertions" Version="7.2.0" />
+        <PackageVersion Include="FluentAssertions" Version="7.2.1" />
         <PackageVersion Include="FluentAssertions.Analyzers" Version="0.34.1" />
         <PackageVersion Include="JunitXml.TestLogger" Version="8.0.0" />
         <PackageVersion Include="Microsoft.NET.Test.Sdk" Version="18.0.1" />
@@ -31,6 +31,6 @@
         <PackageVersion Include="Microsoft.Extensions.Logging.Abstractions" Version="10.0.2" />
     </ItemGroup>
     <ItemGroup Condition="'$(TargetFramework)' == 'net10.0'">
-        <PackageVersion Include="Microsoft.Extensions.Logging.Abstractions" Version="10.0.2" />
+        <PackageVersion Include="Microsoft.Extensions.Logging.Abstractions" Version="10.0.3" />
     </ItemGroup>
 </Project>
