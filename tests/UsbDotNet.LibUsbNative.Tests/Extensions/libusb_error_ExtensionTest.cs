@@ -67,7 +67,7 @@ public class libusb_error_ExtensionTest
     [InlineData(1337)]
     [InlineData(123456789)]
     [InlineData(0x7FFFFFFF)]
-    public void ToUsbResult_successfully_maps_undefined_libusb_error_enum_value_to_UsbResult(
+    public void ToUsbResult_successfully_maps_undefined_libusb_error_to_UsbResult_UnknownError(
         int undefinedError
     )
     {
