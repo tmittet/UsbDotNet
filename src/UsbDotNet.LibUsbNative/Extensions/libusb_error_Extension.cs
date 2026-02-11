@@ -51,6 +51,9 @@ public static class libusb_error_Extension
             libusb_error.LIBUSB_ERROR_NO_MEM => UsbResult.InsufficientMemory,
             libusb_error.LIBUSB_ERROR_NOT_SUPPORTED => UsbResult.NotSupported,
             libusb_error.LIBUSB_ERROR_OTHER => UsbResult.OtherError,
+            // Since we cast libusb_error to int, we can get values that are not defined
+            // in the enum (e.g. due to a native call returning an unexpected value)
+            _ => UsbResult.UnknownError,
         };
 
     internal static LibUsbException ToLibUsbException(this libusb_error error, string message)

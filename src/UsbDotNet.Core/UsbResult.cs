@@ -72,4 +72,9 @@ public enum UsbResult : int
     /// Other error (LIBUSB_ERROR_OTHER)
     /// </summary>
     OtherError = -99,
+
+    /// <summary>
+    /// Unknown error (catch-all for undefined libusb errors)
+    /// </summary>
+    UnknownError = 0x7FFFFFFF, // int.MaxValue
 }
