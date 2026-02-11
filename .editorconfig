@@ -238,6 +238,7 @@ dotnet_diagnostic.CA1707.severity = suggestion # Remove the underscore from type
 dotnet_diagnostic.CA1711.severity = suggestion # Identifiers should not have incorrect suffix
 dotnet_diagnostic.CA1716.severity = suggestion # Identifiers should not match keywords
 dotnet_diagnostic.CA1805.severity = suggestion # Do not initialize unnecessarily
+dotnet_diagnostic.CA1873.severity = suggestion # Avoid potentially expensive logging
 
 dotnet_diagnostic.CA1848.severity = none # Use LoggerMessage Delegates
 dotnet_diagnostic.CS1591.severity = none # XML-Comment warnings

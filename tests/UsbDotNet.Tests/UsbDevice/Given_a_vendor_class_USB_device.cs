@@ -1,7 +1,7 @@
 using UsbDotNet.Descriptor;
 using UsbDotNet.LibUsbNative;
 
-namespace UsbDotNet.Tests;
+namespace UsbDotNet.Tests.UsbDevice;
 
 [Trait("Category", "UsbVendorClassDevice")]
 public sealed class Given_a_vendor_class_USB_device : IDisposable
@@ -9,7 +9,7 @@ public sealed class Given_a_vendor_class_USB_device : IDisposable
     private readonly ILibUsb _libusb;
     private readonly ILoggerFactory _loggerFactory;
     private readonly ILogger<Given_a_vendor_class_USB_device> _logger;
-    private readonly Usb _usb;
+    private readonly UsbDotNet.Usb _usb;
     private readonly TestDeviceSource _deviceSource;
 
     public Given_a_vendor_class_USB_device(ITestOutputHelper output)
@@ -17,7 +17,7 @@ public sealed class Given_a_vendor_class_USB_device : IDisposable
         _libusb = new LibUsb();
         _loggerFactory = new TestLoggerFactory(output);
         _logger = _loggerFactory.CreateLogger<Given_a_vendor_class_USB_device>();
-        _usb = new Usb(_libusb, _loggerFactory);
+        _usb = new UsbDotNet.Usb(_libusb, _loggerFactory);
         try
         {
             _usb.Initialize(LogLevel.Information);
