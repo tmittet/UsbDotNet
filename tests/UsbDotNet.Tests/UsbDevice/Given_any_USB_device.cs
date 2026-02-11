@@ -105,7 +105,7 @@ public sealed class Given_any_USB_device : IDisposable
     }
 
     [SkippableFact]
-    public void ControlWrite_is_successfull_given_params_to_set_current_Configuration()
+    public void ControlWrite_is_successful_given_params_to_set_current_Configuration()
     {
         const byte GetConfigurationRequest = 0x08;
         const byte SetConfigurationRequest = 0x09;
