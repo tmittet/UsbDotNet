@@ -1,9 +1,8 @@
 using UsbDotNet.Core;
-using UsbDotNet.Extensions.ControlTransfer;
 using UsbDotNet.LibUsbNative;
 using UsbDotNet.Transfer;
 
-namespace UsbDotNet.Extensions.Tests.ControlTransfer;
+namespace UsbDotNet.Tests.UsbDevice;
 
 [Trait("Category", "UsbDevice")]
 public sealed class Given_any_USB_device : IDisposable
@@ -11,7 +10,7 @@ public sealed class Given_any_USB_device : IDisposable
     private readonly ILibUsb _libusb;
     private readonly ILoggerFactory _loggerFactory;
     private readonly ILogger<Given_any_USB_device> _logger;
-    private readonly Usb _usb;
+    private readonly UsbDotNet.Usb _usb;
     private readonly TestDeviceSource _deviceSource;
 
     public Given_any_USB_device(ITestOutputHelper output)
@@ -19,16 +18,56 @@ public sealed class Given_any_USB_device : IDisposable
         _libusb = new LibUsb();
         _loggerFactory = new TestLoggerFactory(output);
         _logger = _loggerFactory.CreateLogger<Given_any_USB_device>();
-        _usb = new Usb(_libusb, _loggerFactory);
-        _usb.Initialize(LogLevel.Information);
-        _deviceSource = new TestDeviceSource(_logger, _usb);
-        _deviceSource.SetPreferredVendorId(0x2BD9);
+        _usb = new UsbDotNet.Usb(_libusb, _loggerFactory);
+        try
+        {
+            _usb.Initialize(LogLevel.Information);
+            _deviceSource = new TestDeviceSource(_logger, _usb);
+            _deviceSource.SetPreferredVendorId(0x2BD9);
+        }
+        catch
+        {
+            _usb.Dispose();
+            throw;
+        }
     }
 
     [SkippableFact]
-    public void ControlRead_returns_expected_descriptor_given_Standard_GetDescriptor_request()
+    public void GetSerialNumber_returns_serial_given_an_open_device()
     {
-        const byte DescriptorTypeDevice = 0x01;
+        using var device = _deviceSource.OpenUsbDeviceOrSkip();
+        var serial = device.GetSerialNumber();
+        _logger.LogInformation(
+            "Device open: VID=0x{VID:X4}, PID=0x{PID:X4}, SerialNumber={SerialNumber}.",
+            device.Descriptor.VendorId,
+            device.Descriptor.ProductId,
+            serial
+        );
+        serial.Should().NotBeNullOrWhiteSpace();
+    }
+
+    [SkippableFact]
+    public void GetManufacturer_returns_manufacturer_given_an_open_device()
+    {
+        using var device = _deviceSource.OpenUsbDeviceOrSkip();
+        var manufacturer = device.GetManufacturer();
+        manufacturer.Should().NotBeNullOrEmpty();
+        _ = device.GetManufacturer();
+    }
+
+    [SkippableFact]
+    public void GetProductName_returns_product_name_given_an_open_device()
+    {
+        using var device = _deviceSource.OpenUsbDeviceOrSkip();
+        var productName = device.GetProduct();
+        productName.Should().NotBeNullOrWhiteSpace();
+    }
+
+    [SkippableFact]
+    public void ControlRead_returns_expected_descriptor_given_correct_Device_GetDescriptor_params()
+    {
+        const byte GetDescriptorRequest = 0x06;
+        const byte DeviceDescriptorType = 0x01;
         const ushort DescriptorIndex = 0x00;
 
         using var device = _deviceSource.OpenUsbDeviceOrSkip();
@@ -41,8 +80,10 @@ public sealed class Given_any_USB_device : IDisposable
             descriptorBuffer,
             out var bytesRead,
             ControlRequestRecipient.Device,
-            StandardRequest.GetDescriptor,
-            (DescriptorTypeDevice << 8) | DescriptorIndex
+            ControlRequestType.Standard,
+            GetDescriptorRequest,
+            (DeviceDescriptorType << 8) | DescriptorIndex,
+            0 // Always zero for Device, GetDescriptor
         );
 
         using var scope = new AssertionScope();
@@ -64,8 +105,11 @@ public sealed class Given_any_USB_device : IDisposable
     }
 
     [SkippableFact]
-    public void ControlWrite_is_successfull_given_Standard_SetConfiguration_request()
+    public void ControlWrite_is_successful_given_params_to_set_current_Configuration()
     {
+        const byte GetConfigurationRequest = 0x08;
+        const byte SetConfigurationRequest = 0x09;
+
         using var device = _deviceSource.OpenUsbDeviceOrSkip();
 
         // Start by getting current device configuration
@@ -74,8 +118,10 @@ public sealed class Given_any_USB_device : IDisposable
             readBuffer,
             out var bytesRead,
             ControlRequestRecipient.Device,
-            StandardRequest.GetConfiguration,
-            0
+            ControlRequestType.Standard,
+            GetConfigurationRequest,
+            0, // Always zero for Device, GetConfigurationRequest
+            0 // Always zero for Device, GetConfigurationRequest
         );
         readResult
             .Should()
@@ -89,8 +135,10 @@ public sealed class Given_any_USB_device : IDisposable
             [],
             out var bytesWritten,
             ControlRequestRecipient.Device,
-            StandardRequest.SetConfiguration,
-            readBuffer[0]
+            ControlRequestType.Standard,
+            SetConfigurationRequest,
+            readBuffer[0],
+            0 // Always zero for Device, SetConfigurationRequest
         );
 
         using var scope = new AssertionScope();
