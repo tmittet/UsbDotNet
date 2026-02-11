@@ -111,5 +111,6 @@ public sealed class Given_no_USB_device : IDisposable
     public void Dispose()
     {
         _loggerFactory.Dispose();
+        _loggerFactory.Dispose();
     }
 }

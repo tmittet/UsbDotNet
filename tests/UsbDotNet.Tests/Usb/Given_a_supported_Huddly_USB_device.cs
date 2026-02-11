@@ -73,5 +73,6 @@ public sealed class Given_a_supported_Huddly_USB_device : IDisposable
     public void Dispose()
     {
         _usb.Dispose();
+        _loggerFactory.Dispose();
     }
 }

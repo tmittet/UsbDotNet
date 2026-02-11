@@ -124,5 +124,6 @@ public sealed class Given_a_vendor_class_USB_device : IDisposable
     public void Dispose()
     {
         _usb.Dispose();
+        _loggerFactory.Dispose();
     }
 }
