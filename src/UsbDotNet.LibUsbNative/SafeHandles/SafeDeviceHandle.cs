@@ -15,7 +15,7 @@ internal sealed class SafeDeviceHandle : SafeHandle, ISafeDeviceHandle
 
     public override bool IsInvalid => handle == IntPtr.Zero;
 
-    /// <inheritdoc />
+    /// <inheritdoc/>
     public ISafeDevice Device
     {
         get
@@ -50,7 +50,7 @@ internal sealed class SafeDeviceHandle : SafeHandle, ISafeDeviceHandle
         return true;
     }
 
-    /// <inheritdoc />
+    /// <inheritdoc/>
     public string GetStringDescriptorAscii(byte index)
     {
         return TryGetStringDescriptorAscii(index, out var value, out var error)
@@ -60,7 +60,7 @@ internal sealed class SafeDeviceHandle : SafeHandle, ISafeDeviceHandle
             );
     }
 
-    /// <inheritdoc />
+    /// <inheritdoc/>
     public bool TryGetStringDescriptorAscii(
         byte index,
         [NotNullWhen(true)] out string? descriptorValue,
@@ -101,7 +101,7 @@ internal sealed class SafeDeviceHandle : SafeHandle, ISafeDeviceHandle
         return new SafeDeviceInterface(this, interfaceNumber);
     }
 
-    /// <inheritdoc />
+    /// <inheritdoc/>
     public void ResetDevice()
     {
         SafeHelper.ThrowIfClosed(this);
@@ -109,7 +109,7 @@ internal sealed class SafeDeviceHandle : SafeHandle, ISafeDeviceHandle
         result.ThrowLibUsbExceptionForApi(nameof(_context.Api.libusb_reset_device));
     }
 
-    /// <inheritdoc />
+    /// <inheritdoc/>
     public ISafeTransfer AllocateTransfer(int isoPackets = 0)
     {
         if (isoPackets < 0)

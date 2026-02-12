@@ -4,6 +4,11 @@ using UsbDotNet.Descriptor;
 
 namespace UsbDotNet;
 
+/// <summary>
+/// Main entry point for USB operations. Provides methods to initialize the USB library, enumerate
+/// USB devices or register hotplug events, and open USB devices. It implements IDisposable for
+/// proper cleanup of resources when the USB operations are no longer needed.
+/// </summary>
 public interface IUsb : IDisposable
 {
     /// <summary>

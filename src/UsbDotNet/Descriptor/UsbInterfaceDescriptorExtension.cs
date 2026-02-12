@@ -1,5 +1,8 @@
 namespace UsbDotNet.Descriptor;
 
+/// <summary>
+/// Extension methods for IUsbInterfaceDescriptor.
+/// </summary>
 public static class UsbInterfaceDescriptorExtension
 {
     /// <summary>

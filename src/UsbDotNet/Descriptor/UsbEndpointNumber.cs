@@ -1,5 +1,12 @@
 ﻿namespace UsbDotNet.Descriptor;
 
+/// <summary>
+/// USB endpoint number.
+/// <para>
+/// The endpoint number is a 4-bit value in the USB specification;
+/// it can only represent values from 0 to 15.
+/// </para>
+/// </summary>
 public enum UsbEndpointNumber : byte
 {
     Ep00 = 0,

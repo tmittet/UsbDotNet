@@ -4,6 +4,10 @@ using UsbDotNet.Transfer;
 
 namespace UsbDotNet;
 
+/// <summary>
+/// Represents a USB device. Provides access to device descriptors
+/// and methods to interact with the device and its interfaces.
+/// </summary>
 public interface IUsbDevice : IDisposable
 {
     /// <summary>

@@ -3,6 +3,9 @@ using UsbDotNet.Descriptor;
 
 namespace UsbDotNet;
 
+/// <summary>
+/// Extension methods for IUsb.
+/// </summary>
 public static class UsbExtension
 {
     /// <summary>

@@ -11,6 +11,7 @@ using UsbDotNet.LibUsbNative.SafeHandles;
 
 namespace UsbDotNet;
 
+/// <inheritdoc/>
 public sealed class Usb : IUsb
 {
     private static int _instances;
@@ -68,7 +69,7 @@ public sealed class Usb : IUsb
         }
     }
 
-    /// <inheritdoc />
+    /// <inheritdoc/>
     public void Initialize(LogLevel logLevel = LogLevel.Warning)
     {
         lock (_lock)
@@ -116,7 +117,7 @@ public sealed class Usb : IUsb
         }
     }
 
-    /// <inheritdoc />
+    /// <inheritdoc/>
     public bool RegisterHotplug(
         UsbClass? deviceClass = default,
         ushort? vendorId = default,
@@ -192,7 +193,7 @@ public sealed class Usb : IUsb
         return libusb_hotplug_return.REARM;
     }
 
-    /// <inheritdoc />
+    /// <inheritdoc/>
     public List<IUsbDeviceDescriptor> GetDeviceList(
         ushort? vendorId = default,
         HashSet<ushort>? productIds = default
@@ -210,7 +211,7 @@ public sealed class Usb : IUsb
         }
     }
 
-    /// <inheritdoc />
+    /// <inheritdoc/>
     public string GetDeviceSerial(string deviceKey)
     {
         lock (_lock)
@@ -226,7 +227,7 @@ public sealed class Usb : IUsb
         }
     }
 
-    /// <inheritdoc />
+    /// <inheritdoc/>
     public IUsbDevice OpenDevice(string deviceKey)
     {
         lock (_lock)

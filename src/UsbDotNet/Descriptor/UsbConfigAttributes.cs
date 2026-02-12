@@ -1,5 +1,8 @@
 namespace UsbDotNet.Descriptor;
 
+/// <summary>
+/// Specifies configuration attributes for a USB device configuration descriptor.
+/// </summary>
 [Flags]
 public enum UsbConfigAttributes : byte
 {

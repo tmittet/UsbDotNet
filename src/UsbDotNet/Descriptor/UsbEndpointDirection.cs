@@ -1,5 +1,8 @@
 namespace UsbDotNet.Descriptor;
 
+/// <summary>
+/// Specifies the direction of data flow for a USB endpoint.
+/// </summary>
 public enum UsbEndpointDirection
 {
     /// <summary>

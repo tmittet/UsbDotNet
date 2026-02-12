@@ -37,7 +37,7 @@ internal sealed class SafeContext : SafeHandle, ISafeContext
         return true;
     }
 
-    /// <inheritdoc />
+    /// <inheritdoc/>
     public void SetOption(libusb_option libusbOption, int value)
     {
         SafeHelper.ThrowIfClosed(this);
@@ -45,7 +45,7 @@ internal sealed class SafeContext : SafeHandle, ISafeContext
         result.ThrowLibUsbExceptionForApi(nameof(Api.libusb_set_option));
     }
 
-    /// <inheritdoc />
+    /// <inheritdoc/>
     public void SetOption(libusb_option libusbOption, nint value)
     {
         SafeHelper.ThrowIfClosed(this);
@@ -53,7 +53,7 @@ internal sealed class SafeContext : SafeHandle, ISafeContext
         result.ThrowLibUsbExceptionForApi(nameof(Api.libusb_set_option));
     }
 
-    /// <inheritdoc />
+    /// <inheritdoc/>
     public libusb_error HandleEventsCompleted(nint completedPtr)
     {
         SafeHelper.ThrowIfClosed(this);
@@ -63,14 +63,14 @@ internal sealed class SafeContext : SafeHandle, ISafeContext
             : Api.libusb_handle_events_completed(handle, completedPtr);
     }
 
-    /// <inheritdoc />
+    /// <inheritdoc/>
     public void InterruptEventHandler()
     {
         SafeHelper.ThrowIfClosed(this);
         Api.libusb_interrupt_event_handler(handle);
     }
 
-    /// <inheritdoc />
+    /// <inheritdoc/>
     public void RegisterLogCallback(Action<libusb_log_level, string> logHandler)
     {
         SafeHelper.ThrowIfClosed(this);
@@ -96,7 +96,7 @@ internal sealed class SafeContext : SafeHandle, ISafeContext
         _logHandler?.Invoke(level, message);
     }
 
-    /// <inheritdoc />
+    /// <inheritdoc/>
     public ISafeCallbackHandle RegisterHotplugCallback(
         libusb_hotplug_event events,
         libusb_hotplug_flag flags,
@@ -115,7 +115,7 @@ internal sealed class SafeContext : SafeHandle, ISafeContext
             productId
         );
 
-    /// <inheritdoc />
+    /// <inheritdoc/>
     public ISafeCallbackHandle RegisterHotplugCallback(
         libusb_hotplug_event events,
         libusb_hotplug_flag flags,
@@ -215,7 +215,7 @@ internal sealed class SafeContext : SafeHandle, ISafeContext
         }
     }
 
-    /// <inheritdoc />
+    /// <inheritdoc/>
     public ISafeDeviceList GetDeviceList()
     {
         SafeHelper.ThrowIfClosed(this);

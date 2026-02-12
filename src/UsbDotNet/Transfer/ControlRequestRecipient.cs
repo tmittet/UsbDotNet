@@ -1,5 +1,8 @@
 ﻿namespace UsbDotNet.Transfer;
 
+/// <summary>
+/// Defines the recipient of a control request, as specified in the USB standard.
+/// </summary>
 public enum ControlRequestRecipient : byte
 {
     /// <summary>

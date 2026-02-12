@@ -1,5 +1,14 @@
 ﻿namespace UsbDotNet.Descriptor;
 
+/// <summary>
+/// Represents a USB endpoint address, including its direction and endpoint number,
+/// as specified in a USB endpoint descriptor.
+/// </summary>
+/// <remarks>
+/// The USB endpoint address is an 8-bit value defined by the USB specification, where the lower
+/// four bits indicate the endpoint number and the most significant bit indicates the direction.
+/// This class provides convenient access to these components.
+/// </remarks>
 public class UsbEndpointAddress(byte rawValue)
 {
     /// <summary>
@@ -18,5 +27,6 @@ public class UsbEndpointAddress(byte rawValue)
     /// </summary>
     public byte RawValue { get; } = rawValue;
 
+    /// <inheritdoc/>
     public override string ToString() => $"{Direction} {Number} (0x{RawValue:X2})";
 }
