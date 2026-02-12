@@ -1,5 +1,16 @@
 namespace UsbDotNet.Descriptor;
 
+/// <summary>
+/// Represents a USB interface descriptor, providing information about
+/// a specific interface within a USB device configuration.
+/// </summary>
+/// <remarks>
+/// This interface exposes properties that correspond to the standard USB interface descriptor
+/// fields, including interface number, alternate setting, class, subclass, protocol, and associated
+/// endpoints. Implementations typically reflect the structure defined by the USB specification. Use
+/// this interface to query interface-level metadata and endpoint information when enumerating or
+/// interacting with USB devices.
+/// </remarks>
 public interface IUsbInterfaceDescriptor
 {
     /// <summary>

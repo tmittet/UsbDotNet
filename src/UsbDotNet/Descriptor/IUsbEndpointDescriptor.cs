@@ -1,5 +1,17 @@
 namespace UsbDotNet.Descriptor;
 
+/// <summary>
+/// Represents a USB endpoint descriptor, providing information about the endpoint's address,
+/// attributes, packet size, polling interval, and additional configuration data as defined by the
+/// USB specification.
+/// </summary>
+/// <remarks>
+/// This interface exposes properties corresponding to fields in a USB endpoint descriptor,
+/// including support for audio-specific fields such as refresh and synchronization address.
+/// Implementations provide access to endpoint configuration details required for USB device
+/// communication and setup. Refer to the USB specification for interpretation of individual fields
+/// and their valid values.
+/// </remarks>
 public interface IUsbEndpointDescriptor
 {
     /// <summary>

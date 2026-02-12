@@ -12,5 +12,6 @@ public record struct UsbInterfaceDescriptor(
     List<IUsbEndpointDescriptor> Endpoints
 ) : IUsbInterfaceDescriptor
 {
+    /// <inheritdoc/>
     public override readonly string ToString() => $"{InterfaceClass} #{InterfaceNumber}";
 }

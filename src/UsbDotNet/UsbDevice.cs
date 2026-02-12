@@ -12,6 +12,7 @@ using UsbDotNet.Transfer;
 
 namespace UsbDotNet;
 
+/// <inheritdoc/>
 public sealed class UsbDevice : IUsbDevice
 {
     private const byte ControlRequestEndpointAddress = 0x00;
@@ -30,10 +31,10 @@ public sealed class UsbDevice : IUsbDevice
 
     internal ISafeDeviceHandle Handle { get; init; }
 
-    /// <inheritdoc />
+    /// <inheritdoc/>
     public IUsbDeviceDescriptor Descriptor => _descriptor;
 
-    /// <inheritdoc />
+    /// <inheritdoc/>
     public IUsbConfigDescriptor ConfigDescriptor { get; init; }
 
     internal UsbDevice(
@@ -54,13 +55,13 @@ public sealed class UsbDevice : IUsbDevice
         ConfigDescriptor = configDescriptor;
     }
 
-    /// <inheritdoc />
+    /// <inheritdoc/>
     public string GetManufacturer() => ReadStringDescriptorCached(_descriptor.ManufacturerIndex);
 
-    /// <inheritdoc />
+    /// <inheritdoc/>
     public string GetProduct() => ReadStringDescriptorCached(_descriptor.ProductIndex);
 
-    /// <inheritdoc />
+    /// <inheritdoc/>
     public string GetSerialNumber() => ReadStringDescriptorCached(_descriptor.SerialNumberIndex);
 
     private string ReadStringDescriptorCached(byte descriptorIndex)
@@ -88,14 +89,14 @@ public sealed class UsbDevice : IUsbDevice
         }
     }
 
-    /// <inheritdoc />
+    /// <inheritdoc/>
     public string ReadStringDescriptor(byte descriptorIndex)
     {
         using var token = _rundownGuard.AcquireSharedToken();
         return Handle.GetStringDescriptorAscii(descriptorIndex);
     }
 
-    /// <inheritdoc />
+    /// <inheritdoc/>
     public UsbResult ControlRead(
         Span<byte> destination,
         out ushort bytesRead,
@@ -155,7 +156,7 @@ public sealed class UsbDevice : IUsbDevice
         }
     }
 
-    /// <inheritdoc />
+    /// <inheritdoc/>
     public UsbResult ControlWrite(
         ReadOnlySpan<byte> source,
         out int bytesWritten,
@@ -214,7 +215,7 @@ public sealed class UsbDevice : IUsbDevice
         }
     }
 
-    /// <inheritdoc />
+    /// <inheritdoc/>
     public IUsbInterface ClaimInterface(IUsbInterfaceDescriptor descriptor)
     {
         using var token = _rundownGuard.AcquireExclusiveToken();
@@ -271,13 +272,14 @@ public sealed class UsbDevice : IUsbDevice
         }
     }
 
-    /// <inheritdoc />
+    /// <inheritdoc/>
     public void Reset()
     {
         using var token = _rundownGuard.AcquireExclusiveToken();
         Handle.ResetDevice();
     }
 
+    /// <inheritdoc/>
     public override string ToString() => _descriptor.DeviceKey;
 
     /// <summary>

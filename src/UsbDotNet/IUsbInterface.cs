@@ -4,6 +4,9 @@ using UsbDotNet.Descriptor;
 
 namespace UsbDotNet;
 
+/// <summary>
+/// Represents a USB interface, providing methods for accessing endpoints and performing IO.
+/// </summary>
 public interface IUsbInterface : IDisposable
 {
     /// <summary>

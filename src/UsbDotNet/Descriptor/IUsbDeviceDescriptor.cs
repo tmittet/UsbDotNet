@@ -1,5 +1,18 @@
 namespace UsbDotNet.Descriptor;
 
+/// <summary>
+/// Provides a read-only descriptor for a USB device, exposing identifying information,
+/// configuration details, and connection parameters as defined by the USB specification.
+/// </summary>
+/// <remarks>
+/// This interface supplies properties that represent standard USB device descriptor fields,
+/// including vendor and product IDs, device class codes, and connection-specific information such
+/// as bus and port numbers. Implementations may use these properties to uniquely identify devices,
+/// query their capabilities, or enumerate connected USB devices. The values correspond to those
+/// defined in the USB specification and may be used for device matching or configuration purposes.
+/// Port and bus numbering may vary between host controllers and is not guaranteed to be stable
+/// across sessions or hardware changes.
+/// </remarks>
 public interface IUsbDeviceDescriptor
 {
     /// <summary>

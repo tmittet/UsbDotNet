@@ -10,6 +10,7 @@ using UsbDotNet.LibUsbNative.SafeHandles;
 
 namespace UsbDotNet;
 
+/// <inheritdoc/>
 public sealed class UsbInterface : IUsbInterface
 {
     // These buffers should be a multiple of the USB endpoint MaxPacketSize.
@@ -34,7 +35,7 @@ public sealed class UsbInterface : IUsbInterface
     private readonly CancellationTokenSource _disposeCts;
     private volatile bool _disposed;
 
-    /// <inheritdoc />
+    /// <inheritdoc/>
     public byte Number => _descriptor.InterfaceNumber;
 
     /// <summary>
@@ -83,7 +84,7 @@ public sealed class UsbInterface : IUsbInterface
         _disposeCts = new CancellationTokenSource();
     }
 
-    /// <inheritdoc />
+    /// <inheritdoc/>
     public bool TryGetInputEndpoint([NotNullWhen(true)] out IUsbEndpointDescriptor? endpoint)
     {
         try
@@ -98,7 +99,7 @@ public sealed class UsbInterface : IUsbInterface
         }
     }
 
-    /// <inheritdoc />
+    /// <inheritdoc/>
     public bool TryGetOutputEndpoint([NotNullWhen(true)] out IUsbEndpointDescriptor? endpoint)
     {
         try
@@ -113,7 +114,7 @@ public sealed class UsbInterface : IUsbInterface
         }
     }
 
-    /// <inheritdoc />
+    /// <inheritdoc/>
     public UsbResult BulkRead(Span<byte> destination, out int bytesRead, int timeout)
     {
         CheckTransferTimeout(timeout);
@@ -161,7 +162,7 @@ public sealed class UsbInterface : IUsbInterface
         }
     }
 
-    /// <inheritdoc />
+    /// <inheritdoc/>
     public UsbResult BulkWrite(ReadOnlySpan<byte> source, out int bytesWritten, int timeout)
     {
         CheckTransferTimeout(timeout);
@@ -207,6 +208,7 @@ public sealed class UsbInterface : IUsbInterface
         }
     }
 
+    /// <inheritdoc/>
     public override string ToString() =>
         $"{_descriptor.InterfaceClass} #{_descriptor.InterfaceNumber}";
 

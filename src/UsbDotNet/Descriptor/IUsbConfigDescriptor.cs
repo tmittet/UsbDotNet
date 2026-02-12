@@ -1,5 +1,17 @@
 namespace UsbDotNet.Descriptor;
 
+/// <summary>
+/// Represents a USB configuration descriptor, providing access to configuration-specific
+/// attributes, power requirements, and interface descriptors for a USB device.
+/// </summary>
+/// <remarks>
+/// This interface exposes information about a USB device's configuration as defined by the USB
+/// specification. It includes properties for identifying the configuration, describing its
+/// characteristics, and enumerating its interfaces and alternate settings. Implementations
+/// typically correspond to a single configuration within a USB device, which may support multiple
+/// configurations. The interface does not modify device state and is intended for querying
+/// descriptor information.
+/// </remarks>
 public interface IUsbConfigDescriptor
 {
     /// <summary>

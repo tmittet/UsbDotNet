@@ -34,7 +34,7 @@ internal sealed class SafeDevice : SafeHandle, ISafeDevice
         return true;
     }
 
-    /// <inheritdoc />
+    /// <inheritdoc/>
     public libusb_device_descriptor GetDeviceDescriptor()
     {
         SafeHelper.ThrowIfClosed(this);
@@ -45,7 +45,7 @@ internal sealed class SafeDevice : SafeHandle, ISafeDevice
         return descriptor;
     }
 
-    /// <inheritdoc />
+    /// <inheritdoc/>
     public libusb_config_descriptor GetActiveConfigDescriptor()
     {
         SafeHelper.ThrowIfClosed(this);
@@ -62,7 +62,7 @@ internal sealed class SafeDevice : SafeHandle, ISafeDevice
         }
     }
 
-    /// <inheritdoc />
+    /// <inheritdoc/>
     public libusb_config_descriptor GetConfigDescriptor(byte config_index)
     {
         SafeHelper.ThrowIfClosed(this);
@@ -83,28 +83,28 @@ internal sealed class SafeDevice : SafeHandle, ISafeDevice
         }
     }
 
-    /// <inheritdoc />
+    /// <inheritdoc/>
     public byte GetBusNumber()
     {
         SafeHelper.ThrowIfClosed(this);
         return _context.Api.libusb_get_bus_number(handle);
     }
 
-    /// <inheritdoc />
+    /// <inheritdoc/>
     public byte GetDeviceAddress()
     {
         SafeHelper.ThrowIfClosed(this);
         return _context.Api.libusb_get_device_address(handle);
     }
 
-    /// <inheritdoc />
+    /// <inheritdoc/>
     public byte GetPortNumber()
     {
         SafeHelper.ThrowIfClosed(this);
         return _context.Api.libusb_get_port_number(handle);
     }
 
-    /// <inheritdoc />
+    /// <inheritdoc/>
     public ISafeDeviceHandle Open()
     {
         SafeHelper.ThrowIfClosed(this);

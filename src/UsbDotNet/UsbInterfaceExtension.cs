@@ -2,8 +2,19 @@
 
 namespace UsbDotNet;
 
+/// <summary>
+/// Extension methods for IUsbInterface.
+/// </summary>
 public static class UsbInterfaceExtension
 {
+    /// <summary>
+    /// Performs a bulk read operation on the specified USB interface, reading data into the
+    /// provided byte array.
+    /// <para>
+    /// NOTE: Consider using the Span-based BulkRead method for improved performance and reduced
+    /// memory allocations.
+    /// </para>
+    /// </summary>
     public static UsbResult BulkRead(
         this IUsbInterface usbInterface,
         byte[] destination,
@@ -11,6 +22,14 @@ public static class UsbInterfaceExtension
         int timeout = Timeout.Infinite
     ) => usbInterface.BulkRead(destination.AsSpan(), out bytesRead, timeout);
 
+    /// <summary>
+    /// Performs a bulk write operation on the specified USB interface, writing data from the
+    /// provided byte array.
+    /// <para>
+    /// NOTE: Consider using the Span-based BulkWrite method for improved performance and reduced
+    /// memory allocations.
+    /// </para>
+    /// </summary>
     public static UsbResult BulkWrite(
         this IUsbInterface usbInterface,
         byte[] source,
