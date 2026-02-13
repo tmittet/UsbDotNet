@@ -9,4 +9,16 @@ public class UsbException : Exception
     {
         Code = code;
     }
+
+    public UsbException()
+        : this(null) { }
+
+    public UsbException(string? message)
+        : this(message, null) { }
+
+    public UsbException(string? message, Exception? innerException)
+        : base(message, innerException)
+    {
+        Code = UsbResult.UnknownError;
+    }
 }

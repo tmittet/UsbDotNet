@@ -1,4 +1,5 @@
-﻿using Microsoft.Extensions.Logging;
+﻿using System.Collections.Immutable;
+using Microsoft.Extensions.Logging;
 using UsbDotNet.Core;
 using UsbDotNet.Descriptor;
 using UsbDotNet.LibUsbNative.SafeHandles;
@@ -16,7 +17,7 @@ internal static class UsbDeviceEnum
     /// <param name="productIds">Optional product ID filter; only return matching devices.</param>
     /// <exception cref="ObjectDisposedException">Thrown when context is disposed.</exception>
     /// <exception cref="UsbException">Thrown when the get device list operation fails.</exception>
-    internal static List<IUsbDeviceDescriptor> GetDeviceList(
+    internal static IReadOnlyCollection<IUsbDeviceDescriptor> GetDeviceList(
         ILogger logger,
         ISafeContext libusbContext,
         ushort? vendorId,
@@ -32,7 +33,7 @@ internal static class UsbDeviceEnum
                 && (productIds is null || productIds.Contains(d.ProductId))
             )
             .Cast<IUsbDeviceDescriptor>()
-            .ToList();
+            .ToImmutableList();
     }
 
     /// <summary>

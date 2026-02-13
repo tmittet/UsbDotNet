@@ -52,5 +52,5 @@ public interface IUsbInterfaceDescriptor
     /// <summary>
     /// A list of endpoints.
     /// </summary>
-    List<IUsbEndpointDescriptor> Endpoints { get; }
+    IReadOnlyCollection<IUsbEndpointDescriptor> Endpoints { get; }
 }

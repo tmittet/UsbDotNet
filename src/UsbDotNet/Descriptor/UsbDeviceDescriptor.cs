@@ -1,7 +1,7 @@
 namespace UsbDotNet.Descriptor;
 
 /// <inheritdoc/>
-public readonly struct UsbDeviceDescriptor : IUsbDeviceDescriptor
+public readonly record struct UsbDeviceDescriptor : IUsbDeviceDescriptor
 {
     /// <inheritdoc/>
     public string DeviceKey { get; init; }

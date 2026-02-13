@@ -194,7 +194,7 @@ public sealed class Usb : IUsb
     }
 
     /// <inheritdoc/>
-    public List<IUsbDeviceDescriptor> GetDeviceList(
+    public IReadOnlyCollection<IUsbDeviceDescriptor> GetDeviceList(
         ushort? vendorId = default,
         HashSet<ushort>? productIds = default
     )

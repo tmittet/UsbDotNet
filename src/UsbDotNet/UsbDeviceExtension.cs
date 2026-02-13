@@ -59,7 +59,7 @@ public static class UsbDeviceExtension
     /// <param name="withSubClass">Optional interface sub-class filter.</param>
     /// <param name="withProtocol">Optional interface protocol filter.</param>
     /// <returns>A list of matching interface descriptors.</returns>
-    public static List<IUsbInterfaceDescriptor> GetInterfaceDescriptorList(
+    public static IReadOnlyCollection<IUsbInterfaceDescriptor> GetInterfaceDescriptorList(
         this IUsbDevice device,
         UsbClass withClass,
         byte? withSubClass = null,
@@ -74,7 +74,7 @@ public static class UsbDeviceExtension
                 && (withSubClass is null || i.InterfaceSubClass == withSubClass.Value)
                 && (withProtocol is null || i.InterfaceProtocol == withProtocol.Value)
             )
-            .ToList();
+            .ToImmutableList();
 
     /// <summary>
     /// Get interface descriptors matching given parameters.

@@ -1,7 +1,7 @@
 namespace UsbDotNet.Descriptor;
 
 /// <inheritdoc/>
-public record struct UsbConfigDescriptor(
+public readonly record struct UsbConfigDescriptor(
     byte ConfigId,
     byte StringDescriptionIndex,
     UsbConfigAttributes Attributes,

@@ -1,7 +1,7 @@
 namespace UsbDotNet.Descriptor;
 
 /// <inheritdoc/>
-public record struct UsbEndpointDescriptor(
+public readonly record struct UsbEndpointDescriptor(
     UsbEndpointAddress EndpointAddress,
     UsbEndpointAttributes Attributes,
     ushort MaxPacketSize,

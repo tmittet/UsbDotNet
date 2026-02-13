@@ -1,6 +1,13 @@
 # C# files
 [*.cs]
 
+dotnet_diagnostic.CA1008.severity = suggestion # Enums should have zero value
+# TODO: Look into hardening this
+dotnet_diagnostic.CA5392.severity = suggestion # Use DefaultDllImportSearchPaths attribute for P/Invokes
+dotnet_diagnostic.CA1027.severity = suggestion # CA1027: Mark enums with FlagsAttribute
+
+dotnet_diagnostic.CA1028.severity = none # Enum storage should be Int32
+dotnet_diagnostic.CA1700.severity = none # Do not name enum values 'Reserved'
 dotnet_diagnostic.CA1707.severity = none # Identifiers should not contain underscores
 dotnet_diagnostic.CA1712.severity = none # Do not prefix enum values with type name
 dotnet_diagnostic.IDE1006.severity = none # Naming Styles
