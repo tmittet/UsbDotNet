@@ -1,7 +1,7 @@
 namespace UsbDotNet.Descriptor;
 
 /// <inheritdoc/>
-public record struct UsbInterfaceDescriptor(
+public readonly record struct UsbInterfaceDescriptor(
     byte InterfaceNumber,
     byte AlternateSetting,
     UsbClass InterfaceClass,
@@ -9,7 +9,7 @@ public record struct UsbInterfaceDescriptor(
     byte InterfaceProtocol,
     byte StringDescriptionIndex,
     byte[] ExtraBytes,
-    List<IUsbEndpointDescriptor> Endpoints
+    IReadOnlyCollection<IUsbEndpointDescriptor> Endpoints
 ) : IUsbInterfaceDescriptor
 {
     /// <inheritdoc/>

@@ -18,7 +18,7 @@ public static class UsbExtension
     /// <exception cref="UsbException">Thrown when the get device list operation fails.</exception>
     /// <exception cref="ObjectDisposedException">Thrown when the Usb type is disposed.</exception>
     /// <exception cref="InvalidOperationException">Thrown when the Usb type is not initialized.</exception>
-    public static List<IUsbDeviceDescriptor> GetDeviceList(
+    public static IReadOnlyCollection<IUsbDeviceDescriptor> GetDeviceList(
         this IUsb usb,
         ushort? vendorId = default,
         params ushort[] productId

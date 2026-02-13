@@ -13,4 +13,16 @@ public class LibUsbException : UsbException
     {
         Error = error;
     }
+
+    public LibUsbException()
+        : this(null) { }
+
+    public LibUsbException(string? message)
+        : this(message, null) { }
+
+    public LibUsbException(string? message, Exception? innerException)
+        : base(message, innerException)
+    {
+        Error = libusb_error.LIBUSB_ERROR_OTHER;
+    }
 }

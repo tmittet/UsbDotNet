@@ -39,7 +39,7 @@ public interface IUsb : IDisposable
     /// <exception cref="UsbException">Thrown when the get device list operation fails.</exception>
     /// <exception cref="ObjectDisposedException">Thrown when the Usb type is disposed.</exception>
     /// <exception cref="InvalidOperationException">Thrown when the Usb type is not initialized.</exception>
-    List<IUsbDeviceDescriptor> GetDeviceList(
+    IReadOnlyCollection<IUsbDeviceDescriptor> GetDeviceList(
         ushort? vendorId = default,
         HashSet<ushort>? productIds = default
     );
