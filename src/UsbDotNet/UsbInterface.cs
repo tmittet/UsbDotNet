@@ -118,32 +118,40 @@ public sealed class UsbInterface : IUsbInterface
     public UsbResult BulkRead(Span<byte> destination, out int bytesRead, int timeout)
     {
         CheckTransferTimeout(timeout);
-        _disposeLock.EnterReadLock(); // Use read lock for reads and writes, to support duplex
         try
         {
-            if (_disposed)
+            // Use read lock for reads and writes, to support duplex
+            _disposeLock.EnterReadLock();
+            try
             {
-                throw new ObjectDisposedException(nameof(UsbInterface));
-            }
-            var bufferLength = Math.Min(destination.Length, ReadBufferSize);
-            lock (_bulkReadLock)
-            {
-                var result = LibUsbTransfer.ExecuteSync(
-                    _logger,
-                    _device.Handle,
-                    libusb_endpoint_transfer_type.LIBUSB_ENDPOINT_TRANSFER_TYPE_BULK,
-                    _readEndpoint.Value.EndpointAddress.RawValue,
-                    _bulkReadBufferHandle,
-                    bufferLength,
-                    timeout > 0 ? (uint)timeout : 0,
-                    out bytesRead,
-                    _disposeCts.Token
-                );
-                if (bytesRead > 0)
+                if (_disposed)
                 {
-                    _bulkReadBuffer.AsSpan(0, bytesRead).CopyTo(destination);
+                    throw new ObjectDisposedException(nameof(UsbInterface));
                 }
-                return result.ToUsbResult();
+                var bufferLength = Math.Min(destination.Length, ReadBufferSize);
+                lock (_bulkReadLock)
+                {
+                    var result = LibUsbTransfer.ExecuteSync(
+                        _logger,
+                        _device.Handle,
+                        libusb_endpoint_transfer_type.LIBUSB_ENDPOINT_TRANSFER_TYPE_BULK,
+                        _readEndpoint.Value.EndpointAddress.RawValue,
+                        _bulkReadBufferHandle,
+                        bufferLength,
+                        timeout > 0 ? (uint)timeout : 0,
+                        out bytesRead,
+                        _disposeCts.Token
+                    );
+                    if (bytesRead > 0)
+                    {
+                        _bulkReadBuffer.AsSpan(0, bytesRead).CopyTo(destination);
+                    }
+                    return result.ToUsbResult();
+                }
+            }
+            finally
+            {
+                _disposeLock.ExitReadLock();
             }
         }
         catch (ObjectDisposedException ex)
@@ -156,40 +164,44 @@ public sealed class UsbInterface : IUsbInterface
             bytesRead = 0;
             return UsbResult.Interrupted;
         }
-        finally
-        {
-            _disposeLock.ExitReadLock();
-        }
     }
 
     /// <inheritdoc/>
     public UsbResult BulkWrite(ReadOnlySpan<byte> source, out int bytesWritten, int timeout)
     {
         CheckTransferTimeout(timeout);
-        _disposeLock.EnterReadLock(); // Use read lock for reads and writes, to support duplex
         try
         {
-            if (_disposed)
+            // Use read lock for reads and writes, to support duplex
+            _disposeLock.EnterReadLock();
+            try
             {
-                throw new ObjectDisposedException(nameof(UsbInterface));
+                if (_disposed)
+                {
+                    throw new ObjectDisposedException(nameof(UsbInterface));
+                }
+                var bufferLength = Math.Min(source.Length, WriteBufferSize);
+                lock (_bulkWriteLock)
+                {
+                    source[..bufferLength].CopyTo(_bulkWriteBuffer.AsSpan(0, bufferLength));
+                    return LibUsbTransfer
+                        .ExecuteSync(
+                            _logger,
+                            _device.Handle,
+                            libusb_endpoint_transfer_type.LIBUSB_ENDPOINT_TRANSFER_TYPE_BULK,
+                            _writeEndpoint.Value.EndpointAddress.RawValue,
+                            _bulkWriteBufferHandle,
+                            bufferLength,
+                            timeout > 0 ? (uint)timeout : 0,
+                            out bytesWritten,
+                            _disposeCts.Token
+                        )
+                        .ToUsbResult();
+                }
             }
-            var bufferLength = Math.Min(source.Length, WriteBufferSize);
-            lock (_bulkWriteLock)
+            finally
             {
-                source[..bufferLength].CopyTo(_bulkWriteBuffer.AsSpan(0, bufferLength));
-                return LibUsbTransfer
-                    .ExecuteSync(
-                        _logger,
-                        _device.Handle,
-                        libusb_endpoint_transfer_type.LIBUSB_ENDPOINT_TRANSFER_TYPE_BULK,
-                        _writeEndpoint.Value.EndpointAddress.RawValue,
-                        _bulkWriteBufferHandle,
-                        bufferLength,
-                        timeout > 0 ? (uint)timeout : 0,
-                        out bytesWritten,
-                        _disposeCts.Token
-                    )
-                    .ToUsbResult();
+                _disposeLock.ExitReadLock();
             }
         }
         catch (ObjectDisposedException ex)
@@ -201,10 +213,6 @@ public sealed class UsbInterface : IUsbInterface
             );
             bytesWritten = 0;
             return UsbResult.Interrupted;
-        }
-        finally
-        {
-            _disposeLock.ExitReadLock();
         }
     }
 
@@ -276,6 +284,7 @@ public sealed class UsbInterface : IUsbInterface
             finally
             {
                 _disposeLock.ExitWriteLock();
+                _disposeLock.Dispose();
             }
         }
     }

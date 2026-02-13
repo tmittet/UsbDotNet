@@ -22,7 +22,10 @@ public sealed class Usb : IUsb
     private readonly ILoggerFactory _loggerFactory;
     private readonly ILogger<Usb> _logger;
     private readonly ConcurrentDictionary<string, UsbDevice> _openDevices = new();
+#pragma warning disable CA2213 // Disposable fields should be disposed
+    // CA2213 false positive
     private ISafeContext? _context;
+#pragma warning restore CA2213 // Disposable fields should be disposed
     private LibUsbEventLoop? _eventLoop;
     private ISafeCallbackHandle? _hotplugCallbackHandle;
     private bool _disposed;
