@@ -145,6 +145,7 @@ dotnet_diagnostic.CA1051.severity = error # Do not declare visible instance fiel
 dotnet_diagnostic.CA2007.severity = error # Do not directly await a Task
 dotnet_code_quality.CA2007.output_kind = DynamicallyLinkedLibrary
 dotnet_diagnostic.CA2202.severity = error # Do Not Dispose Objects Multiple Times
+dotnet_diagnostic.CA2213.severity = error # Disposable fields should be disposed
 # Unhandled enum value warnings only for defined enum values
 dotnet_diagnostic.CS8509.severity = error # switch case handling not exhaustive
 dotnet_diagnostic.VSTHRD100.severity = error # Avoid async void methods
@@ -291,8 +292,6 @@ csharp_style_expression_bodied_local_functions = when_on_single_line:silent
 csharp_style_allow_blank_line_after_colon_in_constructor_initializer_experimental = true:silent
 
 
-// TODO: Address this!!!
-dotnet_diagnostic.CA2213.severity = suggestion # Disposable fields should be disposed
 # TODO: Consider introducing logger message delegates
 dotnet_diagnostic.CA1848.severity = none # Use the LoggerMessage delegates
 dotnet_diagnostic.CA1873.severity = none # Avoid potentially expensive logging

@@ -9,7 +9,10 @@ namespace UsbDotNet.LibUsbNative.SafeHandles;
 internal sealed class SafeDeviceHandle : SafeHandle, ISafeDeviceHandle
 {
     private readonly SafeContext _context;
+#pragma warning disable CA2213 // Disposable fields should be disposed
+    // SafeDevice disposed in ReleaseHandle
     private readonly SafeDevice _device;
+#pragma warning restore CA2213 // Disposable fields should be disposed
 
     internal ILibUsbApi Api => _context.Api;
 
