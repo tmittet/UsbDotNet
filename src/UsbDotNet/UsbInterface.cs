@@ -218,7 +218,8 @@ public sealed class UsbInterface : IUsbInterface
 
     /// <inheritdoc/>
     public override string ToString() =>
-        $"{_descriptor.InterfaceClass} #{_descriptor.InterfaceNumber}";
+        $"#{_descriptor.InterfaceNumber} "
+        + $"({_descriptor.InterfaceClass} subclass {_descriptor.InterfaceSubClass})";
 
     private IUsbEndpointDescriptor GetEndpoint(
         IUsbInterfaceDescriptor descriptor,
@@ -264,7 +265,7 @@ public sealed class UsbInterface : IUsbInterface
         {
             if (_disposed)
             {
-                _logger.LogDebug("USB interface {UsbInterface} already disposed.", this);
+                _logger.LogDebug("Interface {UsbInterface} already disposed.", this);
                 return;
             }
             // Prevent new transfers from starting and cancel any ongoing

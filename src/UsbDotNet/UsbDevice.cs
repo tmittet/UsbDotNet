@@ -224,7 +224,7 @@ public sealed class UsbDevice : IUsbDevice
         {
             if (_claimedInterfaces.TryGetValue(descriptor.InterfaceNumber, out var existing))
             {
-                throw new InvalidOperationException($"USB interface {existing} already claimed.");
+                throw new InvalidOperationException($"Interface {existing} already claimed.");
             }
 
             // TODO: libusb_set_auto_detach_kernel_driver on Linux?
@@ -233,7 +233,7 @@ public sealed class UsbDevice : IUsbDevice
             var usbInterface = new UsbInterface(_loggerFactory, this, descriptor, claimedInterface);
             // No need to check if already added, checked in TryGetValue above
             _claimedInterfaces[descriptor.InterfaceNumber] = usbInterface;
-            _logger.LogDebug("USB interface {UsbInterface} claimed.", usbInterface);
+            _logger.LogDebug("Interface {UsbInterface} claimed.", usbInterface);
             return usbInterface;
         }
     }
@@ -254,18 +254,18 @@ public sealed class UsbDevice : IUsbDevice
             if (!_claimedInterfaces.TryGetValue(interfaceNumber, out var usbInterface))
             {
                 throw new InvalidOperationException(
-                    $"USB interface #{interfaceNumber} not found in list of claimed interfaces."
+                    $"Interface #{interfaceNumber} not found in list of claimed interfaces."
                 );
             }
 
             if (_claimedInterfaces.TryRemove(interfaceNumber, out var _))
             {
-                _logger.LogDebug("USB interface {UsbInterface} released.", usbInterface);
+                _logger.LogDebug("Interface {UsbInterface} released.", usbInterface);
             }
             else
             {
                 _logger.LogError(
-                    "Failed to remove released USB interface {UsbInterface} from list of claimed interfaces.",
+                    "Failed to remove released interface {UsbInterface} from list of claimed interfaces.",
                     usbInterface
                 );
             }

@@ -257,7 +257,7 @@ public sealed class Usb : IUsb
                 $"Device with key '{deviceKey}' is already open."
             );
         }
-        _logger.LogInformation("LibUsbDevice '{DeviceKey}' open.", deviceKey);
+        _logger.LogInformation("UsbDevice '{DeviceKey}' open.", deviceKey);
         return device;
     }
 
