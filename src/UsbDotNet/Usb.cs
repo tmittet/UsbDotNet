@@ -363,6 +363,7 @@ public sealed class Usb : IUsb
                     );
                 }
             }
+            LibUsbLogHandler.ClearLogger();
             _logger.LogDebug("Usb type disposed.");
             _ = Interlocked.Exchange(ref _instances, 0);
             _disposed = true;

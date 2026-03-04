@@ -11,6 +11,8 @@ internal static class LibUsbLogHandler
 
     public static void SetLogger(ILogger logger) => _staticLogger = logger;
 
+    public static void ClearLogger() => _staticLogger = null;
+
     public static void Log(libusb_log_level level, string message)
     {
         var logger = _staticLogger;
