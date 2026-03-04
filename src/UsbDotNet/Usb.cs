@@ -15,7 +15,6 @@ namespace UsbDotNet;
 public sealed class Usb : IUsb
 {
     private static int _instances;
-    private static ILogger<Usb>? _staticLogger;
 
     private readonly object _lock = new();
     private readonly ILibUsb _libUsb;
@@ -63,7 +62,7 @@ public sealed class Usb : IUsb
             _libUsb = libUsb ?? new LibUsb();
             _loggerFactory = loggerFactory ?? new NullLoggerFactory();
             _logger = _loggerFactory.CreateLogger<Usb>();
-            _staticLogger = _logger;
+            LibUsbLogHandler.SetLogger(_logger);
         }
         catch (Exception)
         {
@@ -86,13 +85,13 @@ public sealed class Usb : IUsb
             _context = _libUsb.CreateContext();
             _logger.LogInformation("LibUsb v{LibUsbVersion} initialized.", GetVersion());
 
-            InitializeLogging(_context, logLevel);
+            InitializeLibUsbLogHandler(_context, logLevel);
             _eventLoop = new LibUsbEventLoop(_loggerFactory, _context);
             _eventLoop.Start();
         }
     }
 
-    private void InitializeLogging(ISafeContext context, LogLevel logLevel)
+    private void InitializeLibUsbLogHandler(ISafeContext context, LogLevel logLevel)
     {
         if (logLevel == LogLevel.None)
         {
@@ -101,7 +100,7 @@ public sealed class Usb : IUsb
 
         try
         {
-            context.RegisterLogCallback((level, message) => LibUsbLogHandler(level, message));
+            context.RegisterLogCallback((level, message) => LibUsbLogHandler.Log(level, message));
         }
         catch (UsbException ex)
         {
@@ -257,7 +256,7 @@ public sealed class Usb : IUsb
                 $"Device with key '{deviceKey}' is already open."
             );
         }
-        _logger.LogInformation("LibUsbDevice '{DeviceKey}' open.", deviceKey);
+        _logger.LogInformation("UsbDevice '{DeviceKey}' open.", deviceKey);
         return device;
     }
 
@@ -364,40 +363,10 @@ public sealed class Usb : IUsb
                     );
                 }
             }
-            _staticLogger = null;
+            LibUsbLogHandler.ClearLogger();
             _logger.LogDebug("Usb type disposed.");
             _ = Interlocked.Exchange(ref _instances, 0);
             _disposed = true;
-        }
-    }
-
-    private static void LibUsbLogHandler(libusb_log_level level, string message)
-    {
-        switch (level)
-        {
-            case libusb_log_level.LIBUSB_LOG_LEVEL_ERROR:
-                _staticLogger?.LogError("{LibUsbMessage}", message.TrimEnd());
-                break;
-            case libusb_log_level.LIBUSB_LOG_LEVEL_WARNING:
-                _staticLogger?.LogWarning("{LibUsbMessage}", message.TrimEnd());
-                break;
-            case libusb_log_level.LIBUSB_LOG_LEVEL_INFO:
-                _staticLogger?.LogInformation("{LibUsbMessage}", message.TrimEnd());
-                break;
-            // LibUsbLogLevel.Debug is very verbose and is best mapped to .NET LogLevel.Trace
-            case libusb_log_level.LIBUSB_LOG_LEVEL_DEBUG:
-                _staticLogger?.LogTrace("{LibUsbMessage}", message.TrimEnd());
-                break;
-            case libusb_log_level.LIBUSB_LOG_LEVEL_NONE:
-                break;
-            // Catch the unlikely case that libusb adds another log level in a future version
-            default:
-                _staticLogger?.LogError(
-                    "Unexpected libusb_log_level '{LibUsbLogLevel}'. {LibUsbMessage}",
-                    level,
-                    message.TrimEnd()
-                );
-                break;
         }
     }
 }
