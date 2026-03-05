@@ -22,20 +22,18 @@ internal static class LibUsbLogHandler
         }
         // Trim libusb log messages to remove trailing whitespace; typically newline characters
         message = message.TrimEnd();
-        // Selectively lower the log level for INFO, WARN and ERROR messages that are too verbose
-        if (level is not libusb_log_level.LIBUSB_LOG_LEVEL_DEBUG)
+        // Selectively lower the log level for messages that are too verbose
+        if (LogAsTraceOverride(level, message))
         {
-            if (LogTraceOverride(message))
-            {
-                logger.LogTrace("{LibUsbMessage}", message);
-                return;
-            }
-            if (LogDebugOverride(message))
-            {
-                logger.LogDebug("{LibUsbMessage}", message);
-                return;
-            }
+            logger.LogTrace("{LibUsbMessage}", message);
+            return;
         }
+        if (LogAsDebugOverride(level, message))
+        {
+            logger.LogDebug("{LibUsbMessage}", message);
+            return;
+        }
+        // Map libusb log levels and log the message
         switch (level)
         {
             case libusb_log_level.LIBUSB_LOG_LEVEL_ERROR:
@@ -65,8 +63,9 @@ internal static class LibUsbLogHandler
     /// <summary>
     /// Selectively lower the log level to trace for messages that are too verbose.
     /// </summary>
-    private static bool LogTraceOverride(string message) =>
+    private static bool LogAsTraceOverride(libusb_log_level level, string message) =>
         IsWindows
+        && level is libusb_log_level.LIBUSB_LOG_LEVEL_WARNING
         && (
             // Very frequent during device enumeration on Windows
             message.StartsWith(
@@ -83,25 +82,33 @@ internal static class LibUsbLogHandler
     /// <summary>
     /// Selectively lower the log level to debug for messages that are too verbose.
     /// </summary>
-    private static bool LogDebugOverride(string message) =>
+    private static bool LogAsDebugOverride(libusb_log_level level, string message) =>
         IsWindows
         && (
             // Frequent when devices are disconnected during enumeration on Windows
             (
-                message.StartsWith("libusb: error [init_device]", StringComparison.Ordinal)
+                level is libusb_log_level.LIBUSB_LOG_LEVEL_WARNING
+                && message.StartsWith(
+                    "libusb: warning [winusb_get_device_list] could not detect installation state of driver for",
+                    StringComparison.Ordinal
+                )
+            )
+            // Frequent when devices are disconnected during enumeration on Windows
+            || (
+                level is libusb_log_level.LIBUSB_LOG_LEVEL_ERROR
+                && message.StartsWith("libusb: error [init_device]", StringComparison.Ordinal)
                 && (
                     message.EndsWith("has invalid descriptor!", StringComparison.Ordinal)
                     || message.EndsWith("is no longer connected!", StringComparison.Ordinal)
                 )
             )
-            // Frequent when devices are disconnected during enumeration on Windows
-            || message.StartsWith(
-                "libusb: warning [winusb_get_device_list] could not detect installation state of driver for",
-                StringComparison.Ordinal
-            )
             // Sometimes when a reset is attempted during device disconnect on Windows
             || (
-                message.StartsWith("libusb: error [winusbx_reset_device]", StringComparison.Ordinal)
+                level is libusb_log_level.LIBUSB_LOG_LEVEL_ERROR
+                && message.StartsWith(
+                    "libusb: error [winusbx_reset_device]",
+                    StringComparison.Ordinal
+                )
                 && (
                     message.EndsWith(
                         "A device which does not exist was specified.",
