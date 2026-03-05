@@ -120,5 +120,14 @@ internal static class LibUsbLogHandler
                     )
                 )
             )
+            // Sometimes during large data transfers on Windows; even if transfer is successful.
+            // TODO: Re-evaluate when https://github.com/libusb/libusb/issues/966 is resolved.
+            || (
+                level is libusb_log_level.LIBUSB_LOG_LEVEL_ERROR
+                && message.Equals(
+                    "libusb: error [windows_submit_transfer] program assertion failed - transfer HANDLE is NULL after transfer was submitted",
+                    StringComparison.Ordinal
+                )
+            )
         );
 }
