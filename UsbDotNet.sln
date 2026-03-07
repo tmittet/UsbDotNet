@@ -35,6 +35,7 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "workflows", "workflows", "{
 		.github\workflows\build.yml = .github\workflows\build.yml
 		.github\workflows\build_libusb_android.yml = .github\workflows\build_libusb_android.yml
 		.github\workflows\build_libusb_mac.yml = .github\workflows\build_libusb_mac.yml
+		.github\workflows\build_libusb_windows.yml = .github\workflows\build_libusb_windows.yml
 	EndProjectSection
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Tests", "Tests", "{D5E2E026-05AB-49B8-A8DB-5DFEF339FDE4}"
