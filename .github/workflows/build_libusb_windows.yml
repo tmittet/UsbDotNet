@@ -1,8 +1,14 @@
 name: Build libusb (Windows)
+run-name: "Build libusb (Windows) - ${{ inputs.libusb_repo }}@${{ inputs.libusb_ref }}"
 
 on:
   workflow_dispatch:
     inputs:
+      libusb_repo:
+        description: "GitHub repo for libusb (owner/name)"
+        default: "libusb/libusb"
+        type: string
+        required: true
       libusb_ref:
         description: "git ref for libusb (tag/branch/commit)"
         default: "v1.0.29"
@@ -33,11 +39,24 @@ jobs:
     runs-on: ${{ matrix.runner }}
 
     env:
+      LIBUSB_REPO: ${{ github.event.inputs.libusb_repo }}
       LIBUSB_REF: ${{ github.event.inputs.libusb_ref }}
       SRC_DIR:   ${{ github.workspace }}/libusb
       BUILD_DIR: ${{ github.workspace }}/build
 
     steps:
+      - name: Validate inputs
+        shell: bash
+        run: |
+          if [[ ! "$LIBUSB_REPO" =~ ^[a-zA-Z0-9._-]+/[a-zA-Z0-9._-]+$ ]]; then
+            echo "::error::Invalid libusb_repo format: must be 'owner/name'"
+            exit 1
+          fi
+          if [[ ! "$LIBUSB_REF" =~ ^[a-zA-Z0-9._/-]+$ ]]; then
+            echo "::error::Invalid libusb_ref format: must be a valid git ref"
+            exit 1
+          fi
+
       - name: Checkout (this repo)
         uses: actions/checkout@v4
 
@@ -45,7 +64,7 @@ jobs:
         shell: bash
         run: |
           git init "$SRC_DIR" && cd "$SRC_DIR"
-          git remote add origin https://github.com/libusb/libusb.git
+          git remote add origin "https://github.com/${LIBUSB_REPO}.git"
           git fetch --depth=1 origin "$LIBUSB_REF" || git fetch origin "$LIBUSB_REF"
           git checkout FETCH_HEAD
           echo "libusb ref:"; git rev-parse --short HEAD
