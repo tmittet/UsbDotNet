@@ -1,0 +1,83 @@
+name: Build libusb (Windows)
+
+on:
+  workflow_dispatch:
+    inputs:
+      libusb_ref:
+        description: "git ref for libusb (tag/branch/commit)"
+        default: "v1.0.29"
+        type: string
+        required: true
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        # Visit github-hosted-runners page for reference:
+        # https://docs.github.com/en/actions/reference/runners/github-hosted-runners
+        include:
+          - name: Windows x64
+            runner: windows-latest
+            platform: x64
+          - name: Windows arm64
+            runner: windows-11-arm
+            platform: ARM64
+
+    name: ${{ matrix.name }}
+    runs-on: ${{ matrix.runner }}
+
+    env:
+      LIBUSB_REF: ${{ github.event.inputs.libusb_ref }}
+      SRC_DIR:   ${{ github.workspace }}/libusb
+      BUILD_DIR: ${{ github.workspace }}/build
+
+    steps:
+      - name: Checkout (this repo)
+        uses: actions/checkout@v4
+
+      - name: Fetch libusb source
+        shell: bash
+        run: |
+          git init "$SRC_DIR" && cd "$SRC_DIR"
+          git remote add origin https://github.com/libusb/libusb.git
+          git fetch --depth=1 origin "$LIBUSB_REF" || git fetch origin "$LIBUSB_REF"
+          git checkout FETCH_HEAD
+          echo "libusb ref:"; git rev-parse --short HEAD
+
+      - name: Setup MSBuild
+        uses: microsoft/setup-msbuild@v2
+
+      - name: Print tool versions
+        run: |
+          msbuild -version
+
+      - name: Build libusb DLL (${{ matrix.platform }})
+        working-directory: ${{ env.SRC_DIR }}/msvc
+        run: >
+          msbuild libusb_dll.vcxproj
+          -m
+          -v:minimal
+          -p:PlatformToolset=v143,Platform=${{ matrix.platform }},Configuration=Release
+
+      - name: Prepare artifact
+        shell: bash
+        run: |
+          src="$SRC_DIR/build/v143/${{ matrix.platform }}/Release/dll"
+          hdr="$SRC_DIR/libusb/libusb.h"
+          dest="$BUILD_DIR/windows-${{ matrix.platform }}"
+          mkdir -p "$dest/lib" "$dest/include/libusb-1.0"
+          cp "$src/libusb-1.0.dll" "$dest/lib/"
+          cp "$src/libusb-1.0.lib" "$dest/lib/"
+          cp "$src/libusb-1.0.pdb" "$dest/lib/" 2>/dev/null || true
+          cp "$hdr" "$dest/include/libusb-1.0/"
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: libusb-windows-${{ matrix.platform }}-dll
+          path: ${{ env.BUILD_DIR }}/windows-${{ matrix.platform }}/
+          if-no-files-found: error
