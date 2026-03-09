@@ -1,8 +1,8 @@
 namespace UsbDotNet.Extensions.Uvc;
 
 /// <summary>
-/// Camera terminal control properties (KSPROPERTY_CAMERACONTROL_* on Windows;
-/// UVC Camera Terminal control selectors on Linux and macOS).
+/// UVC camera terminal control selectors on Linux and macOS;
+/// mapped tp camera terminal control properties (KSPROPERTY_CAMERACONTROL_*) on Windows.
 /// </summary>
 public enum UvcCameraControl
 {

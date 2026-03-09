@@ -19,31 +19,32 @@ internal sealed class WindowsUvcControls : IUvcControls
     }
 
     /// <summary>
-    /// Gets the current value and flags of a camera terminal control property.
+    /// Gets the current value and control type of a camera terminal control property.
     /// </summary>
     /// <param name="cameraControl">The camera control property to query.</param>
-    /// <param name="value">Receives the current property value.</param>
-    /// <param name="flags">Receives the current auto/manual mode.</param>
+    /// <param name="controlType">The current auto/manual mode.</param>
+    /// <returns>the current property value.</returns>
     /// <exception cref="COMException">The device returned an error.</exception>
     /// <exception cref="InvalidCastException">
     /// The device does not support IAMCameraControl.
     /// </exception>
-    public void GetCameraControl(
-        UvcCameraControl cameraControl,
-        out int value,
-        out UvcControl flags
-    )
+    public int GetCameraControl(UvcCameraControl cameraControl, out UvcControlType controlType)
     {
         var cameraControlInterface = QueryInterface<IAMCameraControl>(_handle);
         try
         {
-            var hr = cameraControlInterface.Get((int)cameraControl, out value, out var rawFlags);
+            var hr = cameraControlInterface.Get(
+                (int)cameraControl,
+                out var value,
+                out var rawFlags
+            );
             Marshal.ThrowExceptionForHR(hr);
-            flags = (UvcControl)rawFlags;
+            controlType = (UvcControlType)rawFlags;
+            return value;
         }
         finally
         {
-            Marshal.ReleaseComObject(cameraControlInterface);
+            _ = Marshal.ReleaseComObject(cameraControlInterface);
         }
     }
 
@@ -52,8 +53,8 @@ internal sealed class WindowsUvcControls : IUvcControls
     /// </summary>
     /// <param name="cameraControl">The camera control property to set.</param>
     /// <param name="value">The value to set.</param>
-    /// <param name="flags">
-    /// Auto or manual mode. Defaults to <see cref="UvcControl.Manual"/>.
+    /// <param name="controlType">
+    /// Auto or manual mode. Defaults to <see cref="UvcControlType.Manual"/>.
     /// </param>
     /// <exception cref="COMException">The device returned an error.</exception>
     /// <exception cref="InvalidCastException">
@@ -62,18 +63,18 @@ internal sealed class WindowsUvcControls : IUvcControls
     public void SetCameraControl(
         UvcCameraControl cameraControl,
         int value,
-        UvcControl flags = UvcControl.Manual
+        UvcControlType controlType = UvcControlType.Manual
     )
     {
         var cameraControlInterface = QueryInterface<IAMCameraControl>(_handle);
         try
         {
-            var hr = cameraControlInterface.Set((int)cameraControl, value, (int)flags);
+            var hr = cameraControlInterface.Set((int)cameraControl, value, (int)controlType);
             Marshal.ThrowExceptionForHR(hr);
         }
         finally
         {
-            Marshal.ReleaseComObject(cameraControlInterface);
+            _ = Marshal.ReleaseComObject(cameraControlInterface);
         }
     }
 
@@ -86,7 +87,7 @@ internal sealed class WindowsUvcControls : IUvcControls
     /// <param name="maxValue">Receives the maximum supported value.</param>
     /// <param name="stepSize">Receives the stepping delta between valid values.</param>
     /// <param name="defaultValue">Receives the default value.</param>
-    /// <param name="capsFlags">Receives the supported modes (auto/manual).</param>
+    /// <param name="controlType">Receives the supported modes (auto/manual).</param>
     /// <exception cref="COMException">The device returned an error.</exception>
     /// <exception cref="InvalidCastException">
     /// The device does not support IAMCameraControl.
@@ -97,7 +98,7 @@ internal sealed class WindowsUvcControls : IUvcControls
         out int maxValue,
         out int stepSize,
         out int defaultValue,
-        out UvcControl capsFlags
+        out UvcControlType controlType
     )
     {
         var cameraControlInterface = QueryInterface<IAMCameraControl>(_handle);
@@ -112,36 +113,37 @@ internal sealed class WindowsUvcControls : IUvcControls
                 out var rawFlags
             );
             Marshal.ThrowExceptionForHR(hr);
-            capsFlags = (UvcControl)rawFlags;
+            controlType = (UvcControlType)rawFlags;
         }
         finally
         {
-            Marshal.ReleaseComObject(cameraControlInterface);
+            _ = Marshal.ReleaseComObject(cameraControlInterface);
         }
     }
 
     /// <summary>
-    /// Gets the current value and flags of a video processing amplifier property.
+    /// Gets the current value and control type of a video processing amplifier property.
     /// </summary>
     /// <param name="imageSetting">The video proc amp property to query.</param>
-    /// <param name="value">Receives the current property value.</param>
-    /// <param name="flags">Receives the current auto/manual mode.</param>
+    /// <param name="controlType">The current auto/manual mode.</param>
+    /// <returns>the current property value.</returns>
     /// <exception cref="COMException">The device returned an error.</exception>
     /// <exception cref="InvalidCastException">
     /// The device does not support IAMVideoProcAmp.
     /// </exception>
-    public void GetImageSetting(UvcImageSetting imageSetting, out int value, out UvcControl flags)
+    public int GetImageSetting(UvcImageSetting imageSetting, out UvcControlType controlType)
     {
         var videoProcAmp = QueryInterface<IAMVideoProcAmp>(_handle);
         try
         {
-            var hr = videoProcAmp.Get((int)imageSetting, out value, out var rawFlags);
+            var hr = videoProcAmp.Get((int)imageSetting, out var value, out var rawFlags);
             Marshal.ThrowExceptionForHR(hr);
-            flags = (UvcControl)rawFlags;
+            controlType = (UvcControlType)rawFlags;
+            return value;
         }
         finally
         {
-            Marshal.ReleaseComObject(videoProcAmp);
+            _ = Marshal.ReleaseComObject(videoProcAmp);
         }
     }
 
@@ -150,8 +152,8 @@ internal sealed class WindowsUvcControls : IUvcControls
     /// </summary>
     /// <param name="imageSetting">The video proc amp property to set.</param>
     /// <param name="value">The value to set.</param>
-    /// <param name="flags">
-    /// Auto or manual mode. Defaults to <see cref="UvcControl.Manual"/>.
+    /// <param name="controlType">
+    /// Auto or manual mode. Defaults to <see cref="UvcControlType.Manual"/>.
     /// </param>
     /// <exception cref="COMException">The device returned an error.</exception>
     /// <exception cref="InvalidCastException">
@@ -160,18 +162,18 @@ internal sealed class WindowsUvcControls : IUvcControls
     public void SetImageSetting(
         UvcImageSetting imageSetting,
         int value,
-        UvcControl flags = UvcControl.Manual
+        UvcControlType controlType = UvcControlType.Manual
     )
     {
         var videoProcAmpInterface = QueryInterface<IAMVideoProcAmp>(_handle);
         try
         {
-            var hr = videoProcAmpInterface.Set((int)imageSetting, value, (int)flags);
+            var hr = videoProcAmpInterface.Set((int)imageSetting, value, (int)controlType);
             Marshal.ThrowExceptionForHR(hr);
         }
         finally
         {
-            Marshal.ReleaseComObject(videoProcAmpInterface);
+            _ = Marshal.ReleaseComObject(videoProcAmpInterface);
         }
     }
 
@@ -195,7 +197,7 @@ internal sealed class WindowsUvcControls : IUvcControls
         out int maxValue,
         out int stepSize,
         out int defaultValue,
-        out UvcControl capsFlags
+        out UvcControlType capsFlags
     )
     {
         var videoProcAmpInterface = QueryInterface<IAMVideoProcAmp>(_handle);
@@ -210,11 +212,11 @@ internal sealed class WindowsUvcControls : IUvcControls
                 out var rawFlags
             );
             Marshal.ThrowExceptionForHR(hr);
-            capsFlags = (UvcControl)rawFlags;
+            capsFlags = (UvcControlType)rawFlags;
         }
         finally
         {
-            Marshal.ReleaseComObject(videoProcAmpInterface);
+            _ = Marshal.ReleaseComObject(videoProcAmpInterface);
         }
     }
 
@@ -223,17 +225,17 @@ internal sealed class WindowsUvcControls : IUvcControls
     /// assuming the device has only one unit/node with the given extension GUID.
     /// </summary>
     /// <param name="extensionGuid">The GUID of the extension unit property set.</param>
-    /// <param name="xuControl">
+    /// <param name="control">
     /// The control selector (property ID) within the extension unit.
     /// </param>
     /// <param name="data">A buffer to receive the control data.</param>
     /// <returns>The number of bytes actually returned by the device.</returns>
     /// <exception cref="COMException">The device returned an error.</exception>
     /// <exception cref="InvalidCastException">The device does not support IKsControl.</exception>
-    public int GetExtensionUnit(Guid extensionGuid, uint xuControl, Span<byte> data)
+    public int GetExtensionUnit(Guid extensionGuid, uint control, Span<byte> data)
     {
         var nodeId = GetCachedExtensionUnitNodeId(extensionGuid);
-        return GetExtensionUnit(extensionGuid, nodeId, xuControl, data);
+        return GetExtensionUnit(extensionGuid, nodeId, control, data);
     }
 
     /// <summary>
@@ -241,16 +243,16 @@ internal sealed class WindowsUvcControls : IUvcControls
     /// assuming the device has only one unit/node with the given extension GUID.
     /// </summary>
     /// <param name="extensionGuid">The GUID of the extension unit property set.</param>
-    /// <param name="xuControl">
+    /// <param name="control">
     /// The control selector (property ID) within the extension unit.
     /// </param>
     /// <param name="data">The control data to write to the device.</param>
     /// <exception cref="COMException">The device returned an error.</exception>
     /// <exception cref="InvalidCastException">The device does not support IKsControl.</exception>
-    public void SetExtensionUnit(Guid extensionGuid, uint xuControl, ReadOnlySpan<byte> data)
+    public void SetExtensionUnit(Guid extensionGuid, uint control, ReadOnlySpan<byte> data)
     {
         var nodeId = GetCachedExtensionUnitNodeId(extensionGuid);
-        SetExtensionUnit(extensionGuid, nodeId, xuControl, data);
+        SetExtensionUnit(extensionGuid, nodeId, control, data);
     }
 
     /// <summary>
@@ -259,7 +261,7 @@ internal sealed class WindowsUvcControls : IUvcControls
     /// Sends a get request with a zero-length buffer; the driver returns the required size.
     /// </summary>
     /// <param name="extensionGuid">The GUID of the extension unit property set.</param>
-    /// <param name="xuControl">
+    /// <param name="control">
     /// The control selector (property ID) within the extension unit.
     /// </param>
     /// <returns>The required buffer length in bytes.</returns>
@@ -267,10 +269,10 @@ internal sealed class WindowsUvcControls : IUvcControls
     /// The device returned an error (other than ERROR_MORE_DATA).
     /// </exception>
     /// <exception cref="InvalidCastException">The device does not support IKsControl.</exception>
-    public int GetExtensionUnitLength(Guid extensionGuid, uint xuControl)
+    public int GetExtensionUnitLength(Guid extensionGuid, uint control)
     {
         var nodeId = GetCachedExtensionUnitNodeId(extensionGuid);
-        return GetExtensionUnitLength(extensionGuid, nodeId, xuControl);
+        return GetExtensionUnitLength(extensionGuid, nodeId, control);
     }
 
     private uint GetCachedExtensionUnitNodeId(Guid extensionGuid) =>
@@ -326,7 +328,7 @@ internal sealed class WindowsUvcControls : IUvcControls
         }
         finally
         {
-            Marshal.ReleaseComObject(topologyInfoInterface);
+            _ = Marshal.ReleaseComObject(topologyInfoInterface);
         }
     }
 
@@ -335,21 +337,21 @@ internal sealed class WindowsUvcControls : IUvcControls
     /// </summary>
     /// <param name="extensionGuid">The GUID of the extension unit property set.</param>
     /// <param name="entityId">The topology node ID of the extension unit.</param>
-    /// <param name="xuControl">
+    /// <param name="control">
     /// The control selector (property ID) within the extension unit.
     /// </param>
     /// <param name="data">A buffer to receive the control data.</param>
     /// <returns>The number of bytes actually returned by the device.</returns>
     /// <exception cref="COMException">The device returned an error.</exception>
     /// <exception cref="InvalidCastException">The device does not support IKsControl.</exception>
-    public int GetExtensionUnit(Guid extensionGuid, uint entityId, uint xuControl, Span<byte> data)
+    public int GetExtensionUnit(Guid extensionGuid, uint entityId, uint control, Span<byte> data)
     {
         var node = new KspNode
         {
             Property = new KsProperty
             {
                 Set = extensionGuid,
-                Id = xuControl,
+                Id = control,
                 Flags = KsPropertyFlags.Get | KsPropertyFlags.Topology,
             },
             NodeId = entityId,
@@ -375,7 +377,7 @@ internal sealed class WindowsUvcControls : IUvcControls
             }
             finally
             {
-                Marshal.ReleaseComObject(ksControl);
+                _ = Marshal.ReleaseComObject(ksControl);
             }
         }
         finally
@@ -389,7 +391,7 @@ internal sealed class WindowsUvcControls : IUvcControls
     /// </summary>
     /// <param name="extensionGuid">The GUID of the extension unit property set.</param>
     /// <param name="entityId">The topology node ID of the extension unit.</param>
-    /// <param name="xuControl">
+    /// <param name="control">
     /// The control selector (property ID) within the extension unit.
     /// </param>
     /// <param name="data">The control data to write to the device.</param>
@@ -398,7 +400,7 @@ internal sealed class WindowsUvcControls : IUvcControls
     public void SetExtensionUnit(
         Guid extensionGuid,
         uint entityId,
-        uint xuControl,
+        uint control,
         ReadOnlySpan<byte> data
     )
     {
@@ -407,7 +409,7 @@ internal sealed class WindowsUvcControls : IUvcControls
             Property = new KsProperty
             {
                 Set = extensionGuid,
-                Id = xuControl,
+                Id = control,
                 Flags = KsPropertyFlags.Set | KsPropertyFlags.Topology,
             },
             NodeId = entityId,
@@ -431,7 +433,7 @@ internal sealed class WindowsUvcControls : IUvcControls
             }
             finally
             {
-                Marshal.ReleaseComObject(ksControl);
+                _ = Marshal.ReleaseComObject(ksControl);
             }
         }
         finally
@@ -446,7 +448,7 @@ internal sealed class WindowsUvcControls : IUvcControls
     /// </summary>
     /// <param name="extensionGuid">The GUID of the extension unit property set.</param>
     /// <param name="entityId">The topology node ID of the extension unit.</param>
-    /// <param name="xuControl">
+    /// <param name="control">
     /// The control selector (property ID) within the extension unit.
     /// </param>
     /// <returns>The required buffer length in bytes.</returns>
@@ -454,14 +456,14 @@ internal sealed class WindowsUvcControls : IUvcControls
     /// The device returned an error (other than ERROR_MORE_DATA).
     /// </exception>
     /// <exception cref="InvalidCastException">The device does not support IKsControl.</exception>
-    public int GetExtensionUnitLength(Guid extensionGuid, uint entityId, uint xuControl)
+    public int GetExtensionUnitLength(Guid extensionGuid, uint entityId, uint control)
     {
         var node = new KspNode
         {
             Property = new KsProperty
             {
                 Set = extensionGuid,
-                Id = xuControl,
+                Id = control,
                 Flags = KsPropertyFlags.Get | KsPropertyFlags.Topology,
             },
             NodeId = entityId,
@@ -480,25 +482,22 @@ internal sealed class WindowsUvcControls : IUvcControls
 
             // HRESULT_FROM_WIN32(ERROR_MORE_DATA) = 0x800700EA is expected here.
             const int errorMoreData = unchecked((int)0x800700EA);
-            if (hr != 0 && hr != errorMoreData)
+            if (hr is not 0 and not errorMoreData)
                 Marshal.ThrowExceptionForHR(hr);
 
             return bytesReturned;
         }
         finally
         {
-            Marshal.ReleaseComObject(ksControl);
+            _ = Marshal.ReleaseComObject(ksControl);
         }
     }
 
     private static T QueryInterface<T>(SafeVideoDeviceHandle handle)
-        where T : class
-    {
-        if (handle.IsInvalid || handle.IsClosed)
-            throw new ObjectDisposedException(nameof(SafeVideoDeviceHandle));
-
-        return (T)Marshal.GetObjectForIUnknown(handle.DangerousGetHandle());
-    }
+        where T : class =>
+        handle.IsInvalid || handle.IsClosed
+            ? throw new ObjectDisposedException(nameof(SafeVideoDeviceHandle))
+            : (T)Marshal.GetObjectForIUnknown(handle.DangerousGetHandle());
 
     public void Dispose() => _handle.Dispose();
 }

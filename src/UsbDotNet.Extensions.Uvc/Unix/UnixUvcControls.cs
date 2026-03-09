@@ -7,69 +7,36 @@ internal sealed class UnixUvcControls : IUvcControls
 {
     private readonly IUsbDevice _device;
     private readonly byte _interfaceNumber;
-    private readonly byte? _cameraControlEntityId;
-    private readonly byte? _imageSettingEntityId;
     private readonly ConcurrentDictionary<Guid, byte> _extensionUnitEntityIds = new();
+    private byte? _cameraControlEntityId,
+        _imageSettingEntityId;
 
     internal UnixUvcControls(IUsbDevice device, byte interfaceNumber)
     {
         _device = device;
         _interfaceNumber = interfaceNumber;
-        _cameraControlEntityId = UvcDescriptor.GetCameraControlEntityId(device, interfaceNumber);
-        _imageSettingEntityId = UvcDescriptor.GetImageSettingEntityId(device, interfaceNumber);
     }
 
-    public void GetCameraControl(
-        UvcCameraControl cameraControl,
-        out int value,
-        out UvcControl flags
-    )
+    /// <inheritdoc />
+    public int GetCameraControl(UvcCameraControl cameraControl, out UvcControlType controlType)
     {
-        value = TransferCameraControl(cameraControl, UvcControlRequest.GetCurrent);
-        flags = UvcControl.Manual;
+        controlType = UvcControlType.Manual;
+        return ReadCameraControl(cameraControl, UvcControlRequest.GetCurrent);
     }
 
+    /// <inheritdoc />
     public void SetCameraControl(
         UvcCameraControl cameraControl,
         int value,
-        UvcControl flags = UvcControl.Manual
+        UvcControlType controlType = UvcControlType.Manual
     )
     {
-        if (_cameraControlEntityId is null)
-        {
-            throw new InvalidOperationException(
-                $"Camera control {cameraControl} is not supported because no Camera Terminal entity was found in the UVC descriptors."
-            );
-        }
+        var cameraControlEntityId = GetCameraControlEntityIdOrThrow();
         var (controlSelector, bufferSize, offset) = UvcTransfer.GetCameraControlDescriptor(
             cameraControl
         );
 
-        // Pan and Tilt share an 8-byte control; do a read-modify-write to preserve the other axis.
-        if (bufferSize == 8)
-        {
-            var buffer = new byte[8];
-            var readResult = _device.ControlReadUvc(
-                buffer,
-                out _,
-                UvcControlRequest.GetCurrent,
-                _interfaceNumber,
-                _cameraControlEntityId.Value,
-                controlSelector
-            );
-            UvcTransfer.ThrowIfFailed(readResult, $"CameraControl {cameraControl} GetCurrent");
-            BinaryPrimitives.WriteInt32LittleEndian(buffer.AsSpan(offset, 4), value);
-            var writeResult = _device.ControlWriteUvc(
-                buffer,
-                out _,
-                UvcControlRequest.SetCurrent,
-                _interfaceNumber,
-                _cameraControlEntityId.Value,
-                controlSelector
-            );
-            UvcTransfer.ThrowIfFailed(writeResult, $"CameraControl {cameraControl} SetCurrent");
-        }
-        else
+        if (cameraControl is not UvcCameraControl.Pan and not UvcCameraControl.Tilt)
         {
             var buffer = new byte[bufferSize];
             UvcTransfer.WriteInt(buffer, 0, bufferSize, value);
@@ -78,38 +45,71 @@ internal sealed class UnixUvcControls : IUvcControls
                 out _,
                 UvcControlRequest.SetCurrent,
                 _interfaceNumber,
-                _cameraControlEntityId.Value,
+                cameraControlEntityId,
                 controlSelector
             );
-            UvcTransfer.ThrowIfFailed(result, $"CameraControl {cameraControl} SetCurrent");
+            UvcTransfer.ThrowIfFailed(
+                result,
+                $"ControlWriteUvc(request=SetCurrent, control={cameraControl})"
+            );
+            return;
         }
+
+        // Pan and Tilt share an 8-byte control; do a read-modify-write to preserve the other axis
+        if (bufferSize != 8)
+        {
+            throw new InvalidOperationException(
+                $"Unexpected buffer size {bufferSize} for {cameraControl} control; expected 8."
+            );
+        }
+        var ptBuffer = new byte[8];
+        var readResult = _device.ControlReadUvc(
+            ptBuffer,
+            out _,
+            UvcControlRequest.GetCurrent,
+            _interfaceNumber,
+            cameraControlEntityId,
+            controlSelector
+        );
+        UvcTransfer.ThrowIfFailed(
+            readResult,
+            $"ControlReadUvc(request=GetCurrent, control={cameraControl})"
+        );
+        BinaryPrimitives.WriteInt32LittleEndian(ptBuffer.AsSpan(offset, 4), value);
+        var writeResult = _device.ControlWriteUvc(
+            ptBuffer,
+            out _,
+            UvcControlRequest.SetCurrent,
+            _interfaceNumber,
+            cameraControlEntityId,
+            controlSelector
+        );
+        UvcTransfer.ThrowIfFailed(
+            writeResult,
+            $"ControlWriteUvc(request=SetCurrent, control={cameraControl})"
+        );
     }
 
+    /// <inheritdoc />
     public void GetCameraControlRange(
         UvcCameraControl cameraControl,
         out int minValue,
         out int maxValue,
         out int stepSize,
         out int defaultValue,
-        out UvcControl capsFlags
+        out UvcControlType capsFlags
     )
     {
-        minValue = TransferCameraControl(cameraControl, UvcControlRequest.GetMinimum);
-        maxValue = TransferCameraControl(cameraControl, UvcControlRequest.GetMaximum);
-        stepSize = TransferCameraControl(cameraControl, UvcControlRequest.GetResolution);
-        defaultValue = TransferCameraControl(cameraControl, UvcControlRequest.GetDefault);
-        capsFlags = UvcControl.Manual;
+        minValue = ReadCameraControl(cameraControl, UvcControlRequest.GetMinimum);
+        maxValue = ReadCameraControl(cameraControl, UvcControlRequest.GetMaximum);
+        stepSize = ReadCameraControl(cameraControl, UvcControlRequest.GetResolution);
+        defaultValue = ReadCameraControl(cameraControl, UvcControlRequest.GetDefault);
+        capsFlags = UvcControlType.Manual;
     }
 
-    // The UVC spec returns the full buffer for pantilt; extract the int at the right offset.
-    private int TransferCameraControl(UvcCameraControl cameraControl, UvcControlRequest request)
+    private int ReadCameraControl(UvcCameraControl cameraControl, UvcControlRequest request)
     {
-        if (_cameraControlEntityId is null)
-        {
-            throw new InvalidOperationException(
-                $"Camera control {cameraControl} is not supported because no Camera Terminal entity was found in the UVC descriptors."
-            );
-        }
+        var cameraControlEntityId = GetCameraControlEntityIdOrThrow();
         var (controlSelector, bufferSize, offset) = UvcTransfer.GetCameraControlDescriptor(
             cameraControl
         );
@@ -119,31 +119,32 @@ internal sealed class UnixUvcControls : IUvcControls
             out _,
             request,
             _interfaceNumber,
-            _cameraControlEntityId.Value,
+            cameraControlEntityId,
             controlSelector
         );
-        UvcTransfer.ThrowIfFailed(result, $"CameraControl {cameraControl} {request}");
+        UvcTransfer.ThrowIfFailed(
+            result,
+            $"ControlReadUvc(request={request}, control={cameraControl})"
+        );
+        // The UVC spec returns the full buffer for pan & tilt; extract the int at the right offset
         return UvcTransfer.ReadInt(buffer, offset, bufferSize <= 4 ? bufferSize : 4);
     }
 
-    public void GetImageSetting(UvcImageSetting imageSetting, out int value, out UvcControl flags)
+    /// <inheritdoc />
+    public int GetImageSetting(UvcImageSetting imageSetting, out UvcControlType controlType)
     {
-        value = TransferImageSetting(imageSetting, UvcControlRequest.GetCurrent);
-        flags = UvcControl.Manual;
+        controlType = UvcControlType.Manual;
+        return ReadImageSetting(imageSetting, UvcControlRequest.GetCurrent);
     }
 
+    /// <inheritdoc />
     public void SetImageSetting(
         UvcImageSetting imageSetting,
         int value,
-        UvcControl flags = UvcControl.Manual
+        UvcControlType controlType = UvcControlType.Manual
     )
     {
-        if (_imageSettingEntityId is null)
-        {
-            throw new InvalidOperationException(
-                $"Image setting {imageSetting} is not supported because no Processing Unit entity was found in the UVC descriptors."
-            );
-        }
+        var imageSettingEntityId = GetImageSettingEntityIdOrThrow();
         var (controlSelector, bufferSize) = UvcTransfer.GetImageSettingDescriptor(imageSetting);
         var buffer = new byte[bufferSize];
         UvcTransfer.WriteInt(buffer, 0, bufferSize, value);
@@ -152,36 +153,35 @@ internal sealed class UnixUvcControls : IUvcControls
             out _,
             UvcControlRequest.SetCurrent,
             _interfaceNumber,
-            _imageSettingEntityId.Value,
+            imageSettingEntityId,
             controlSelector
         );
-        UvcTransfer.ThrowIfFailed(result, $"VideoProcAmp {imageSetting} SetCurrent");
+        UvcTransfer.ThrowIfFailed(
+            result,
+            $"ControlWriteUvc(request=SetCurrent, setting={imageSetting})"
+        );
     }
 
+    /// <inheritdoc />
     public void GetImageSettingRange(
         UvcImageSetting imageSetting,
         out int min,
         out int max,
         out int step,
         out int defaultValue,
-        out UvcControl capsFlags
+        out UvcControlType controlType
     )
     {
-        min = TransferImageSetting(imageSetting, UvcControlRequest.GetMinimum);
-        max = TransferImageSetting(imageSetting, UvcControlRequest.GetMaximum);
-        step = TransferImageSetting(imageSetting, UvcControlRequest.GetResolution);
-        defaultValue = TransferImageSetting(imageSetting, UvcControlRequest.GetDefault);
-        capsFlags = UvcControl.Manual;
+        min = ReadImageSetting(imageSetting, UvcControlRequest.GetMinimum);
+        max = ReadImageSetting(imageSetting, UvcControlRequest.GetMaximum);
+        step = ReadImageSetting(imageSetting, UvcControlRequest.GetResolution);
+        defaultValue = ReadImageSetting(imageSetting, UvcControlRequest.GetDefault);
+        controlType = UvcControlType.Manual;
     }
 
-    private int TransferImageSetting(UvcImageSetting imageSetting, UvcControlRequest request)
+    private int ReadImageSetting(UvcImageSetting imageSetting, UvcControlRequest request)
     {
-        if (_imageSettingEntityId is null)
-        {
-            throw new InvalidOperationException(
-                $"Image setting {imageSetting} is not supported because no Processing Unit entity was found in the UVC descriptors."
-            );
-        }
+        var imageSettingEntityId = GetImageSettingEntityIdOrThrow();
         var (controlSelector, bufferSize) = UvcTransfer.GetImageSettingDescriptor(imageSetting);
         var buffer = new byte[bufferSize];
         var result = _device.ControlReadUvc(
@@ -189,43 +189,39 @@ internal sealed class UnixUvcControls : IUvcControls
             out _,
             request,
             _interfaceNumber,
-            _imageSettingEntityId.Value,
+            imageSettingEntityId,
             controlSelector
         );
-        UvcTransfer.ThrowIfFailed(result, $"VideoProcAmp {imageSetting} {request}");
+        UvcTransfer.ThrowIfFailed(
+            result,
+            $"ControlReadUvc(request={request}, control={imageSetting})"
+        );
         return UvcTransfer.ReadInt(buffer, 0, bufferSize);
     }
 
-    private byte GetCachedExtensionUnitEntityId(Guid extensionGuid) =>
-        _extensionUnitEntityIds.GetOrAdd(
-            extensionGuid,
-            guid =>
-                UvcDescriptor.GetExtensionUnitEntityId(_device, _interfaceNumber, guid)
-                ?? throw new InvalidOperationException(
-                    $"Extension unit is not supported because no matching entity ID was found in the UVC descriptors."
-                )
-        );
-
-    public int GetExtensionUnit(Guid extensionGuid, uint xuControl, Span<byte> data)
+    /// <inheritdoc />
+    public int GetExtensionUnit(Guid extensionGuid, uint control, Span<byte> data)
     {
-        var entityId = GetCachedExtensionUnitEntityId(extensionGuid);
-        return GetExtensionUnit(extensionGuid, entityId, xuControl, data);
+        var entityId = GetExtensionUnitEntityId(extensionGuid);
+        return GetExtensionUnit(extensionGuid, entityId, control, data);
     }
 
-    public void SetExtensionUnit(Guid extensionGuid, uint xuControl, ReadOnlySpan<byte> data)
+    /// <inheritdoc />
+    public void SetExtensionUnit(Guid extensionGuid, uint control, ReadOnlySpan<byte> data)
     {
-        var entityId = GetCachedExtensionUnitEntityId(extensionGuid);
-        SetExtensionUnit(extensionGuid, entityId, xuControl, data);
+        var entityId = GetExtensionUnitEntityId(extensionGuid);
+        SetExtensionUnit(extensionGuid, entityId, control, data);
     }
 
-    public int GetExtensionUnitLength(Guid extensionGuid, uint xuControl)
+    /// <inheritdoc />
+    public int GetExtensionUnitLength(Guid extensionGuid, uint control)
     {
-        var entityId = GetCachedExtensionUnitEntityId(extensionGuid);
-        return GetExtensionUnitLength(extensionGuid, entityId, xuControl);
+        var entityId = GetExtensionUnitEntityId(extensionGuid);
+        return GetExtensionUnitLength(extensionGuid, entityId, control);
     }
 
-    /// <remarks>The extension unit GUID is not used on Linux/macOS.</remarks>
-    public int GetExtensionUnit(Guid extensionGuid, uint entityId, uint xuControl, Span<byte> data)
+    /// <inheritdoc />
+    public int GetExtensionUnit(Guid extensionGuid, uint entityId, uint control, Span<byte> data)
     {
         var result = _device.ControlReadUvc(
             data,
@@ -233,17 +229,20 @@ internal sealed class UnixUvcControls : IUvcControls
             UvcControlRequest.GetCurrent,
             _interfaceNumber,
             (byte)entityId,
-            (byte)xuControl
+            (byte)control
         );
-        UvcTransfer.ThrowIfFailed(result, $"ExtensionUnit Get cs=0x{xuControl:X2}");
+        UvcTransfer.ThrowIfFailed(
+            result,
+            $"ControlReadUvc(request=GetCurrent, entityId=0x{entityId:X2} control=0x{control:X2})"
+        );
         return bytesRead;
     }
 
-    /// <remarks>The extension unit GUID is not used on Linux/macOS.</remarks>
+    /// <inheritdoc />
     public void SetExtensionUnit(
         Guid extensionGuid,
         uint entityId,
-        uint xuControl,
+        uint control,
         ReadOnlySpan<byte> data
     )
     {
@@ -253,16 +252,16 @@ internal sealed class UnixUvcControls : IUvcControls
             UvcControlRequest.SetCurrent,
             _interfaceNumber,
             (byte)entityId,
-            (byte)xuControl
+            (byte)control
         );
-        UvcTransfer.ThrowIfFailed(result, $"ExtensionUnit Set cs=0x{xuControl:X2}");
+        UvcTransfer.ThrowIfFailed(
+            result,
+            $"ControlWriteUvc(request=SetCurrent, entityId=0x{entityId:X2} control=0x{control:X2})"
+        );
     }
 
-    /// <remarks>
-    /// Issues a UVC GET_LEN request. Returns the 16-bit length value from the 2-byte response.
-    /// The extension unit GUID is not used on Linux/macOS.
-    /// </remarks>
-    public int GetExtensionUnitLength(Guid extensionGuid, uint entityId, uint xuControl)
+    /// <inheritdoc />
+    public int GetExtensionUnitLength(Guid extensionGuid, uint entityId, uint control)
     {
         Span<byte> buffer = stackalloc byte[2];
         var result = _device.ControlReadUvc(
@@ -271,11 +270,41 @@ internal sealed class UnixUvcControls : IUvcControls
             UvcControlRequest.GetLength,
             _interfaceNumber,
             (byte)entityId,
-            (byte)xuControl
+            (byte)control
         );
-        UvcTransfer.ThrowIfFailed(result, $"ExtensionUnit GetLength cs=0x{xuControl:X2}");
-        return System.Buffers.Binary.BinaryPrimitives.ReadUInt16LittleEndian(buffer);
+        UvcTransfer.ThrowIfFailed(
+            result,
+            $"ControlReadUvc(request=GetCurrent, entityId=0x{entityId:X2} control=0x{control:X2})"
+        );
+        return BinaryPrimitives.ReadUInt16LittleEndian(buffer);
     }
+
+    private byte GetCameraControlEntityIdOrThrow() =>
+        _cameraControlEntityId ??=
+            UvcDescriptor.GetCameraControlEntityId(_device, _interfaceNumber)
+            ?? throw new InvalidOperationException(
+                "Camera control request is not supported; "
+                    + "no camera terminal entity was found in the UVC descriptors."
+            );
+
+    private byte GetImageSettingEntityIdOrThrow() =>
+        _imageSettingEntityId ??=
+            UvcDescriptor.GetImageSettingEntityId(_device, _interfaceNumber)
+            ?? throw new InvalidOperationException(
+                "Image setting request is not supported; "
+                    + "no processing unit entity was found in the UVC descriptors."
+            );
+
+    private byte GetExtensionUnitEntityId(Guid extensionGuid) =>
+        _extensionUnitEntityIds.GetOrAdd(
+            extensionGuid,
+            guid =>
+                UvcDescriptor.GetExtensionUnitEntityId(_device, _interfaceNumber, guid)
+                ?? throw new InvalidOperationException(
+                    $"Extension unit request is not supported; "
+                        + $"no entity ID matching '{guid}' was found in the UVC descriptors."
+                )
+        );
 
     // Device is not owned; no-op dispose.
     public void Dispose() { }

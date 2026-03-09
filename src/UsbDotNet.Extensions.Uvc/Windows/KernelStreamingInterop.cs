@@ -1,4 +1,3 @@
-#nullable disable
 #pragma warning disable IDE1006 // Naming Styles
 // Kernel Streaming COM interface and struct definitions for extension unit controls on Windows.
 // Nullable is disabled because COM interfaces don't have nullable semantics.

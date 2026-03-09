@@ -5,24 +5,21 @@ using UsbDotNet.Descriptor;
 namespace UsbDotNet.Extensions.Uvc.Windows;
 
 /// <summary>
-/// A <see cref="SafeHandle"/> wrapping a DirectShow IBaseFilter COM pointer for a Windows
-/// UVC (USB Video Class) device. The underlying COM object can be used to query for
-/// DirectShow and Kernel Streaming interfaces such as IAMCameraControl, IAMVideoProcAmp,
-/// and IKsControl.
+/// A <see cref="SafeHandle"/> wrapping a DirectShow IBaseFilter COM pointer for a Windows UVC
+/// (USB Video Class) device. The underlying COM object can be used to query for DirectShow and
+/// Kernel Streaming interfaces such as IAMCameraControl, IAMVideoProcAmp, and IKsControl.
 /// </summary>
 /// <remarks>
-/// On Windows, the USB video class driver (usbvideo.sys) takes exclusive ownership of
-/// UVC interfaces, preventing direct USB control transfers via libusb. This SafeHandle
-/// provides access to the device through the Windows DirectShow / Kernel Streaming API.
+/// On Windows, the USB video class driver (usbvideo.sys) takes exclusive ownership of UVC
+/// interfaces, preventing direct USB control transfers via libusb. This SafeHandle provides
+/// access to the device through the Windows DirectShow / Kernel Streaming API.
 /// <para/>
-/// The device is located by enumerating the <c>CLSID_VideoInputDeviceCategory</c>
-/// DirectShow category and matching the device path against USB VID, PID, and serial
-/// number — the same approach used by <c>Huddly/node-uvc</c> on Windows.
-/// Serial number matching is always required to safely disambiguate when multiple
-/// devices of the same type are connected.
+/// The device is located by enumerating the <c>CLSID_VideoInputDeviceCategory</c> DirectShow
+/// category and matching the device path against USB VID, PID, and serial number. Serial number
+/// matching is always required to safely disambiguate multiple devices of the same VID and PID.
 /// <para/>
-/// For best results, call <see cref="Open(IUsbDevice, byte)"/> from an STA
-/// (Single-Threaded Apartment) thread, as DirectShow components are apartment-threaded.
+/// Call <see cref="Open(IUsbDevice, byte)"/> from an STA (Single-Threaded Apartment) thread,
+/// as DirectShow components are apartment-threaded.
 /// </remarks>
 [SupportedOSPlatform("windows")]
 internal sealed class SafeVideoDeviceHandle : SafeHandle
@@ -47,15 +44,21 @@ internal sealed class SafeVideoDeviceHandle : SafeHandle
     /// Opens a DirectShow video device matching the given USB device.
     /// The device must be open (not disposed) so that the serial number can be read.
     /// </summary>
-    /// <param name="device">An open UsbDevice instance — the serial number is read via <see cref="IUsbDevice.GetSerialNumber"/>.</param>
+    /// <param name="device">
+    /// An open UsbDevice instance; the serial number is read via <see cref="IUsbDevice.GetSerialNumber"/>.
+    /// </param>
     /// <param name="interfaceNumber">
     /// The UVC VideoControl interface number. Used to match the <c>MI_xx</c> component of the
     /// DirectShow device path on devices with multiple Video Interface Collections.
     /// Devices with only one camera (no <c>MI_xx</c> in their path) are matched regardless.
     /// </param>
-    /// <returns>A <see cref="SafeVideoDeviceHandle"/> wrapping the DirectShow IBaseFilter for the matched device.</returns>
-    /// <exception cref="ArgumentNullException"><paramref name="device"/> is <see langword="null"/>.</exception>
-    /// <exception cref="InvalidOperationException">No matching video device was found or COM initialization failed.</exception>
+    /// <returns>
+    /// A <see cref="SafeVideoDeviceHandle"/> wrapping the DirectShow IBaseFilter for the matched device.
+    /// </returns>
+    /// <exception cref="ArgumentNullException"><paramref name="device"/> is null.</exception>
+    /// <exception cref="InvalidOperationException">
+    /// No matching video device was found or COM initialization failed.
+    /// </exception>
     public static SafeVideoDeviceHandle Open(IUsbDevice device, byte interfaceNumber)
     {
         ArgumentNullException.ThrowIfNull(device);
@@ -75,10 +78,16 @@ internal sealed class SafeVideoDeviceHandle : SafeHandle
     /// DirectShow device path on devices with multiple Video Interface Collections.
     /// Devices with only one camera (no <c>MI_xx</c> in their path) are matched regardless.
     /// </param>
-    /// <returns>A <see cref="SafeVideoDeviceHandle"/> wrapping the DirectShow IBaseFilter for the matched device.</returns>
-    /// <exception cref="ArgumentNullException"><paramref name="descriptor"/> or <paramref name="serialNumber"/> is <see langword="null"/>.</exception>
+    /// <returns>
+    /// A <see cref="SafeVideoDeviceHandle"/> wrapping the DirectShow IBaseFilter for the matched device.
+    /// </returns>
+    /// <exception cref="ArgumentNullException">
+    /// <paramref name="descriptor"/> or <paramref name="serialNumber"/> is null.
+    /// </exception>
     /// <exception cref="ArgumentException"><paramref name="serialNumber"/> is empty.</exception>
-    /// <exception cref="InvalidOperationException">No matching video device was found or COM initialization failed.</exception>
+    /// <exception cref="InvalidOperationException">
+    /// No matching video device was found or COM initialization failed.
+    /// </exception>
     public static SafeVideoDeviceHandle Open(
         IUsbDeviceDescriptor descriptor,
         string serialNumber,
@@ -103,10 +112,14 @@ internal sealed class SafeVideoDeviceHandle : SafeHandle
     /// DirectShow device path on devices with multiple Video Interface Collections.
     /// Devices with only one camera (no <c>MI_xx</c> in their path) are matched regardless.
     /// </param>
-    /// <returns>A <see cref="SafeVideoDeviceHandle"/> wrapping the DirectShow IBaseFilter for the matched device.</returns>
-    /// <exception cref="ArgumentNullException"><paramref name="serialNumber"/> is <see langword="null"/>.</exception>
+    /// <returns>
+    /// A <see cref="SafeVideoDeviceHandle"/> wrapping the DirectShow IBaseFilter for the matched device.
+    /// </returns>
+    /// <exception cref="ArgumentNullException"><paramref name="serialNumber"/> is null.</exception>
     /// <exception cref="ArgumentException"><paramref name="serialNumber"/> is empty.</exception>
-    /// <exception cref="InvalidOperationException">No matching video device was found or COM initialization failed.</exception>
+    /// <exception cref="InvalidOperationException">
+    /// No matching video device was found or COM initialization failed.
+    /// </exception>
     public static SafeVideoDeviceHandle Open(
         ushort vendorId,
         ushort productId,
@@ -242,7 +255,8 @@ internal sealed class SafeVideoDeviceHandle : SafeHandle
 
     /// <summary>
     /// Checks whether a DirectShow device path matches the given USB identifiers.
-    /// Device paths follow the pattern: <c>\\?\usb#vid_XXXX&amp;pid_YYYY[&amp;mi_ZZ]#INSTANCE#{device-class-guid}</c>.
+    /// Device paths follow the pattern:
+    /// <c>\\?\usb#vid_XXXX&amp;pid_YYYY[&amp;mi_ZZ]#INSTANCE#{device-class-guid}</c>.
     /// The instance ID belongs to the USB interface node, which always uses a Windows-generated
     /// location-based ID (<c>D&amp;...</c>) — the USB serial number lives on the parent composite
     /// device node. When <paramref name="serialNumber"/> is provided, the parent is resolved via
@@ -292,10 +306,7 @@ internal sealed class SafeVideoDeviceHandle : SafeHandle
         {
             var miStart = miIndex + 3;
             var miEnd = hwIdSegment.IndexOf('&', miStart);
-            var miValue =
-                miEnd >= 0
-                    ? hwIdSegment.Substring(miStart, miEnd - miStart)
-                    : hwIdSegment.Substring(miStart);
+            var miValue = miEnd >= 0 ? hwIdSegment[miStart..miEnd] : hwIdSegment[miStart..];
             if (
                 !byte.TryParse(
                     miValue,
@@ -319,6 +330,7 @@ internal sealed class SafeVideoDeviceHandle : SafeHandle
         string serialNumber
     ) =>
         new(
-            $"No video device found matching VID=0x{vendorId:X4}, PID=0x{productId:X4}, Serial={serialNumber}."
+            $"No video device found matching "
+                + $"VID=0x{vendorId:X4}, PID=0x{productId:X4}, Serial={serialNumber}."
         );
 }

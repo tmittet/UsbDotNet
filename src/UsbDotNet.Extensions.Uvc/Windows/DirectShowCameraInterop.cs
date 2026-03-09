@@ -1,6 +1,4 @@
-#nullable disable
 // COM interface definitions for DirectShow camera and video processing controls on Windows.
-// Nullable is disabled because COM interfaces don't have nullable semantics.
 
 using System.Runtime.InteropServices;
 

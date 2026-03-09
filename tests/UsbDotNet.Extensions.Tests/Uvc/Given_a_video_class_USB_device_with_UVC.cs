@@ -10,7 +10,7 @@ public sealed class Given_a_video_class_USB_device_with_UVC : IDisposable
 {
     private const byte UvcInterfaceSubClass = UvcDescriptor.UvcVideoControlSubClass;
 
-    private readonly TestLoggerFactory _loggerFactory;
+    private readonly ILoggerFactory _loggerFactory;
     private readonly ILogger<Given_a_video_class_USB_device_with_UVC> _logger;
     private readonly Usb _usb;
     private readonly TestDeviceSource _deviceSource;
@@ -204,7 +204,7 @@ public sealed class Given_a_video_class_USB_device_with_UVC : IDisposable
         using var device = _deviceSource.OpenUsbDeviceOrSkip();
         using var uvc = OpenFirstUvcControls(device);
         uvc.GetCameraControlRange(control, out var min, out var max, out _, out _, out _);
-        uvc.GetCameraControl(control, out var value, out _);
+        var value = uvc.GetCameraControl(control, out _);
         _logger.LogInformation(
             "{Control}: value={Value}, range=[{Min}, {Max}].",
             control,
@@ -224,12 +224,12 @@ public sealed class Given_a_video_class_USB_device_with_UVC : IDisposable
         using var device = _deviceSource.OpenUsbDeviceOrSkip();
         using var uvc = OpenFirstUvcControls(device);
         uvc.GetCameraControlRange(control, out var min, out var max, out var step, out _, out _);
-        uvc.GetCameraControl(control, out var originalValue, out _);
+        var originalValue = uvc.GetCameraControl(control, out _);
         var targetValue = originalValue + step <= max ? originalValue + step : originalValue - step;
         try
         {
             uvc.SetCameraControl(control, targetValue);
-            uvc.GetCameraControl(control, out var readBack, out _);
+            var readBack = uvc.GetCameraControl(control, out _);
             _logger.LogInformation(
                 "{Control}: original={Original}, target={Target}, readBack={ReadBack}.",
                 control,
@@ -280,7 +280,7 @@ public sealed class Given_a_video_class_USB_device_with_UVC : IDisposable
         using var device = _deviceSource.OpenUsbDeviceOrSkip();
         using var uvc = OpenFirstUvcControls(device);
         uvc.GetImageSettingRange(setting, out var min, out var max, out _, out _, out _);
-        uvc.GetImageSetting(setting, out var value, out _);
+        var value = uvc.GetImageSetting(setting, out _);
         _logger.LogInformation(
             "{Setting}: value={Value}, range=[{Min}, {Max}].",
             setting,
@@ -299,12 +299,12 @@ public sealed class Given_a_video_class_USB_device_with_UVC : IDisposable
         using var device = _deviceSource.OpenUsbDeviceOrSkip();
         using var uvc = OpenFirstUvcControls(device);
         uvc.GetImageSettingRange(setting, out var min, out var max, out var step, out _, out _);
-        uvc.GetImageSetting(setting, out var originalValue, out _);
+        var originalValue = uvc.GetImageSetting(setting, out _);
         var targetValue = originalValue + step <= max ? originalValue + step : originalValue - step;
         try
         {
             uvc.SetImageSetting(setting, targetValue);
-            uvc.GetImageSetting(setting, out var readBack, out _);
+            var readBack = uvc.GetImageSetting(setting, out _);
             _logger.LogInformation(
                 "{Setting}: original={Original}, target={Target}, readBack={ReadBack}.",
                 setting,

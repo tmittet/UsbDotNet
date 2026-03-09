@@ -1,6 +1,4 @@
-#nullable disable
 // COM interface definitions for DirectShow device enumeration on Windows.
-// Nullable is disabled because COM interfaces don't have nullable semantics.
 
 using System.Runtime.InteropServices;
 

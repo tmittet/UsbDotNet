@@ -21,19 +21,19 @@ internal static class CfgMgrInterop
     /// <returns>
     /// The serial number component of the parent device instance ID
     /// (e.g. <c>52322F0017-12101A0022</c> from <c>USB\VID_2BD9&amp;PID_A032\52322F0017-12101A0022</c>),
-    /// or <see langword="null"/> if the parent node could not be resolved.
+    /// or null if the parent node could not be resolved.
     /// </returns>
     internal static string? GetParentSerialNumber(string devicePath)
     {
         // Convert "\\?\USB#VID_XXXX&PID_YYYY&MI_ZZ#D&...#{guid}\GLOBAL"
         // to the device instance ID "USB\VID_XXXX&PID_YYYY&MI_ZZ\D&..."
-        var p = devicePath;
-        if (p.StartsWith(@"\\?\", StringComparison.OrdinalIgnoreCase))
-            p = p.Substring(4);
-        var guidHash = p.IndexOf("#{", StringComparison.Ordinal);
+        var path = devicePath;
+        if (path.StartsWith(@"\\?\", StringComparison.Ordinal))
+            path = path[4..];
+        var guidHash = path.IndexOf("#{", StringComparison.Ordinal);
         if (guidHash >= 0)
-            p = p.Substring(0, guidHash);
-        var instanceId = p.Replace('#', '\\');
+            path = path[..guidHash];
+        var instanceId = path.Replace('#', '\\');
 
         if (CM_Locate_DevNode(out var devInst, instanceId, 0) != 0)
             return null;
@@ -49,9 +49,11 @@ internal static class CfgMgrInterop
         return parts.Length >= 3 ? parts[2] : null;
     }
 
-    // TODO: Fix CA5392 warnings (not possible with .NET6)
-#pragma warning disable CA5392 // Use DefaultDllImportSearchPaths attribute for P/Invokes
+    // SYSLIB1054: LibraryImportAttribute not available in .NET6, silence until removal of .NET6 support
+#pragma warning disable SYSLIB1054 // Use 'LibraryImportAttribute' instead of 'DllImportAttribute' to generate P/Invoke marshalling code at compile time
+
     [DllImport("CfgMgr32.dll", CharSet = CharSet.Unicode)]
+    [DefaultDllImportSearchPaths(DllImportSearchPath.SafeDirectories)]
     private static extern int CM_Locate_DevNode(
         out uint pdnDevInst,
         string pDeviceID,
@@ -59,14 +61,17 @@ internal static class CfgMgrInterop
     );
 
     [DllImport("CfgMgr32.dll")]
+    [DefaultDllImportSearchPaths(DllImportSearchPath.SafeDirectories)]
     private static extern int CM_Get_Parent(out uint pdnDevInst, uint dnDevInst, uint ulFlags);
 
     [DllImport("CfgMgr32.dll", CharSet = CharSet.Unicode)]
+    [DefaultDllImportSearchPaths(DllImportSearchPath.SafeDirectories)]
     private static extern int CM_Get_Device_ID(
         uint dnDevInst,
         char[] Buffer,
         uint BufferLen,
         uint ulFlags
     );
-#pragma warning restore CA5392 // Use DefaultDllImportSearchPaths attribute for P/Invokes
+
+#pragma warning restore SYSLIB1054 // Use 'LibraryImportAttribute' instead of 'DllImportAttribute' to generate P/Invoke marshalling code at compile time
 }

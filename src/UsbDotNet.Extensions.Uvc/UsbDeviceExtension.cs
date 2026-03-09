@@ -23,7 +23,7 @@ public static class UsbDeviceExtension
     /// <returns>
     /// Success = The read operation completed successfully.<br />
     /// IO = The read operation failed.<br />
-    /// InvalidParameter = TransferCameraControl size is larger than OS or hardware can support.<br />
+    /// InvalidParameter = The transfer size is larger than OS or hardware can support.<br />
     /// NoDevice = The device has been disconnected.<br />
     /// ResourceBusy = Halt condition detected (endpoint stalled) or control request not supported.<br />
     /// Timeout = The read operation timed out.<br />
@@ -69,7 +69,7 @@ public static class UsbDeviceExtension
     /// <returns>
     /// Success = The write operation completed successfully.<br />
     /// IO = The write operation failed.<br />
-    /// InvalidParameter = TransferCameraControl size is larger than OS or hardware can support.<br />
+    /// InvalidParameter = The transfer size is larger than OS or hardware can support.<br />
     /// NoDevice = The device has been disconnected.<br />
     /// ResourceBusy = Halt condition detected (endpoint stalled) or control request not supported.<br />
     /// Timeout = The write operation timed out.<br />
@@ -115,8 +115,16 @@ public static class UsbDeviceExtension
     /// An <see cref="IUvcControls"/> bound to the specified interface,
     /// backed by Kernel Streaming on Windows or by libusb UVC control transfers on Linux and macOS.
     /// </returns>
-    /// <exception cref="ArgumentNullException"><paramref name="device"/> is <see langword="null"/>.</exception>
-    /// <exception cref="InvalidOperationException">On Windows: no matching DirectShow video device found.</exception>
+    /// <remarks>
+    /// On Windows: If possible call <see cref="OpenUvcControls(IUsbDevice, byte)"/> from an STA
+    /// (Single-Threaded Apartment) thread, as DirectShow components are apartment-threaded.
+    /// Alternatively, make sure the thread calling OpenUvcControls lives as long as the lifetime
+    /// of the returned <see cref="IUvcControls"/> instance. If not, DirectShow calls may fail.
+    /// </remarks>
+    /// <exception cref="ArgumentNullException"><paramref name="device"/> is null.</exception>
+    /// <exception cref="InvalidOperationException">
+    /// On Windows: no matching DirectShow video device found.
+    /// </exception>
     public static IUvcControls OpenUvcControls(this IUsbDevice device, byte interfaceNumber)
     {
         ArgumentNullException.ThrowIfNull(device);

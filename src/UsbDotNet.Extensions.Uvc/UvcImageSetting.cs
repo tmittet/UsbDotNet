@@ -1,9 +1,8 @@
 namespace UsbDotNet.Extensions.Uvc;
 
 /// <summary>
-/// Video processing amplifier properties (KSPROPERTY_VIDEOPROCAMP_* on Windows;
-/// UVC Processing Unit control selectors on Linux and macOS).
-/// Values are non-contiguous because they match the Windows SDK constants.
+/// UVC processing unit control selectors on Linux and macOS;
+/// mapped to video processing amplifier properties (KSPROPERTY_VIDEOPROCAMP_*) on Windows.
 /// </summary>
 #pragma warning disable CA1027 // Mark enums with FlagsAttribute
 public enum UvcImageSetting

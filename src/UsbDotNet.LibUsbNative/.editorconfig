@@ -2,8 +2,6 @@
 [*.cs]
 
 dotnet_diagnostic.CA1008.severity = suggestion # Enums should have zero value
-# TODO: Look into hardening this (not possible with .NET6)
-dotnet_diagnostic.CA5392.severity = suggestion # Use DefaultDllImportSearchPaths attribute for P/Invokes
 dotnet_diagnostic.CA1027.severity = suggestion # CA1027: Mark enums with FlagsAttribute
 
 dotnet_diagnostic.CA1028.severity = none # Enum storage should be Int32
