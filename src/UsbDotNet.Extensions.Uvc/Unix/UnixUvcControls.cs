@@ -281,7 +281,7 @@ internal sealed class UnixUvcControls : IUvcControls
 
     private byte GetCameraControlEntityIdOrThrow() =>
         _cameraControlEntityId ??=
-            UvcDescriptor.GetCameraControlEntityId(_device, _interfaceNumber)
+            _device.GetUvcCameraControlEntityId(_interfaceNumber)
             ?? throw new InvalidOperationException(
                 "Camera control request is not supported; "
                     + "no camera terminal entity was found in the UVC descriptors."
@@ -289,7 +289,7 @@ internal sealed class UnixUvcControls : IUvcControls
 
     private byte GetImageSettingEntityIdOrThrow() =>
         _imageSettingEntityId ??=
-            UvcDescriptor.GetImageSettingEntityId(_device, _interfaceNumber)
+            _device.GetUvcImageSettingEntityId(_interfaceNumber)
             ?? throw new InvalidOperationException(
                 "Image setting request is not supported; "
                     + "no processing unit entity was found in the UVC descriptors."
@@ -299,7 +299,7 @@ internal sealed class UnixUvcControls : IUvcControls
         _extensionUnitEntityIds.GetOrAdd(
             extensionGuid,
             guid =>
-                UvcDescriptor.GetExtensionUnitEntityId(_device, _interfaceNumber, guid)
+                _device.GetUvcExtensionUnitEntityId(_interfaceNumber, guid)
                 ?? throw new InvalidOperationException(
                     $"Extension unit request is not supported; "
                         + $"no entity ID matching '{guid}' was found in the UVC descriptors."

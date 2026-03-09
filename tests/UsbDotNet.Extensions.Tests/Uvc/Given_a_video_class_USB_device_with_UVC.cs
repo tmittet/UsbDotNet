@@ -8,7 +8,7 @@ namespace UsbDotNet.Extensions.Tests.Uvc;
 [Trait("Category", "UsbVideoControl")]
 public sealed class Given_a_video_class_USB_device_with_UVC : IDisposable
 {
-    private const byte UvcInterfaceSubClass = UvcDescriptor.UvcVideoControlSubClass;
+    private const byte UvcInterfaceSubClass = UsbDeviceDescriptorExtension.UvcVideoControlSubClass;
 
     private readonly ILoggerFactory _loggerFactory;
     private readonly ILogger<Given_a_video_class_USB_device_with_UVC> _logger;
@@ -32,7 +32,7 @@ public sealed class Given_a_video_class_USB_device_with_UVC : IDisposable
     {
         using var device = _deviceSource.OpenUsbDeviceOrSkip();
         var uvcInterface = GetFirstUvcInterface(device);
-        var entityId = UvcDescriptor.GetCameraControlEntityId(device, uvcInterface.InterfaceNumber);
+        var entityId = device.GetUvcCameraControlEntityId(uvcInterface.InterfaceNumber);
         entityId.Should().NotBeNull("The device must have a camera terminal to test UVC controls.");
     }
 
@@ -41,7 +41,7 @@ public sealed class Given_a_video_class_USB_device_with_UVC : IDisposable
     {
         using var device = _deviceSource.OpenUsbDeviceOrSkip();
         var uvcInterface = GetFirstUvcInterface(device);
-        var entityId = UvcDescriptor.GetImageSettingEntityId(device, uvcInterface.InterfaceNumber);
+        var entityId = device.GetUvcImageSettingEntityId(uvcInterface.InterfaceNumber);
         entityId.Should().NotBeNull("The device must have a processing unit to test UVC controls.");
     }
 
@@ -76,7 +76,7 @@ public sealed class Given_a_video_class_USB_device_with_UVC : IDisposable
             uvcInterface.InterfaceNumber
         );
         var entityId =
-            UvcDescriptor.GetImageSettingEntityId(device, uvcInterface.InterfaceNumber)
+            device.GetUvcImageSettingEntityId(uvcInterface.InterfaceNumber)
             ?? throw new InvalidOperationException("Camera control entity ID not found.");
         var (controlSelector, bufferSize) = UvcTransfer.GetImageSettingDescriptor(
             UvcImageSetting.Brightness
@@ -104,9 +104,7 @@ public sealed class Given_a_video_class_USB_device_with_UVC : IDisposable
         }
         using var device = _deviceSource.OpenUsbDeviceOrSkip();
         var serial = device.GetSerialNumber();
-        var uvcInterface = device
-            .GetInterfaceDescriptorList(UsbClass.Video, UvcInterfaceSubClass)
-            .First();
+        var uvcInterface = GetFirstUvcInterface(device);
         _logger.LogInformation(
             "Video device open: VID=0x{VID:X4}, PID=0x{PID:X4}, "
                 + "SerialNumber={SerialNumber}, UVC interface: {Interface}.",
@@ -116,7 +114,7 @@ public sealed class Given_a_video_class_USB_device_with_UVC : IDisposable
             uvcInterface.InterfaceNumber
         );
         var entityId =
-            UvcDescriptor.GetImageSettingEntityId(device, uvcInterface.InterfaceNumber)
+            device.GetUvcImageSettingEntityId(uvcInterface.InterfaceNumber)
             ?? throw new InvalidOperationException("Camera control entity ID not found.");
         var (controlSelector, bufferSize) = UvcTransfer.GetImageSettingDescriptor(
             UvcImageSetting.Brightness

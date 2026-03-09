@@ -1,7 +1,7 @@
 using System.Buffers.Binary;
 using UsbDotNet.Descriptor;
 
-namespace UsbDotNet.Extensions.Uvc.Unix;
+namespace UsbDotNet.Extensions.Uvc;
 
 /// <summary>
 /// Parses UVC VideoControl class-specific interface descriptors to discover entity IDs.
@@ -23,12 +23,12 @@ namespace UsbDotNet.Extensions.Uvc.Unix;
 /// <item>0x06 VC_EXTENSION_UNIT — byte 3 = bUnitID, bytes 4–19 = guidExtensionCode</item>
 /// </list>
 /// </remarks>
-internal static class UvcDescriptor
+public static class UsbDeviceDescriptorExtension
 {
     /// <summary>
     /// SC_VIDEOCONTROL
     /// </summary>
-    public const byte UvcVideoControlSubClass = 0x01;
+    internal const byte UvcVideoControlSubClass = 0x01;
 
     private const byte CsInterface = 0x24;
     private const ushort IttCamera = 0x0201;
@@ -40,12 +40,13 @@ internal static class UvcDescriptor
     /// <summary>
     /// Returns the VideoControl interface descriptor for the specified interface number, or null.
     /// </summary>
-    public static IUsbInterfaceDescriptor? GetVideoControlDescriptor(
-        IUsbDevice device,
+    public static IUsbInterfaceDescriptor? GetUvcInterfaceDescriptor(
+        this IUsbDevice? device,
         byte interfaceNumber
     ) =>
         device is not null
         && device.ConfigDescriptor.Interfaces.TryGetValue(interfaceNumber, out var altSettings)
+        // Per the USB spec, alternate setting 0 always exists and is the default alternate setting
         && altSettings.TryGetValue(0, out var usbInterface)
         && usbInterface.InterfaceClass == UsbClass.Video
         && usbInterface.InterfaceSubClass == UvcVideoControlSubClass
@@ -57,9 +58,9 @@ internal static class UvcDescriptor
     /// VideoControl interface, or null if the device has no camera terminal
     /// (e.g. a capture card or a device with no optical controls).
     /// </summary>
-    public static byte? GetCameraControlEntityId(IUsbDevice device, byte interfaceNumber)
+    public static byte? GetUvcCameraControlEntityId(this IUsbDevice? device, byte interfaceNumber)
     {
-        var usbInterface = GetVideoControlDescriptor(device, interfaceNumber);
+        var usbInterface = GetUvcInterfaceDescriptor(device, interfaceNumber);
         if (usbInterface is null)
             return null;
 
@@ -81,9 +82,9 @@ internal static class UvcDescriptor
     /// Returns the ID of the Processing Unit on the specified VideoControl interface,
     /// or null if the device has no processing unit.
     /// </summary>
-    public static byte? GetImageSettingEntityId(IUsbDevice device, byte interfaceNumber)
+    public static byte? GetUvcImageSettingEntityId(this IUsbDevice? device, byte interfaceNumber)
     {
-        var usbInterface = GetVideoControlDescriptor(device, interfaceNumber);
+        var usbInterface = GetUvcInterfaceDescriptor(device, interfaceNumber);
         if (usbInterface is null)
             return null;
 
@@ -102,13 +103,13 @@ internal static class UvcDescriptor
     /// whose <c>guidExtensionCode</c> matches <paramref name="extensionGuid"/>;
     /// or null if no matching Extension Unit is found.
     /// </summary>
-    public static byte? GetExtensionUnitEntityId(
-        IUsbDevice device,
+    public static byte? GetUvcExtensionUnitEntityId(
+        this IUsbDevice? device,
         byte interfaceNumber,
         Guid extensionGuid
     )
     {
-        var usbInterface = GetVideoControlDescriptor(device, interfaceNumber);
+        var usbInterface = GetUvcInterfaceDescriptor(device, interfaceNumber);
         if (usbInterface is null)
             return null;
 
