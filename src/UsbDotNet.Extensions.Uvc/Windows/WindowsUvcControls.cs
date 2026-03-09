@@ -31,7 +31,7 @@ internal sealed class WindowsUvcControls : IUvcControls
     public void GetCameraControl(
         UvcCameraControl cameraControl,
         out int value,
-        out ControlFlags flags
+        out UvcControl flags
     )
     {
         var cameraControlInterface = QueryInterface<IAMCameraControl>(_handle);
@@ -39,7 +39,7 @@ internal sealed class WindowsUvcControls : IUvcControls
         {
             var hr = cameraControlInterface.Get((int)cameraControl, out value, out var rawFlags);
             Marshal.ThrowExceptionForHR(hr);
-            flags = (ControlFlags)rawFlags;
+            flags = (UvcControl)rawFlags;
         }
         finally
         {
@@ -53,7 +53,7 @@ internal sealed class WindowsUvcControls : IUvcControls
     /// <param name="cameraControl">The camera control property to set.</param>
     /// <param name="value">The value to set.</param>
     /// <param name="flags">
-    /// Auto or manual mode. Defaults to <see cref="ControlFlags.Manual"/>.
+    /// Auto or manual mode. Defaults to <see cref="UvcControl.Manual"/>.
     /// </param>
     /// <exception cref="COMException">The device returned an error.</exception>
     /// <exception cref="InvalidCastException">
@@ -62,7 +62,7 @@ internal sealed class WindowsUvcControls : IUvcControls
     public void SetCameraControl(
         UvcCameraControl cameraControl,
         int value,
-        ControlFlags flags = ControlFlags.Manual
+        UvcControl flags = UvcControl.Manual
     )
     {
         var cameraControlInterface = QueryInterface<IAMCameraControl>(_handle);
@@ -97,7 +97,7 @@ internal sealed class WindowsUvcControls : IUvcControls
         out int maxValue,
         out int stepSize,
         out int defaultValue,
-        out ControlFlags capsFlags
+        out UvcControl capsFlags
     )
     {
         var cameraControlInterface = QueryInterface<IAMCameraControl>(_handle);
@@ -112,7 +112,7 @@ internal sealed class WindowsUvcControls : IUvcControls
                 out var rawFlags
             );
             Marshal.ThrowExceptionForHR(hr);
-            capsFlags = (ControlFlags)rawFlags;
+            capsFlags = (UvcControl)rawFlags;
         }
         finally
         {
@@ -130,14 +130,14 @@ internal sealed class WindowsUvcControls : IUvcControls
     /// <exception cref="InvalidCastException">
     /// The device does not support IAMVideoProcAmp.
     /// </exception>
-    public void GetImageSetting(UvcImageSetting imageSetting, out int value, out ControlFlags flags)
+    public void GetImageSetting(UvcImageSetting imageSetting, out int value, out UvcControl flags)
     {
         var videoProcAmp = QueryInterface<IAMVideoProcAmp>(_handle);
         try
         {
             var hr = videoProcAmp.Get((int)imageSetting, out value, out var rawFlags);
             Marshal.ThrowExceptionForHR(hr);
-            flags = (ControlFlags)rawFlags;
+            flags = (UvcControl)rawFlags;
         }
         finally
         {
@@ -151,7 +151,7 @@ internal sealed class WindowsUvcControls : IUvcControls
     /// <param name="imageSetting">The video proc amp property to set.</param>
     /// <param name="value">The value to set.</param>
     /// <param name="flags">
-    /// Auto or manual mode. Defaults to <see cref="ControlFlags.Manual"/>.
+    /// Auto or manual mode. Defaults to <see cref="UvcControl.Manual"/>.
     /// </param>
     /// <exception cref="COMException">The device returned an error.</exception>
     /// <exception cref="InvalidCastException">
@@ -160,7 +160,7 @@ internal sealed class WindowsUvcControls : IUvcControls
     public void SetImageSetting(
         UvcImageSetting imageSetting,
         int value,
-        ControlFlags flags = ControlFlags.Manual
+        UvcControl flags = UvcControl.Manual
     )
     {
         var videoProcAmpInterface = QueryInterface<IAMVideoProcAmp>(_handle);
@@ -195,7 +195,7 @@ internal sealed class WindowsUvcControls : IUvcControls
         out int maxValue,
         out int stepSize,
         out int defaultValue,
-        out ControlFlags capsFlags
+        out UvcControl capsFlags
     )
     {
         var videoProcAmpInterface = QueryInterface<IAMVideoProcAmp>(_handle);
@@ -210,7 +210,7 @@ internal sealed class WindowsUvcControls : IUvcControls
                 out var rawFlags
             );
             Marshal.ThrowExceptionForHR(hr);
-            capsFlags = (ControlFlags)rawFlags;
+            capsFlags = (UvcControl)rawFlags;
         }
         finally
         {

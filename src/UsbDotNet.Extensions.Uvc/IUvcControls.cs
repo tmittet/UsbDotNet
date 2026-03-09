@@ -13,76 +13,76 @@ namespace UsbDotNet.Extensions.Uvc;
 /// On Linux and macOS, controls are sent via libusb UVC control transfers using the entity ID.
 /// <para/>
 /// Auto/manual flags are fully supported on Windows. On Linux and macOS,
-/// <see cref="GetImageSetting"/> always returns <see cref="ControlFlags.Manual"/> and
-/// the <see cref="ControlFlags.Auto"/> flag is ignored by <see cref="SetImageSetting"/>.
+/// <see cref="GetImageSetting"/> always returns <see cref="UvcControl.Manual"/> and
+/// the <see cref="UvcControl.Auto"/> flag is ignored by <see cref="SetImageSetting"/>.
 /// <para/>
 /// <see cref="UvcImageSetting.ColorEnable"/> is Windows-only; using it on Linux or macOS
 /// throws <see cref="NotSupportedException"/>.
 /// </remarks>
 public interface IUvcControls : IDisposable
 {
-    /// <summary>Gets the current value and control mode of a Camera Terminal cameraControl.</summary>
-    /// <param name="cameraControl">The cameraControl to query.</param>
+    /// <summary>Gets the current value and control mode of a Camera Terminal control.</summary>
+    /// <param name="cameraControl">The camera control to query.</param>
     /// <param name="value">Receives the current value.</param>
-    /// <param name="flags">Receives the current auto/manual mode (Windows only; always <see cref="ControlFlags.Manual"/> on Linux/macOS).</param>
-    void GetCameraControl(UvcCameraControl cameraControl, out int value, out ControlFlags flags);
+    /// <param name="flags">Receives the current auto/manual mode (Windows only; always <see cref="UvcControl.Manual"/> on Linux/macOS).</param>
+    void GetCameraControl(UvcCameraControl cameraControl, out int value, out UvcControl flags);
 
-    /// <summary>Sets the value of a Camera Terminal cameraControl.</summary>
-    /// <param name="cameraControl">The cameraControl to set.</param>
+    /// <summary>Sets the value of a Camera Terminal control.</summary>
+    /// <param name="cameraControl">The camera control to set.</param>
     /// <param name="value">The value to set.</param>
-    /// <param name="flags">Auto or manual mode (Windows only; ignored on Linux/macOS). Defaults to <see cref="ControlFlags.Manual"/>.</param>
+    /// <param name="flags">Auto or manual mode (Windows only; ignored on Linux/macOS). Defaults to <see cref="UvcControl.Manual"/>.</param>
     void SetCameraControl(
         UvcCameraControl cameraControl,
         int value,
-        ControlFlags flags = ControlFlags.Manual
+        UvcControl flags = UvcControl.Manual
     );
 
-    /// <summary>Gets the supported range and capabilities of a Camera Terminal cameraControl.</summary>
-    /// <param name="cameraControl">The cameraControl to query.</param>
+    /// <summary>Gets the supported range and capabilities of a Camera Terminal control.</summary>
+    /// <param name="cameraControl">The camera control to query.</param>
     /// <param name="minValue">Receives the minimum supported value.</param>
     /// <param name="maxValue">Receives the maximum supported value.</param>
     /// <param name="stepSize">Receives the stepping delta between valid values.</param>
     /// <param name="defaultValue">Receives the default value.</param>
-    /// <param name="capsFlags">Receives the supported modes (Windows only; always <see cref="ControlFlags.Manual"/> on Linux/macOS).</param>
+    /// <param name="capsFlags">Receives the supported modes (Windows only; always <see cref="UvcControl.Manual"/> on Linux/macOS).</param>
     void GetCameraControlRange(
         UvcCameraControl cameraControl,
         out int minValue,
         out int maxValue,
         out int stepSize,
         out int defaultValue,
-        out ControlFlags capsFlags
+        out UvcControl capsFlags
     );
 
-    /// <summary>Gets the current value and control mode of a Processing Unit imageSetting.</summary>
-    /// <param name="imageSetting">The imageSetting to query.</param>
+    /// <summary>Gets the current value and control mode of a processing unit image setting.</summary>
+    /// <param name="imageSetting">The image setting to query.</param>
     /// <param name="value">Receives the current value.</param>
-    /// <param name="flags">Receives the current auto/manual mode (Windows only; always <see cref="ControlFlags.Manual"/> on Linux/macOS).</param>
-    void GetImageSetting(UvcImageSetting imageSetting, out int value, out ControlFlags flags);
+    /// <param name="flags">Receives the current auto/manual mode (Windows only; always <see cref="UvcControl.Manual"/> on Linux/macOS).</param>
+    void GetImageSetting(UvcImageSetting imageSetting, out int value, out UvcControl flags);
 
-    /// <summary>Sets the value of a Processing Unit imageSetting.</summary>
-    /// <param name="imageSetting">The imageSetting to set.</param>
+    /// <summary>Sets the value of a processing unit image setting.</summary>
+    /// <param name="imageSetting">The image setting to set.</param>
     /// <param name="value">The value to set.</param>
-    /// <param name="flags">Auto or manual mode (Windows only; ignored on Linux/macOS). Defaults to <see cref="ControlFlags.Manual"/>.</param>
+    /// <param name="flags">Auto or manual mode (Windows only; ignored on Linux/macOS). Defaults to <see cref="UvcControl.Manual"/>.</param>
     void SetImageSetting(
         UvcImageSetting imageSetting,
         int value,
-        ControlFlags flags = ControlFlags.Manual
+        UvcControl flags = UvcControl.Manual
     );
 
-    /// <summary>Gets the supported range and capabilities of a Processing Unit imageSetting.</summary>
-    /// <param name="imageSetting">The imageSetting to query.</param>
+    /// <summary>Gets the supported range and capabilities of a processing unit image setting.</summary>
+    /// <param name="imageSetting">The image setting to query.</param>
     /// <param name="minValue">Receives the minimum supported value.</param>
     /// <param name="maxValue">Receives the maximum supported value.</param>
     /// <param name="stepSize">Receives the stepping delta between valid values.</param>
     /// <param name="defaultValue">Receives the default value.</param>
-    /// <param name="capsFlags">Receives the supported modes (Windows only; always <see cref="ControlFlags.Manual"/> on Linux/macOS).</param>
+    /// <param name="capsFlags">Receives the supported modes (Windows only; always <see cref="UvcControl.Manual"/> on Linux/macOS).</param>
     void GetImageSettingRange(
         UvcImageSetting imageSetting,
         out int minValue,
         out int maxValue,
         out int stepSize,
         out int defaultValue,
-        out ControlFlags capsFlags
+        out UvcControl capsFlags
     );
 
     /// <summary>

@@ -22,17 +22,17 @@ internal sealed class UnixUvcControls : IUvcControls
     public void GetCameraControl(
         UvcCameraControl cameraControl,
         out int value,
-        out ControlFlags flags
+        out UvcControl flags
     )
     {
         value = TransferCameraControl(cameraControl, UvcControlRequest.GetCurrent);
-        flags = ControlFlags.Manual;
+        flags = UvcControl.Manual;
     }
 
     public void SetCameraControl(
         UvcCameraControl cameraControl,
         int value,
-        ControlFlags flags = ControlFlags.Manual
+        UvcControl flags = UvcControl.Manual
     )
     {
         if (_cameraControlEntityId is null)
@@ -91,14 +91,14 @@ internal sealed class UnixUvcControls : IUvcControls
         out int maxValue,
         out int stepSize,
         out int defaultValue,
-        out ControlFlags capsFlags
+        out UvcControl capsFlags
     )
     {
         minValue = TransferCameraControl(cameraControl, UvcControlRequest.GetMinimum);
         maxValue = TransferCameraControl(cameraControl, UvcControlRequest.GetMaximum);
         stepSize = TransferCameraControl(cameraControl, UvcControlRequest.GetResolution);
         defaultValue = TransferCameraControl(cameraControl, UvcControlRequest.GetDefault);
-        capsFlags = ControlFlags.Manual;
+        capsFlags = UvcControl.Manual;
     }
 
     // The UVC spec returns the full buffer for pantilt; extract the int at the right offset.
@@ -126,16 +126,16 @@ internal sealed class UnixUvcControls : IUvcControls
         return UvcTransfer.ReadInt(buffer, offset, bufferSize <= 4 ? bufferSize : 4);
     }
 
-    public void GetImageSetting(UvcImageSetting imageSetting, out int value, out ControlFlags flags)
+    public void GetImageSetting(UvcImageSetting imageSetting, out int value, out UvcControl flags)
     {
         value = TransferImageSetting(imageSetting, UvcControlRequest.GetCurrent);
-        flags = ControlFlags.Manual;
+        flags = UvcControl.Manual;
     }
 
     public void SetImageSetting(
         UvcImageSetting imageSetting,
         int value,
-        ControlFlags flags = ControlFlags.Manual
+        UvcControl flags = UvcControl.Manual
     )
     {
         if (_imageSettingEntityId is null)
@@ -164,14 +164,14 @@ internal sealed class UnixUvcControls : IUvcControls
         out int max,
         out int step,
         out int defaultValue,
-        out ControlFlags capsFlags
+        out UvcControl capsFlags
     )
     {
         min = TransferImageSetting(imageSetting, UvcControlRequest.GetMinimum);
         max = TransferImageSetting(imageSetting, UvcControlRequest.GetMaximum);
         step = TransferImageSetting(imageSetting, UvcControlRequest.GetResolution);
         defaultValue = TransferImageSetting(imageSetting, UvcControlRequest.GetDefault);
-        capsFlags = ControlFlags.Manual;
+        capsFlags = UvcControl.Manual;
     }
 
     private int TransferImageSetting(UvcImageSetting imageSetting, UvcControlRequest request)

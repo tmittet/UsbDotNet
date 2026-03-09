@@ -39,7 +39,7 @@ internal sealed class SafeVideoDeviceHandle : SafeHandle
     /// <inheritdoc/>
     protected override bool ReleaseHandle()
     {
-        Marshal.Release(handle);
+        _ = Marshal.Release(handle);
         return true;
     }
 
@@ -68,6 +68,7 @@ internal sealed class SafeVideoDeviceHandle : SafeHandle
     /// <param name="descriptor">The USB device descriptor providing VID and PID for matching.</param>
     /// <param name="serialNumber">
     /// The device serial number, used together with VID/PID to uniquely identify the device.
+    /// Required to safely disambiguate when multiple devices of the same VID/PID are connected.
     /// </param>
     /// <param name="interfaceNumber">
     /// The UVC VideoControl interface number. Used to match the <c>MI_xx</c> component of the
@@ -75,8 +76,8 @@ internal sealed class SafeVideoDeviceHandle : SafeHandle
     /// Devices with only one camera (no <c>MI_xx</c> in their path) are matched regardless.
     /// </param>
     /// <returns>A <see cref="SafeVideoDeviceHandle"/> wrapping the DirectShow IBaseFilter for the matched device.</returns>
-    /// <exception cref="ArgumentNullException"><paramref name="descriptor"/> is <see langword="null"/>.</exception>
-    /// <exception cref="ArgumentException"><paramref name="serialNumber"/> is <see langword="null"/> or empty.</exception>
+    /// <exception cref="ArgumentNullException"><paramref name="descriptor"/> or <paramref name="serialNumber"/> is <see langword="null"/>.</exception>
+    /// <exception cref="ArgumentException"><paramref name="serialNumber"/> is empty.</exception>
     /// <exception cref="InvalidOperationException">No matching video device was found or COM initialization failed.</exception>
     public static SafeVideoDeviceHandle Open(
         IUsbDeviceDescriptor descriptor,
@@ -95,6 +96,7 @@ internal sealed class SafeVideoDeviceHandle : SafeHandle
     /// <param name="productId">The USB product ID (PID) to match.</param>
     /// <param name="serialNumber">
     /// The device serial number, used together with VID/PID to uniquely identify the device.
+    /// Required to safely disambiguate when multiple devices of the same VID/PID are connected.
     /// </param>
     /// <param name="interfaceNumber">
     /// The UVC VideoControl interface number. Used to match the <c>MI_xx</c> component of the
@@ -102,7 +104,8 @@ internal sealed class SafeVideoDeviceHandle : SafeHandle
     /// Devices with only one camera (no <c>MI_xx</c> in their path) are matched regardless.
     /// </param>
     /// <returns>A <see cref="SafeVideoDeviceHandle"/> wrapping the DirectShow IBaseFilter for the matched device.</returns>
-    /// <exception cref="ArgumentException"><paramref name="serialNumber"/> is <see langword="null"/> or empty.</exception>
+    /// <exception cref="ArgumentNullException"><paramref name="serialNumber"/> is <see langword="null"/>.</exception>
+    /// <exception cref="ArgumentException"><paramref name="serialNumber"/> is empty.</exception>
     /// <exception cref="InvalidOperationException">No matching video device was found or COM initialization failed.</exception>
     public static SafeVideoDeviceHandle Open(
         ushort vendorId,
@@ -157,19 +160,19 @@ internal sealed class SafeVideoDeviceHandle : SafeHandle
                     }
                     finally
                     {
-                        Marshal.ReleaseComObject(moniker);
+                        _ = Marshal.ReleaseComObject(moniker);
                     }
                 }
             }
             finally
             {
                 result?.Dispose();
-                Marshal.ReleaseComObject(enumMoniker);
+                _ = Marshal.ReleaseComObject(enumMoniker);
             }
         }
         finally
         {
-            Marshal.ReleaseComObject(devEnum);
+            _ = Marshal.ReleaseComObject(devEnum);
         }
 
         throw DeviceNotFoundException(vendorId, productId, serialNumber);
@@ -221,13 +224,13 @@ internal sealed class SafeVideoDeviceHandle : SafeHandle
                 var ptr = Marshal.GetIUnknownForObject(filterObj);
 
                 // Release the RCW; our SafeHandle now owns the COM reference.
-                Marshal.ReleaseComObject(filterObj);
+                _ = Marshal.ReleaseComObject(filterObj);
 
                 return new SafeVideoDeviceHandle(ptr);
             }
             finally
             {
-                Marshal.ReleaseComObject(propertyBag);
+                _ = Marshal.ReleaseComObject(propertyBag);
             }
         }
         catch (COMException)
@@ -239,7 +242,11 @@ internal sealed class SafeVideoDeviceHandle : SafeHandle
 
     /// <summary>
     /// Checks whether a DirectShow device path matches the given USB identifiers.
-    /// Device paths follow the pattern: <c>\\?\usb#vid_XXXX&amp;pid_YYYY[&amp;mi_ZZ]#SERIAL#{device-class-guid}</c>.
+    /// Device paths follow the pattern: <c>\\?\usb#vid_XXXX&amp;pid_YYYY[&amp;mi_ZZ]#INSTANCE#{device-class-guid}</c>.
+    /// The instance ID belongs to the USB interface node, which always uses a Windows-generated
+    /// location-based ID (<c>D&amp;...</c>) — the USB serial number lives on the parent composite
+    /// device node. When <paramref name="serialNumber"/> is provided, the parent is resolved via
+    /// <c>CM_Get_Parent</c> and its device instance ID is parsed to extract the serial.
     /// The <c>MI_ZZ</c> component is only present on devices with multiple Video Interface
     /// Collections; when present it is matched against <paramref name="interfaceNumber"/>.
     /// </summary>
@@ -263,12 +270,17 @@ internal sealed class SafeVideoDeviceHandle : SafeHandle
         if (!path.Contains($"PID_{productId:X4}", StringComparison.Ordinal))
             return false;
 
-        // The instance ID (often the serial number) is the third '#'-delimited segment.
         var segments = path.Split('#');
         if (segments.Length < 3)
             return false;
 
-        if (!string.Equals(segments[2], serialNumber, StringComparison.OrdinalIgnoreCase))
+        // The instance ID in segment[2] belongs to the USB interface node and always uses a
+        // Windows-generated location-based ID (D&...). The real serial number lives on the
+        // parent composite device. Navigate up via CfgMgr32 and compare from there.
+        var parentSerial = CfgMgrInterop.GetParentSerialNumber(devicePath);
+        if (parentSerial is null)
+            return false;
+        if (!string.Equals(parentSerial, serialNumber, StringComparison.OrdinalIgnoreCase))
             return false;
 
         // The first segment contains "VID_XXXX&PID_YYYY" and, on multi-VIC devices, "&MI_ZZ".
