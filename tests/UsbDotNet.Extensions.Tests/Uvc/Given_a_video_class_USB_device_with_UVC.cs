@@ -2,14 +2,17 @@ using UsbDotNet.Core;
 using UsbDotNet.Extensions.Uvc;
 using UsbDotNet.Extensions.Uvc.Unix;
 using UsbDotNet.Extensions.Uvc.Windows;
+using UsbDotNet.LibUsbNative;
 
 namespace UsbDotNet.Extensions.Tests.Uvc;
 
 [Trait("Category", "UsbVideoControl")]
 public sealed class Given_a_video_class_USB_device_with_UVC : IDisposable
 {
+    private const ushort HuddlyVendorId = 0x2BD9;
     private const byte UvcInterfaceSubClass = UsbDeviceDescriptorExtension.UvcVideoControlSubClass;
 
+    private readonly ILibUsb _libusb;
     private readonly ILoggerFactory _loggerFactory;
     private readonly ILogger<Given_a_video_class_USB_device_with_UVC> _logger;
     private readonly Usb _usb;
@@ -17,14 +20,23 @@ public sealed class Given_a_video_class_USB_device_with_UVC : IDisposable
 
     public Given_a_video_class_USB_device_with_UVC(ITestOutputHelper output)
     {
+        _libusb = new LibUsb();
         _loggerFactory = new TestLoggerFactory(output);
         _logger = _loggerFactory.CreateLogger<Given_a_video_class_USB_device_with_UVC>();
-        _usb = new Usb(loggerFactory: _loggerFactory);
-        _usb.Initialize(LogLevel.Information);
-        _deviceSource = new TestDeviceSource(_logger, _usb);
-        _deviceSource.SetPreferredVendorId(0x2BD9);
-        _deviceSource.SetRequiredInterfaceClass(UsbClass.Video, TestDeviceAccess.Control);
-        _deviceSource.SetRequiredInterfaceSubClass(UvcInterfaceSubClass);
+        _usb = new Usb(_libusb, _loggerFactory);
+        try
+        {
+            _usb.Initialize(LogLevel.Information);
+            _deviceSource = new TestDeviceSource(_logger, _usb);
+            _deviceSource.SetPreferredVendorId(HuddlyVendorId);
+            _deviceSource.SetRequiredInterfaceClass(UsbClass.Video, TestDeviceAccess.Control);
+            _deviceSource.SetRequiredInterfaceSubClass(UvcInterfaceSubClass);
+        }
+        catch
+        {
+            _usb.Dispose();
+            throw;
+        }
     }
 
     [SkippableFact]

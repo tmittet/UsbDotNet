@@ -1,7 +1,3 @@
-#pragma warning disable IDE1006 // Naming Styles
-// Kernel Streaming COM interface and struct definitions for extension unit controls on Windows.
-// Nullable is disabled because COM interfaces don't have nullable semantics.
-
 using System.Runtime.InteropServices;
 
 namespace UsbDotNet.Extensions.Uvc.Windows;
@@ -43,47 +39,10 @@ internal struct KspNode
 }
 
 /// <summary>
-/// DirectShow/KS topology information interface for enumerating filter nodes.
-/// Used to discover the topology node ID of a UVC Extension Unit by its GUID.
-/// </summary>
-[ComImport]
-[Guid("720D4AC0-7533-11D0-A5D6-28DB04C10000")]
-[InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
-internal interface IKsTopologyInfo
-{
-    [PreserveSig]
-    int get_NumNodes(out uint numNodes);
-
-    [PreserveSig]
-    int get_NodeType(uint nodeIndex, out Guid nodeType);
-
-    [PreserveSig]
-    int get_ConnectionInfo(uint index, out KsTopologyConnection connection);
-
-    [PreserveSig]
-    int get_NodeName(
-        uint nodeIndex,
-        [MarshalAs(UnmanagedType.LPWStr)] out string nodeName,
-        uint bufferSize,
-        out uint nameLen
-    );
-
-    [PreserveSig]
-    int get_NumConnections(out uint numConnections);
-
-    [PreserveSig]
-    int CreateNodeInstance(
-        uint nodeIndex,
-        [MarshalAs(UnmanagedType.LPStruct)] Guid interfaceId,
-        [MarshalAs(UnmanagedType.IUnknown)] out object instance
-    );
-}
-
-/// <summary>
 /// Describes a connection between two nodes in a KS filter topology.
 /// </summary>
 [StructLayout(LayoutKind.Sequential)]
-internal struct KsTopologyConnection
+internal struct KSTopologyConnection
 {
     public uint FromNode;
     public uint FromNodePin;
@@ -91,6 +50,49 @@ internal struct KsTopologyConnection
     public uint ToNodePin;
 }
 
+/// <summary>
+/// DirectShow/KS topology information interface for enumerating filter nodes.
+/// Used to discover the topology node ID of a UVC Extension Unit by its GUID.
+/// </summary>
+[ComImport]
+[Guid("720D4AC0-7533-11D0-A5D6-28DB04C10000")]
+[InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
+#pragma warning disable IDE1006 // Naming Styles
+internal interface IKsTopologyInfo
+{
+    [PreserveSig]
+    int get_NumCategories(out uint pdwNumCategories);
+
+    [PreserveSig]
+    int get_Category(uint dwIndex, out Guid pCategory);
+
+    [PreserveSig]
+    int get_NumConnections(out uint pdwNumConnections);
+
+    [PreserveSig]
+    int get_ConnectionInfo(uint dwIndex, out KSTopologyConnection pConnectionInfo);
+
+    [PreserveSig]
+    int get_NodeName(uint dwNodeId, [MarshalAs(UnmanagedType.BStr)] out string pbstrNodeName);
+
+    [PreserveSig]
+    int get_NumNodes(out uint pdwNumNodes);
+
+    [PreserveSig]
+    int get_NodeType(uint dwNodeId, out Guid pNodeType);
+
+    [PreserveSig]
+    int CreateNodeInstance(
+        uint dwNodeId,
+        [In] ref Guid iid,
+        [MarshalAs(UnmanagedType.IUnknown)] out object? ppvObject
+    );
+}
+#pragma warning restore IDE1006 // Naming Styles
+
+/// <summary>
+/// Filter-scoped IKsControl. Use this on the filter object when sending topology-routed requests with KSP_NODE.
+/// </summary>
 [ComImport]
 [Guid("28F54685-06FD-11D2-B27A-00A0C9223196")]
 [InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
@@ -105,25 +107,21 @@ internal interface IKsControl
         out int bytesReturned
     );
 
-    // KsMethod and KsEvent are not used but must be declared
-    // to maintain correct vtable layout for COM interop.
-
     [PreserveSig]
     int KsMethod(
         IntPtr method,
-        int methodLength,
+        uint methodLength,
         IntPtr methodData,
-        int dataLength,
-        out int bytesReturned
+        uint dataLength,
+        out uint bytesReturned
     );
 
     [PreserveSig]
     int KsEvent(
-        IntPtr ksevent,
-        int eventLength,
+        IntPtr @event,
+        uint eventLength,
         IntPtr eventData,
-        int dataLength,
-        out int bytesReturned
+        uint dataLength,
+        out uint bytesReturned
     );
 }
-#pragma warning restore IDE1006 // Naming Styles
