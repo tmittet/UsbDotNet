@@ -220,10 +220,7 @@ internal sealed class WindowsUvcControls : IUvcControls
         }
     }
 
-    /// <summary>
-    /// Reads data from a UVC Extension Unit control via Kernel Streaming;
-    /// assuming the device has only one unit/node with the given extension GUID.
-    /// </summary>
+    /// <summary>Reads data from a UVC Extension Unit control via Kernel Streaming.</summary>
     /// <param name="extensionGuid">The GUID of the extension unit property set.</param>
     /// <param name="control">
     /// The control selector (property ID) within the extension unit.
@@ -238,10 +235,7 @@ internal sealed class WindowsUvcControls : IUvcControls
         return GetExtensionUnit(extensionGuid, nodeId, control, data);
     }
 
-    /// <summary>
-    /// Writes data to a UVC Extension Unit control via Kernel Streaming;
-    /// assuming the device has only one unit/node with the given extension GUID.
-    /// </summary>
+    /// <summary>Writes data to a UVC Extension Unit control via Kernel Streaming.</summary>
     /// <param name="extensionGuid">The GUID of the extension unit property set.</param>
     /// <param name="control">
     /// The control selector (property ID) within the extension unit.
@@ -256,8 +250,7 @@ internal sealed class WindowsUvcControls : IUvcControls
     }
 
     /// <summary>
-    /// Queries the data length for a UVC Extension Unit control via Kernel Streaming;
-    /// assuming the device has only one unit/node with the given extension GUID.
+    /// Queries the data length for a UVC Extension Unit control via Kernel Streaming.
     /// Sends a get request with a zero-length buffer; the driver returns the required size.
     /// </summary>
     /// <param name="extensionGuid">The GUID of the extension unit property set.</param>
@@ -291,7 +284,7 @@ internal sealed class WindowsUvcControls : IUvcControls
     /// <remarks>
     /// Uses <c>IKsTopologyInfo</c> to enumerate all nodes in the DirectShow filter.
     /// For UVC extension units the node type GUID equals the extension unit's
-    /// <c>guidExtensionCode</c>, so the matching node index is the <c>entityId</c>
+    /// <c>guidExtensionCode</c>, so the matching node index is the <c>nodeId</c>
     /// required by <see cref="GetExtensionUnit(Guid, uint, Span{byte})"/>,
     /// <see cref="SetExtensionUnit(Guid, uint, ReadOnlySpan{byte})"/>,
     /// and <see cref="GetExtensionUnitLength(Guid, uint)"/>.
@@ -336,7 +329,7 @@ internal sealed class WindowsUvcControls : IUvcControls
     /// Reads data from a UVC Extension Unit control via Kernel Streaming.
     /// </summary>
     /// <param name="extensionGuid">The GUID of the extension unit property set.</param>
-    /// <param name="entityId">The topology node ID of the extension unit.</param>
+    /// <param name="nodeId">The topology node ID of the extension unit.</param>
     /// <param name="control">
     /// The control selector (property ID) within the extension unit.
     /// </param>
@@ -344,7 +337,7 @@ internal sealed class WindowsUvcControls : IUvcControls
     /// <returns>The number of bytes actually returned by the device.</returns>
     /// <exception cref="COMException">The device returned an error.</exception>
     /// <exception cref="InvalidCastException">The device does not support IKsControl.</exception>
-    public int GetExtensionUnit(Guid extensionGuid, uint entityId, uint control, Span<byte> data)
+    private int GetExtensionUnit(Guid extensionGuid, uint nodeId, uint control, Span<byte> data)
     {
         var node = new KspNode
         {
@@ -354,7 +347,7 @@ internal sealed class WindowsUvcControls : IUvcControls
                 Id = control,
                 Flags = KsPropertyFlags.Get | KsPropertyFlags.Topology,
             },
-            NodeId = entityId,
+            NodeId = nodeId,
         };
 
         var buffer = new byte[data.Length];
@@ -390,16 +383,16 @@ internal sealed class WindowsUvcControls : IUvcControls
     /// Writes data to a UVC Extension Unit control via Kernel Streaming.
     /// </summary>
     /// <param name="extensionGuid">The GUID of the extension unit property set.</param>
-    /// <param name="entityId">The topology node ID of the extension unit.</param>
+    /// <param name="nodeId">The topology node ID of the extension unit.</param>
     /// <param name="control">
     /// The control selector (property ID) within the extension unit.
     /// </param>
     /// <param name="data">The control data to write to the device.</param>
     /// <exception cref="COMException">The device returned an error.</exception>
     /// <exception cref="InvalidCastException">The device does not support IKsControl.</exception>
-    public void SetExtensionUnit(
+    private void SetExtensionUnit(
         Guid extensionGuid,
-        uint entityId,
+        uint nodeId,
         uint control,
         ReadOnlySpan<byte> data
     )
@@ -412,7 +405,7 @@ internal sealed class WindowsUvcControls : IUvcControls
                 Id = control,
                 Flags = KsPropertyFlags.Set | KsPropertyFlags.Topology,
             },
-            NodeId = entityId,
+            NodeId = nodeId,
         };
 
         var buffer = data.ToArray();
@@ -447,7 +440,7 @@ internal sealed class WindowsUvcControls : IUvcControls
     /// Sends a get request with a zero-length buffer; the driver returns the required size.
     /// </summary>
     /// <param name="extensionGuid">The GUID of the extension unit property set.</param>
-    /// <param name="entityId">The topology node ID of the extension unit.</param>
+    /// <param name="nodeId">The topology node ID of the extension unit.</param>
     /// <param name="control">
     /// The control selector (property ID) within the extension unit.
     /// </param>
@@ -456,7 +449,7 @@ internal sealed class WindowsUvcControls : IUvcControls
     /// The device returned an error (other than ERROR_MORE_DATA).
     /// </exception>
     /// <exception cref="InvalidCastException">The device does not support IKsControl.</exception>
-    public int GetExtensionUnitLength(Guid extensionGuid, uint entityId, uint control)
+    private int GetExtensionUnitLength(Guid extensionGuid, uint nodeId, uint control)
     {
         var node = new KspNode
         {
@@ -466,7 +459,7 @@ internal sealed class WindowsUvcControls : IUvcControls
                 Id = control,
                 Flags = KsPropertyFlags.Get | KsPropertyFlags.Topology,
             },
-            NodeId = entityId,
+            NodeId = nodeId,
         };
 
         var ksControl = QueryInterface<IKsControl>(_handle);

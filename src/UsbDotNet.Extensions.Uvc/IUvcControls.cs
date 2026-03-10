@@ -85,10 +85,7 @@ public interface IUvcControls : IDisposable
         out UvcControlType capsFlags
     );
 
-    /// <summary>
-    /// Reads data from a control within an extension unit;
-    /// assuming the device has only one unit/node with the given extension GUID.
-    /// </summary>
+    /// <summary>Reads data from a control within an extension unit.</summary>
     /// <param name="extensionGuid">The extension unit property set GUID.</param>
     /// <param name="control">
     /// The control selector (property ID) within the extension unit.
@@ -97,8 +94,7 @@ public interface IUvcControls : IDisposable
     /// <returns>The number of bytes returned by the device.</returns>
     int GetExtensionUnit(Guid extensionGuid, uint control, Span<byte> data);
 
-    /// <summary>Writes data to a control within this extension unit;
-    /// assuming the device has only one unit/node with the given extension GUID.</summary>
+    /// <summary>Writes data to a control within this extension unit.</summary>
     /// <param name="extensionGuid">The extension unit property set GUID.</param>
     /// <param name="control">
     /// The control selector (property ID) within the extension unit.
@@ -106,59 +102,11 @@ public interface IUvcControls : IDisposable
     /// <param name="data">The data to write.</param>
     void SetExtensionUnit(Guid extensionGuid, uint control, ReadOnlySpan<byte> data);
 
-    /// <summary>
-    /// Queries the required data length for a control within this extension unit;
-    /// assuming the device has only one unit/node with the given extension GUID.
-    /// </summary>
+    /// <summary>Queries the required data length for a control within this extension unit</summary>
     /// <param name="extensionGuid">The extension unit property set GUID.</param>
     /// <param name="control">
     /// The control selector (property ID) within the extension unit.
     /// </param>
     /// <returns>The required buffer length in bytes.</returns>
     int GetExtensionUnitLength(Guid extensionGuid, uint control);
-
-    /// <summary>Reads data from a control within this extension unit.</summary>
-    /// <param name="extensionGuid">
-    /// The extension unit property set GUID; ignored on Linux and macOS
-    /// where the unit is identified by <paramref name="entityId"/> alone.
-    /// </param>
-    /// <param name="entityId">
-    /// The topology node ID on Windows, or the UVC extension unit ID on Linux and macOS.
-    /// </param>
-    /// <param name="control">
-    /// The control selector (property ID) within the extension unit.
-    /// </param>
-    /// <param name="data">A buffer to receive the control data.</param>
-    /// <returns>The number of bytes returned by the device.</returns>
-    int GetExtensionUnit(Guid extensionGuid, uint entityId, uint control, Span<byte> data);
-
-    /// <summary>Writes data to a control within this extension unit.</summary>
-    /// <param name="extensionGuid">
-    /// The extension unit property set GUID; ignored on Linux and macOS
-    /// where the unit is identified by <paramref name="entityId"/> alone.
-    /// </param>
-    /// <param name="entityId">
-    /// The topology node ID on Windows, or the UVC extension unit ID on Linux and macOS.
-    /// </param>
-    /// <param name="control">
-    /// The control selector (property ID) within the extension unit.
-    /// </param>
-    /// <param name="data">The data to write.</param>
-    void SetExtensionUnit(Guid extensionGuid, uint entityId, uint control, ReadOnlySpan<byte> data);
-
-    /// <summary>
-    /// Queries the required data length for a control within this extension unit.
-    /// </summary>
-    /// <param name="extensionGuid">
-    /// The extension unit property set GUID; ignored on Linux and macOS
-    /// where the unit is identified by <paramref name="entityId"/> alone.
-    /// </param>
-    /// <param name="entityId">
-    /// The topology node ID on Windows, or the UVC extension unit ID on Linux and macOS.
-    /// </param>
-    /// <param name="control">
-    /// The control selector (property ID) within the extension unit.
-    /// </param>
-    /// <returns>The required buffer length in bytes.</returns>
-    int GetExtensionUnitLength(Guid extensionGuid, uint entityId, uint control);
 }

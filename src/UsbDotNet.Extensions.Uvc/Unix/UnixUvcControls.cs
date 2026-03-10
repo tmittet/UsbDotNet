@@ -203,25 +203,24 @@ internal sealed class UnixUvcControls : IUvcControls
     public int GetExtensionUnit(Guid extensionGuid, uint control, Span<byte> data)
     {
         var entityId = GetExtensionUnitEntityId(extensionGuid);
-        return GetExtensionUnit(extensionGuid, entityId, control, data);
+        return GetExtensionUnit(entityId, control, data);
     }
 
     /// <inheritdoc />
     public void SetExtensionUnit(Guid extensionGuid, uint control, ReadOnlySpan<byte> data)
     {
         var entityId = GetExtensionUnitEntityId(extensionGuid);
-        SetExtensionUnit(extensionGuid, entityId, control, data);
+        SetExtensionUnit(entityId, control, data);
     }
 
     /// <inheritdoc />
     public int GetExtensionUnitLength(Guid extensionGuid, uint control)
     {
         var entityId = GetExtensionUnitEntityId(extensionGuid);
-        return GetExtensionUnitLength(extensionGuid, entityId, control);
+        return GetExtensionUnitLength(entityId, control);
     }
 
-    /// <inheritdoc />
-    public int GetExtensionUnit(Guid extensionGuid, uint entityId, uint control, Span<byte> data)
+    private int GetExtensionUnit(uint entityId, uint control, Span<byte> data)
     {
         var result = _device.ControlReadUvc(
             data,
@@ -238,13 +237,7 @@ internal sealed class UnixUvcControls : IUvcControls
         return bytesRead;
     }
 
-    /// <inheritdoc />
-    public void SetExtensionUnit(
-        Guid extensionGuid,
-        uint entityId,
-        uint control,
-        ReadOnlySpan<byte> data
-    )
+    private void SetExtensionUnit(uint entityId, uint control, ReadOnlySpan<byte> data)
     {
         var result = _device.ControlWriteUvc(
             data,
@@ -260,8 +253,7 @@ internal sealed class UnixUvcControls : IUvcControls
         );
     }
 
-    /// <inheritdoc />
-    public int GetExtensionUnitLength(Guid extensionGuid, uint entityId, uint control)
+    private int GetExtensionUnitLength(uint entityId, uint control)
     {
         Span<byte> buffer = stackalloc byte[2];
         var result = _device.ControlReadUvc(
