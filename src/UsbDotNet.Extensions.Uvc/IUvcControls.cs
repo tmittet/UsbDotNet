@@ -5,12 +5,13 @@ namespace UsbDotNet.Extensions.Uvc;
 /// <list type="bullet">
 /// <item>Camera Terminal controls (pan, tilt, zoom, exposure, iris, focus, roll).</item>
 /// <item>Processing Unit controls (brightness, contrast, hue, saturation, gain, etc.).</item>
-/// <item>Vendor-defined UVC extension unit controls.</item>
+/// <item>Vendor specific UVC extension unit controls.</item>
 /// </list>
 /// </summary>
 /// <remarks>
-/// On Windows, controls are accessed via DirectShow <c>IAMCameraControl</c>, <c>IAMVideoProcAmp</c> and <c>IKsControl</c>.
-/// On Linux and macOS, controls are sent via libusb UVC control transfers using the entity ID.
+/// On Linux and macOS, controls are sent via UsbDotNet UVC control transfers.
+/// On Windows, controls are accessed via DirectShow
+/// <c>IAMCameraControl</c>, <c>IAMVideoProcAmp</c> and <c>IKsControl</c>.
 /// <para/>
 /// Auto/manual control types are fully supported on Windows. On Linux and macOS,
 /// <see cref="GetImageSetting"/> always returns <see cref="UvcControlType.Manual"/> and
@@ -85,10 +86,18 @@ public interface IUvcControls : IDisposable
         out UvcControlType capsFlags
     );
 
+    /// <summary>Queries the required data length for a control within this extension unit</summary>
+    /// <param name="extensionGuid">The extension unit property set GUID.</param>
+    /// <param name="control">
+    /// The control selector within the extension unit.
+    /// </param>
+    /// <returns>The required buffer length in bytes.</returns>
+    int GetExtensionUnitLength(Guid extensionGuid, uint control);
+
     /// <summary>Reads data from a control within an extension unit.</summary>
     /// <param name="extensionGuid">The extension unit property set GUID.</param>
     /// <param name="control">
-    /// The control selector (property ID) within the extension unit.
+    /// The control selector within the extension unit.
     /// </param>
     /// <param name="data">A buffer to receive the control data.</param>
     /// <returns>The number of bytes returned by the device.</returns>
@@ -97,16 +106,8 @@ public interface IUvcControls : IDisposable
     /// <summary>Writes data to a control within this extension unit.</summary>
     /// <param name="extensionGuid">The extension unit property set GUID.</param>
     /// <param name="control">
-    /// The control selector (property ID) within the extension unit.
+    /// The control selector within the extension unit.
     /// </param>
     /// <param name="data">The data to write.</param>
     void SetExtensionUnit(Guid extensionGuid, uint control, ReadOnlySpan<byte> data);
-
-    /// <summary>Queries the required data length for a control within this extension unit</summary>
-    /// <param name="extensionGuid">The extension unit property set GUID.</param>
-    /// <param name="control">
-    /// The control selector (property ID) within the extension unit.
-    /// </param>
-    /// <returns>The required buffer length in bytes.</returns>
-    int GetExtensionUnitLength(Guid extensionGuid, uint control);
 }

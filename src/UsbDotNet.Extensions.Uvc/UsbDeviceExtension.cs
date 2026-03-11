@@ -13,10 +13,10 @@ public static class UsbDeviceExtension
     /// <param name="device">A UsbDevice instance</param>
     /// <param name="destination">A destination span for read bytes</param>
     /// <param name="bytesRead">The number of bytes read</param>
-    /// <param name="request">The USB standard control request type</param>
+    /// <param name="request">The UVC control request type</param>
     /// <param name="interfaceNumber">The InterfaceNumber from the USB configuration descriptor</param>
     /// <param name="entityId">The unit, terminal or interface within the video function</param>
-    /// <param name="controlSelector">The target control within the entity, e.g. brightness or zoom</param>
+    /// <param name="control">The target control within the entity, e.g. brightness or zoom</param>
     /// <param name="fieldNumber">The channel or field number of the control, e.g. right channel</param>
     /// <param name="timeout">Timeout before giving up due to no response being received</param>
     /// <exception cref="ArgumentException">Thrown when the destination buffer is too large.</exception>
@@ -38,7 +38,7 @@ public static class UsbDeviceExtension
         UvcControlRequest request,
         byte interfaceNumber,
         byte entityId,
-        byte controlSelector,
+        byte control,
         byte fieldNumber = 0,
         int timeout = Timeout.Infinite
     ) =>
@@ -48,7 +48,7 @@ public static class UsbDeviceExtension
             ControlRequestRecipient.Interface,
             ControlRequestType.Class,
             (byte)request,
-            (ushort)(controlSelector << 8 | fieldNumber),
+            (ushort)(control << 8 | fieldNumber),
             (ushort)(entityId << 8 | interfaceNumber),
             timeout
         );
@@ -59,10 +59,10 @@ public static class UsbDeviceExtension
     /// <param name="device">A UsbDevice instance</param>
     /// <param name="source">The payload to send to the device (max. 65.535 bytes)</param>
     /// <param name="bytesWritten">The actual number of bytes written to the device</param>
-    /// <param name="request">The USB standard control request type</param>
+    /// <param name="request">The UVC control request type</param>
     /// <param name="interfaceNumber">The InterfaceNumber from the USB configuration descriptor</param>
     /// <param name="entityId">The unit, terminal or interface within the video function</param>
-    /// <param name="controlSelector">The target control within the entity, e.g. brightness or zoom</param>
+    /// <param name="control">The target control within the entity, e.g. brightness or zoom</param>
     /// <param name="fieldNumber">The channel or field number of the control, e.g. right channel</param>
     /// <param name="timeout">Timeout before giving up due to no response being received</param>
     /// <exception cref="ArgumentException">Thrown when the source payload is too large.</exception>
@@ -84,7 +84,7 @@ public static class UsbDeviceExtension
         UvcControlRequest request,
         byte interfaceNumber,
         byte entityId,
-        byte controlSelector,
+        byte control,
         byte fieldNumber = 0,
         int timeout = Timeout.Infinite
     ) =>
@@ -94,7 +94,7 @@ public static class UsbDeviceExtension
             ControlRequestRecipient.Interface,
             ControlRequestType.Class,
             (byte)request,
-            (ushort)(controlSelector << 8 | fieldNumber),
+            (ushort)(control << 8 | fieldNumber),
             (ushort)(entityId << 8 | interfaceNumber),
             timeout
         );

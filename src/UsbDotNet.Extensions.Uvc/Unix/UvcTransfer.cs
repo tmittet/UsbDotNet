@@ -18,11 +18,9 @@ internal static class UvcTransfer
     /// Pan occupies bytes 0–3, Tilt occupies bytes 4–7.
     /// A read-modify-write is required when setting one axis to preserve the other.
     /// </remarks>
-    internal static (
-        byte controlSelector,
-        int bufferSize,
-        int valueOffset
-    ) GetCameraControlDescriptor(UvcCameraControl property) =>
+    internal static (byte control, int bufferSize, int valueOffset) GetCameraControlDescriptor(
+        UvcCameraControl property
+    ) =>
         property switch
         {
             UvcCameraControl.Pan => (0x0D, 8, 0), // CT_PANTILT_ABSOLUTE_CONTROL — pan
@@ -39,7 +37,7 @@ internal static class UvcTransfer
     /// Returns the UVC control selector and data buffer size in bytes
     /// for an ImageSetting (processing unit) control request.
     /// </summary>
-    internal static (byte controlSelector, int bufferSize) GetImageSettingDescriptor(
+    internal static (byte control, int bufferSize) GetImageSettingDescriptor(
         UvcImageSetting property
     ) =>
         property switch
@@ -55,7 +53,7 @@ internal static class UvcTransfer
             UvcImageSetting.Gamma => (0x09, 2), // PU_GAMMA_CONTROL
             UvcImageSetting.WhiteBalance => (0x0A, 2), // PU_WHITE_BALANCE_TEMPERATURE_CONTROL
             UvcImageSetting.ColorEnable => throw new NotSupportedException(
-                $"{nameof(UvcImageSetting.ColorEnable)} has no standard UVC Processing Unit "
+                $"{nameof(UvcImageSetting.ColorEnable)} has no UVC Processing Unit "
                     + "equivalent and is not supported on Linux and macOS."
             ),
             _ => throw new ArgumentOutOfRangeException(nameof(property), property, null),

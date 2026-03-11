@@ -90,7 +90,7 @@ public sealed class Given_a_video_class_USB_device_with_UVC : IDisposable
         var entityId =
             device.GetUvcImageSettingEntityId(uvcInterface.InterfaceNumber)
             ?? throw new InvalidOperationException("Camera control entity ID not found.");
-        var (controlSelector, bufferSize) = UvcTransfer.GetImageSettingDescriptor(
+        var (control, bufferSize) = UvcTransfer.GetImageSettingDescriptor(
             UvcImageSetting.Brightness
         );
         var readBuffer = new Span<byte>(new byte[bufferSize]);
@@ -100,7 +100,7 @@ public sealed class Given_a_video_class_USB_device_with_UVC : IDisposable
             UvcControlRequest.GetCurrent,
             uvcInterface.InterfaceNumber,
             entityId,
-            controlSelector,
+            control,
             timeout: 500
         );
         var readValue = BitConverter.ToInt16(readBuffer);
@@ -128,7 +128,7 @@ public sealed class Given_a_video_class_USB_device_with_UVC : IDisposable
         var entityId =
             device.GetUvcImageSettingEntityId(uvcInterface.InterfaceNumber)
             ?? throw new InvalidOperationException("Camera control entity ID not found.");
-        var (controlSelector, bufferSize) = UvcTransfer.GetImageSettingDescriptor(
+        var (control, bufferSize) = UvcTransfer.GetImageSettingDescriptor(
             UvcImageSetting.Brightness
         );
         var initialValueBuffer = new Span<byte>(new byte[bufferSize]);
@@ -138,7 +138,7 @@ public sealed class Given_a_video_class_USB_device_with_UVC : IDisposable
             UvcControlRequest.GetCurrent,
             uvcInterface.InterfaceNumber,
             entityId,
-            controlSelector,
+            control,
             timeout: 500
         );
         initialReadResult
@@ -154,7 +154,7 @@ public sealed class Given_a_video_class_USB_device_with_UVC : IDisposable
             UvcControlRequest.SetCurrent,
             uvcInterface.InterfaceNumber,
             entityId,
-            controlSelector,
+            control,
             timeout: 500
         );
         writeResult.Should().Be(UsbResult.Success);
@@ -167,7 +167,7 @@ public sealed class Given_a_video_class_USB_device_with_UVC : IDisposable
             UvcControlRequest.GetCurrent,
             uvcInterface.InterfaceNumber,
             entityId,
-            controlSelector,
+            control,
             timeout: 500
         );
         newReadResult.Should().Be(UsbResult.Success);

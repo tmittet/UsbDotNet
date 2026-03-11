@@ -32,9 +32,7 @@ internal sealed class UnixUvcControls : IUvcControls
     )
     {
         var cameraControlEntityId = GetCameraControlEntityIdOrThrow();
-        var (controlSelector, bufferSize, offset) = UvcTransfer.GetCameraControlDescriptor(
-            cameraControl
-        );
+        var (control, bufferSize, offset) = UvcTransfer.GetCameraControlDescriptor(cameraControl);
 
         if (cameraControl is not UvcCameraControl.Pan and not UvcCameraControl.Tilt)
         {
@@ -46,7 +44,7 @@ internal sealed class UnixUvcControls : IUvcControls
                 UvcControlRequest.SetCurrent,
                 _interfaceNumber,
                 cameraControlEntityId,
-                controlSelector
+                control
             );
             UvcTransfer.ThrowIfFailed(
                 result,
@@ -69,7 +67,7 @@ internal sealed class UnixUvcControls : IUvcControls
             UvcControlRequest.GetCurrent,
             _interfaceNumber,
             cameraControlEntityId,
-            controlSelector
+            control
         );
         UvcTransfer.ThrowIfFailed(
             readResult,
@@ -82,7 +80,7 @@ internal sealed class UnixUvcControls : IUvcControls
             UvcControlRequest.SetCurrent,
             _interfaceNumber,
             cameraControlEntityId,
-            controlSelector
+            control
         );
         UvcTransfer.ThrowIfFailed(
             writeResult,
@@ -110,9 +108,7 @@ internal sealed class UnixUvcControls : IUvcControls
     private int ReadCameraControl(UvcCameraControl cameraControl, UvcControlRequest request)
     {
         var cameraControlEntityId = GetCameraControlEntityIdOrThrow();
-        var (controlSelector, bufferSize, offset) = UvcTransfer.GetCameraControlDescriptor(
-            cameraControl
-        );
+        var (control, bufferSize, offset) = UvcTransfer.GetCameraControlDescriptor(cameraControl);
         var buffer = new byte[bufferSize];
         var result = _device.ControlReadUvc(
             buffer,
@@ -120,7 +116,7 @@ internal sealed class UnixUvcControls : IUvcControls
             request,
             _interfaceNumber,
             cameraControlEntityId,
-            controlSelector
+            control
         );
         UvcTransfer.ThrowIfFailed(
             result,
@@ -145,7 +141,7 @@ internal sealed class UnixUvcControls : IUvcControls
     )
     {
         var imageSettingEntityId = GetImageSettingEntityIdOrThrow();
-        var (controlSelector, bufferSize) = UvcTransfer.GetImageSettingDescriptor(imageSetting);
+        var (control, bufferSize) = UvcTransfer.GetImageSettingDescriptor(imageSetting);
         var buffer = new byte[bufferSize];
         UvcTransfer.WriteInt(buffer, 0, bufferSize, value);
         var result = _device.ControlWriteUvc(
@@ -154,7 +150,7 @@ internal sealed class UnixUvcControls : IUvcControls
             UvcControlRequest.SetCurrent,
             _interfaceNumber,
             imageSettingEntityId,
-            controlSelector
+            control
         );
         UvcTransfer.ThrowIfFailed(
             result,
@@ -182,7 +178,7 @@ internal sealed class UnixUvcControls : IUvcControls
     private int ReadImageSetting(UvcImageSetting imageSetting, UvcControlRequest request)
     {
         var imageSettingEntityId = GetImageSettingEntityIdOrThrow();
-        var (controlSelector, bufferSize) = UvcTransfer.GetImageSettingDescriptor(imageSetting);
+        var (control, bufferSize) = UvcTransfer.GetImageSettingDescriptor(imageSetting);
         var buffer = new byte[bufferSize];
         var result = _device.ControlReadUvc(
             buffer,
@@ -190,13 +186,20 @@ internal sealed class UnixUvcControls : IUvcControls
             request,
             _interfaceNumber,
             imageSettingEntityId,
-            controlSelector
+            control
         );
         UvcTransfer.ThrowIfFailed(
             result,
             $"ControlReadUvc(request={request}, control={imageSetting})"
         );
         return UvcTransfer.ReadInt(buffer, 0, bufferSize);
+    }
+
+    /// <inheritdoc />
+    public int GetExtensionUnitLength(Guid extensionGuid, uint control)
+    {
+        var entityId = GetExtensionUnitEntityId(extensionGuid);
+        return GetExtensionUnitLength(entityId, control);
     }
 
     /// <inheritdoc />
@@ -211,13 +214,6 @@ internal sealed class UnixUvcControls : IUvcControls
     {
         var entityId = GetExtensionUnitEntityId(extensionGuid);
         SetExtensionUnit(entityId, control, data);
-    }
-
-    /// <inheritdoc />
-    public int GetExtensionUnitLength(Guid extensionGuid, uint control)
-    {
-        var entityId = GetExtensionUnitEntityId(extensionGuid);
-        return GetExtensionUnitLength(entityId, control);
     }
 
     private int GetExtensionUnit(uint entityId, uint control, Span<byte> data)
