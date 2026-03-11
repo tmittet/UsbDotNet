@@ -89,6 +89,6 @@ internal static class UvcTransfer
     internal static void ThrowIfFailed(UsbResult result, string operation)
     {
         if (result != UsbResult.Success)
-            throw new IOException($"UVC {operation} failed: {result}.");
+            throw new UsbException(result, $"UVC {operation} failed: {result}.");
     }
 }

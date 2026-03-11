@@ -1,5 +1,6 @@
 using System.Buffers.Binary;
 using System.Collections.Concurrent;
+using UsbDotNet.Core;
 
 namespace UsbDotNet.Extensions.Uvc.Unix;
 
@@ -56,8 +57,9 @@ internal sealed class UnixUvcControls : IUvcControls
         // Pan and Tilt share an 8-byte control; do a read-modify-write to preserve the other axis
         if (bufferSize != 8)
         {
-            throw new InvalidOperationException(
-                $"Unexpected buffer size {bufferSize} for {cameraControl} control; expected 8."
+            throw new UsbException(
+                "SetCameraControl failed: "
+                    + $"Unexpected buffer size {bufferSize} for {cameraControl} control; expected 8."
             );
         }
         var ptBuffer = new byte[8];
@@ -270,7 +272,7 @@ internal sealed class UnixUvcControls : IUvcControls
     private byte GetCameraControlEntityIdOrThrow() =>
         _cameraControlEntityId ??=
             _device.GetUvcCameraControlEntityId(_interfaceNumber)
-            ?? throw new InvalidOperationException(
+            ?? throw new NotSupportedException(
                 "Camera control request is not supported; "
                     + "no camera terminal entity was found in the UVC descriptors."
             );
@@ -278,7 +280,7 @@ internal sealed class UnixUvcControls : IUvcControls
     private byte GetImageSettingEntityIdOrThrow() =>
         _imageSettingEntityId ??=
             _device.GetUvcImageSettingEntityId(_interfaceNumber)
-            ?? throw new InvalidOperationException(
+            ?? throw new NotSupportedException(
                 "Image setting request is not supported; "
                     + "no processing unit entity was found in the UVC descriptors."
             );
@@ -288,7 +290,7 @@ internal sealed class UnixUvcControls : IUvcControls
             extensionGuid,
             guid =>
                 _device.GetUvcExtensionUnitEntityId(_interfaceNumber, guid)
-                ?? throw new InvalidOperationException(
+                ?? throw new NotSupportedException(
                     $"Extension unit request is not supported; "
                         + $"no entity ID matching '{guid}' was found in the UVC descriptors."
                 )

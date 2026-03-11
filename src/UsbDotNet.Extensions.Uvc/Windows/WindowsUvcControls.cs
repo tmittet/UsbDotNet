@@ -1,6 +1,7 @@
 using System.Collections.Concurrent;
 using System.Runtime.InteropServices;
 using System.Runtime.Versioning;
+using UsbDotNet.Core;
 
 namespace UsbDotNet.Extensions.Uvc.Windows;
 
@@ -17,68 +18,95 @@ internal sealed class WindowsUvcControls : IUvcControls
     private readonly SafeVideoDeviceHandle _handle;
     private readonly ConcurrentDictionary<Guid, uint> _extensionUnitNodeIds = new();
 
+    private readonly IAMCameraControl? _cameraControl;
+    private readonly IAMVideoProcAmp? _videoProcAmp;
+    private readonly IKsControl? _ksControl;
+    private readonly IKsTopologyInfo? _topologyInfo;
+
+    private readonly object _disposeLock = new();
+    private bool _disposed;
+
+    private IAMCameraControl CameraControl =>
+        !_disposed
+            ? _cameraControl
+                ?? throw new InvalidOperationException("IAMCameraControl not supported.")
+            : throw new ObjectDisposedException(nameof(WindowsUvcControls));
+
+    private IAMVideoProcAmp VideoProcAmp =>
+        !_disposed
+            ? _videoProcAmp ?? throw new InvalidOperationException("IAMVideoProcAmp not supported.")
+            : throw new ObjectDisposedException(nameof(WindowsUvcControls));
+
+    private IKsControl KsControl =>
+        !_disposed
+            ? _ksControl ?? throw new InvalidOperationException("IKsControl not supported.")
+            : throw new ObjectDisposedException(nameof(WindowsUvcControls));
+
+    private IKsTopologyInfo TopologyInfo =>
+        !_disposed
+            ? _topologyInfo ?? throw new InvalidOperationException("IKsTopologyInfo not supported.")
+            : throw new ObjectDisposedException(nameof(WindowsUvcControls));
+
     internal WindowsUvcControls(SafeVideoDeviceHandle handle)
     {
         _handle = handle;
+
+        var unknownDevice =
+            handle.IsInvalid || handle.IsClosed
+                ? throw new ObjectDisposedException(nameof(SafeVideoDeviceHandle))
+                : handle.DangerousGetHandle();
+
+        var directShowObject = Marshal.GetObjectForIUnknown(unknownDevice);
+
+        _cameraControl = directShowObject as IAMCameraControl;
+        _videoProcAmp = directShowObject as IAMVideoProcAmp;
+        _ksControl = directShowObject as IKsControl;
+        _topologyInfo = directShowObject as IKsTopologyInfo;
     }
 
     /// <summary>
     /// Gets the current value and control type of a camera terminal control property.
     /// </summary>
-    /// <param name="cameraControl">The camera control property to query.</param>
-    /// <param name="controlType">The current auto/manual mode.</param>
-    /// <returns>the current property value.</returns>
-    /// <exception cref="COMException">The device returned an error.</exception>
-    /// <exception cref="InvalidCastException">
-    /// The device does not support IAMCameraControl.
-    /// </exception>
     public int GetCameraControl(UvcCameraControl cameraControl, out UvcControlType controlType)
     {
-        var cameraControlInterface = QueryInterface<IAMCameraControl>(_handle);
-        try
+        lock (_disposeLock)
         {
-            var hr = cameraControlInterface.Get(
-                (int)cameraControl,
-                out var value,
-                out var rawFlags
-            );
-            Marshal.ThrowExceptionForHR(hr);
-            controlType = (UvcControlType)rawFlags;
-            return value;
-        }
-        finally
-        {
-            _ = Marshal.ReleaseComObject(cameraControlInterface);
+            ThrowIfDisposed();
+            try
+            {
+                var hr = CameraControl.Get((int)cameraControl, out var value, out var rawFlags);
+                Marshal.ThrowExceptionForHR(hr);
+                controlType = (UvcControlType)rawFlags;
+                return value;
+            }
+            catch (Exception ex) when (ex is not ArgumentException and not ObjectDisposedException)
+            {
+                throw new UsbException($"GetCameraControl failed: {ex.Message}", ex);
+            }
         }
     }
 
     /// <summary>
     /// Sets the value of a camera terminal control property.
     /// </summary>
-    /// <param name="cameraControl">The camera control property to set.</param>
-    /// <param name="value">The value to set.</param>
-    /// <param name="controlType">
-    /// Auto or manual mode. Defaults to <see cref="UvcControlType.Manual"/>.
-    /// </param>
-    /// <exception cref="COMException">The device returned an error.</exception>
-    /// <exception cref="InvalidCastException">
-    /// The device does not support IAMCameraControl.
-    /// </exception>
     public void SetCameraControl(
         UvcCameraControl cameraControl,
         int value,
         UvcControlType controlType = UvcControlType.Manual
     )
     {
-        var cameraControlInterface = QueryInterface<IAMCameraControl>(_handle);
-        try
+        lock (_disposeLock)
         {
-            var hr = cameraControlInterface.Set((int)cameraControl, value, (int)controlType);
-            Marshal.ThrowExceptionForHR(hr);
-        }
-        finally
-        {
-            _ = Marshal.ReleaseComObject(cameraControlInterface);
+            ThrowIfDisposed();
+            try
+            {
+                var hr = CameraControl.Set((int)cameraControl, value, (int)controlType);
+                Marshal.ThrowExceptionForHR(hr);
+            }
+            catch (Exception ex) when (ex is not ArgumentException and not ObjectDisposedException)
+            {
+                throw new UsbException($"GetCameraControl failed: {ex.Message}", ex);
+            }
         }
     }
 
@@ -86,16 +114,6 @@ internal sealed class WindowsUvcControls : IUvcControls
     /// Gets the supported range (minValue, maxValue, stepSize, default)
     /// and capabilities for a camera control property.
     /// </summary>
-    /// <param name="cameraControl">The camera control property to query.</param>
-    /// <param name="minValue">Receives the minimum supported value.</param>
-    /// <param name="maxValue">Receives the maximum supported value.</param>
-    /// <param name="stepSize">Receives the stepping delta between valid values.</param>
-    /// <param name="defaultValue">Receives the default value.</param>
-    /// <param name="controlType">Receives the supported modes (auto/manual).</param>
-    /// <exception cref="COMException">The device returned an error.</exception>
-    /// <exception cref="InvalidCastException">
-    /// The device does not support IAMCameraControl.
-    /// </exception>
     public void GetCameraControlRange(
         UvcCameraControl cameraControl,
         out int minValue,
@@ -105,79 +123,72 @@ internal sealed class WindowsUvcControls : IUvcControls
         out UvcControlType controlType
     )
     {
-        var cameraControlInterface = QueryInterface<IAMCameraControl>(_handle);
-        try
+        lock (_disposeLock)
         {
-            var hr = cameraControlInterface.GetRange(
-                (int)cameraControl,
-                out minValue,
-                out maxValue,
-                out stepSize,
-                out defaultValue,
-                out var rawFlags
-            );
-            Marshal.ThrowExceptionForHR(hr);
-            controlType = (UvcControlType)rawFlags;
-        }
-        finally
-        {
-            _ = Marshal.ReleaseComObject(cameraControlInterface);
+            ThrowIfDisposed();
+            try
+            {
+                var hr = CameraControl.GetRange(
+                    (int)cameraControl,
+                    out minValue,
+                    out maxValue,
+                    out stepSize,
+                    out defaultValue,
+                    out var rawFlags
+                );
+                Marshal.ThrowExceptionForHR(hr);
+                controlType = (UvcControlType)rawFlags;
+            }
+            catch (Exception ex) when (ex is not ArgumentException and not ObjectDisposedException)
+            {
+                throw new UsbException($"GetCameraControl failed: {ex.Message}", ex);
+            }
         }
     }
 
     /// <summary>
     /// Gets the current value and control type of a video processing amplifier property.
     /// </summary>
-    /// <param name="imageSetting">The video proc amp property to query.</param>
-    /// <param name="controlType">The current auto/manual mode.</param>
-    /// <returns>the current property value.</returns>
-    /// <exception cref="COMException">The device returned an error.</exception>
-    /// <exception cref="InvalidCastException">
-    /// The device does not support IAMVideoProcAmp.
-    /// </exception>
     public int GetImageSetting(UvcImageSetting imageSetting, out UvcControlType controlType)
     {
-        var videoProcAmp = QueryInterface<IAMVideoProcAmp>(_handle);
-        try
+        lock (_disposeLock)
         {
-            var hr = videoProcAmp.Get((int)imageSetting, out var value, out var rawFlags);
-            Marshal.ThrowExceptionForHR(hr);
-            controlType = (UvcControlType)rawFlags;
-            return value;
-        }
-        finally
-        {
-            _ = Marshal.ReleaseComObject(videoProcAmp);
+            ThrowIfDisposed();
+            try
+            {
+                var hr = VideoProcAmp.Get((int)imageSetting, out var value, out var rawFlags);
+                Marshal.ThrowExceptionForHR(hr);
+                controlType = (UvcControlType)rawFlags;
+                return value;
+            }
+            catch (Exception ex) when (ex is not ArgumentException and not ObjectDisposedException)
+            {
+                throw new UsbException($"GetCameraControl failed: {ex.Message}", ex);
+            }
         }
     }
 
     /// <summary>
     /// Sets the value of a video processing amplifier property.
     /// </summary>
-    /// <param name="imageSetting">The video proc amp property to set.</param>
-    /// <param name="value">The value to set.</param>
-    /// <param name="controlType">
-    /// Auto or manual mode. Defaults to <see cref="UvcControlType.Manual"/>.
-    /// </param>
-    /// <exception cref="COMException">The device returned an error.</exception>
-    /// <exception cref="InvalidCastException">
-    /// The device does not support IAMVideoProcAmp.
-    /// </exception>
     public void SetImageSetting(
         UvcImageSetting imageSetting,
         int value,
         UvcControlType controlType = UvcControlType.Manual
     )
     {
-        var videoProcAmpInterface = QueryInterface<IAMVideoProcAmp>(_handle);
-        try
+        lock (_disposeLock)
         {
-            var hr = videoProcAmpInterface.Set((int)imageSetting, value, (int)controlType);
-            Marshal.ThrowExceptionForHR(hr);
-        }
-        finally
-        {
-            _ = Marshal.ReleaseComObject(videoProcAmpInterface);
+            ThrowIfDisposed();
+            try
+            {
+                var hr = VideoProcAmp.Set((int)imageSetting, value, (int)controlType);
+                Marshal.ThrowExceptionForHR(hr);
+            }
+            catch (Exception ex) when (ex is not ArgumentException and not ObjectDisposedException)
+            {
+                throw new UsbException($"GetCameraControl failed: {ex.Message}", ex);
+            }
         }
     }
 
@@ -185,16 +196,6 @@ internal sealed class WindowsUvcControls : IUvcControls
     /// Gets the supported range (minValue, maxValue, stepSize, default)
     /// and capabilities for a video proc amp property.
     /// </summary>
-    /// <param name="imageSetting">The video proc amp property to query.</param>
-    /// <param name="minValue">Receives the minimum supported value.</param>
-    /// <param name="maxValue">Receives the maximum supported value.</param>
-    /// <param name="stepSize">Receives the stepping delta between valid values.</param>
-    /// <param name="defaultValue">Receives the default value.</param>
-    /// <param name="capsFlags">Receives the supported modes (auto/manual).</param>
-    /// <exception cref="COMException">The device returned an error.</exception>
-    /// <exception cref="InvalidCastException">
-    /// The device does not support IAMVideoProcAmp.
-    /// </exception>
     public void GetImageSettingRange(
         UvcImageSetting imageSetting,
         out int minValue,
@@ -204,23 +205,26 @@ internal sealed class WindowsUvcControls : IUvcControls
         out UvcControlType capsFlags
     )
     {
-        var videoProcAmpInterface = QueryInterface<IAMVideoProcAmp>(_handle);
-        try
+        lock (_disposeLock)
         {
-            var hr = videoProcAmpInterface.GetRange(
-                (int)imageSetting,
-                out minValue,
-                out maxValue,
-                out stepSize,
-                out defaultValue,
-                out var rawFlags
-            );
-            Marshal.ThrowExceptionForHR(hr);
-            capsFlags = (UvcControlType)rawFlags;
-        }
-        finally
-        {
-            _ = Marshal.ReleaseComObject(videoProcAmpInterface);
+            ThrowIfDisposed();
+            try
+            {
+                var hr = VideoProcAmp.GetRange(
+                    (int)imageSetting,
+                    out minValue,
+                    out maxValue,
+                    out stepSize,
+                    out defaultValue,
+                    out var rawFlags
+                );
+                Marshal.ThrowExceptionForHR(hr);
+                capsFlags = (UvcControlType)rawFlags;
+            }
+            catch (Exception ex) when (ex is not ArgumentException and not ObjectDisposedException)
+            {
+                throw new UsbException($"GetCameraControl failed: {ex.Message}", ex);
+            }
         }
     }
 
@@ -228,55 +232,52 @@ internal sealed class WindowsUvcControls : IUvcControls
     /// Queries the data length for a UVC Extension Unit control via Kernel Streaming.
     /// Sends a get request with a zero-length buffer; the driver returns the required size.
     /// </summary>
-    /// <param name="extensionGuid">The GUID of the extension unit property set.</param>
-    /// <param name="control">
-    /// The control selector (property ID) within the extension unit.
-    /// </param>
-    /// <returns>The required buffer length in bytes.</returns>
-    /// <exception cref="COMException">
-    /// The device returned an error (other than ERROR_MORE_DATA).
-    /// </exception>
-    /// <exception cref="InvalidCastException">The device does not support IKsControl.</exception>
     public int GetExtensionUnitLength(Guid extensionGuid, uint control)
     {
-        var nodeId = GetCachedExtensionUnitNodeId(extensionGuid, control);
-        return GetExtensionUnitLength(_handle, extensionGuid, nodeId, control);
+        try
+        {
+            var nodeId = GetCachedExtensionUnitNodeId(extensionGuid, control);
+            return GetExtensionUnitLength(extensionGuid, nodeId, control);
+        }
+        catch (Exception ex) when (ex is not ArgumentException and not ObjectDisposedException)
+        {
+            throw new UsbException($"GetCameraControl failed: {ex.Message}", ex);
+        }
     }
 
     /// <summary>Reads data from a UVC Extension Unit control via Kernel Streaming.</summary>
-    /// <param name="extensionGuid">The GUID of the extension unit property set.</param>
-    /// <param name="control">
-    /// The control selector (property ID) within the extension unit.
-    /// </param>
-    /// <param name="data">A buffer to receive the control data.</param>
-    /// <returns>The number of bytes actually returned by the device.</returns>
-    /// <exception cref="COMException">The device returned an error.</exception>
-    /// <exception cref="InvalidCastException">The device does not support IKsControl.</exception>
     public int GetExtensionUnit(Guid extensionGuid, uint control, Span<byte> data)
     {
-        var nodeId = GetCachedExtensionUnitNodeId(extensionGuid, control);
-        return GetExtensionUnit(_handle, extensionGuid, nodeId, control, data);
+        try
+        {
+            var nodeId = GetCachedExtensionUnitNodeId(extensionGuid, control);
+            return GetExtensionUnit(extensionGuid, nodeId, control, data);
+        }
+        catch (Exception ex) when (ex is not ArgumentException and not ObjectDisposedException)
+        {
+            throw new UsbException($"GetCameraControl failed: {ex.Message}", ex);
+        }
     }
 
     /// <summary>Writes data to a UVC Extension Unit control via Kernel Streaming.</summary>
-    /// <param name="extensionGuid">The GUID of the extension unit property set.</param>
-    /// <param name="control">
-    /// The control selector (property ID) within the extension unit.
-    /// </param>
-    /// <param name="data">The control data to write to the device.</param>
-    /// <exception cref="COMException">The device returned an error.</exception>
-    /// <exception cref="InvalidCastException">The device does not support IKsControl.</exception>
     public void SetExtensionUnit(Guid extensionGuid, uint control, ReadOnlySpan<byte> data)
     {
-        var nodeId = GetCachedExtensionUnitNodeId(extensionGuid, control);
-        SetExtensionUnit(_handle, extensionGuid, nodeId, control, data);
+        try
+        {
+            var nodeId = GetCachedExtensionUnitNodeId(extensionGuid, control);
+            SetExtensionUnit(extensionGuid, nodeId, control, data);
+        }
+        catch (Exception ex) when (ex is not ArgumentException and not ObjectDisposedException)
+        {
+            throw new UsbException($"GetCameraControl failed: {ex.Message}", ex);
+        }
     }
 
-    private static T QueryInterface<T>(SafeVideoDeviceHandle handle)
-        where T : class =>
-        handle.IsInvalid || handle.IsClosed
-            ? throw new ObjectDisposedException(nameof(SafeVideoDeviceHandle))
-            : (T)Marshal.GetObjectForIUnknown(handle.DangerousGetHandle());
+    private void ThrowIfDisposed()
+    {
+        if (_disposed)
+            throw new ObjectDisposedException(nameof(WindowsUvcControls));
+    }
 
     private uint GetCachedExtensionUnitNodeId(Guid extensionGuid, uint control) =>
         _extensionUnitNodeIds.GetOrAdd(
@@ -290,15 +291,23 @@ internal sealed class WindowsUvcControls : IUvcControls
         );
 
     /// <summary>
-    /// Tries to find the topology node ID for a UVC Extension Unit that supports the specified control.
+    /// Finds the topology node ID for a UVC Extension Unit that supports the specified control.
+    /// <para />
+    /// The mapping is done by trial and error: for each candidate node, we attempt to query the
+    /// control length. If the call succeeds we have found the correct node ID. If the call returns
+    /// an unexpected error, we continue. This works because each extension unit node will only
+    /// accept controls from its own GUID.
+    /// <para />
+    /// The Windows API does not provide a reliable way to directly query which node corresponds to
+    /// a given extension.
     /// </summary>
     private uint? GetExtensionUnitNodeId(Guid extensionGuid, uint control)
     {
-        foreach (var nodeId in GetExtensionUnitNodeIds(_handle))
+        foreach (var nodeId in GetExtensionUnitNodeIds())
         {
             try
             {
-                _ = GetExtensionUnitLength(_handle, extensionGuid, nodeId, control);
+                _ = GetExtensionUnitLength(extensionGuid, nodeId, control);
                 return nodeId;
             }
             catch (COMException)
@@ -315,29 +324,28 @@ internal sealed class WindowsUvcControls : IUvcControls
     /// <remarks>
     /// Uses <c>IKsTopologyInfo</c> to enumerate all nodes in the DirectShow filter.
     /// </remarks>
-    /// <param name="handle">A valid <see cref="SafeVideoDeviceHandle"/>.</param>
     /// <returns>
     /// A list of all the node <see cref="DeviceSpecificNode"/> node IDs.
     /// </returns>
     /// <exception cref="COMException">
     /// The device returned an error from <c>IKsTopologyInfo</c>.
     /// </exception>
-    /// <exception cref="InvalidCastException">
+    /// <exception cref="InvalidOperationException">
     /// The device does not support <c>IKsTopologyInfo</c>.
     /// </exception>
-    private static List<uint> GetExtensionUnitNodeIds(SafeVideoDeviceHandle handle)
+    private List<uint> GetExtensionUnitNodeIds()
     {
-        var topology = QueryInterface<IKsTopologyInfo>(handle);
-        var ksControl = QueryInterface<IKsControl>(handle);
         var xuNodes = new List<uint>();
-        try
+        lock (_disposeLock)
         {
-            var hr = topology.get_NumNodes(out var numNodes);
+            ThrowIfDisposed();
+
+            var hr = TopologyInfo.get_NumNodes(out var numNodes);
             Marshal.ThrowExceptionForHR(hr);
 
             for (uint nodeId = 0; nodeId < numNodes; nodeId++)
             {
-                hr = topology.get_NodeType(nodeId, out var nodeType);
+                hr = TopologyInfo.get_NodeType(nodeId, out var nodeType);
                 Marshal.ThrowExceptionForHR(hr);
 
                 if (nodeType == DeviceSpecificNode)
@@ -346,11 +354,6 @@ internal sealed class WindowsUvcControls : IUvcControls
                 }
             }
         }
-        finally
-        {
-            _ = Marshal.ReleaseComObject(ksControl);
-            _ = Marshal.ReleaseComObject(topology);
-        }
         return xuNodes;
     }
 
@@ -358,7 +361,6 @@ internal sealed class WindowsUvcControls : IUvcControls
     /// Queries the data length for a UVC Extension Unit control via Kernel Streaming.
     /// Sends a get request with a zero-length buffer; the driver returns the required size.
     /// </summary>
-    /// <param name="handle">A valid <see cref="SafeVideoDeviceHandle"/>.</param>
     /// <param name="extensionGuid">The GUID of the extension unit property set.</param>
     /// <param name="nodeId">The topology node ID of the extension unit.</param>
     /// <param name="control">
@@ -368,13 +370,8 @@ internal sealed class WindowsUvcControls : IUvcControls
     /// <exception cref="COMException">
     /// The device returned an error (other than ERROR_MORE_DATA).
     /// </exception>
-    /// <exception cref="InvalidCastException">The device does not support IKsControl.</exception>
-    private static int GetExtensionUnitLength(
-        SafeVideoDeviceHandle handle,
-        Guid extensionGuid,
-        uint nodeId,
-        uint control
-    )
+    /// <exception cref="InvalidOperationException">The device does not support IKsControl.</exception>
+    private int GetExtensionUnitLength(Guid extensionGuid, uint nodeId, uint control)
     {
         var node = new KspNode
         {
@@ -387,10 +384,11 @@ internal sealed class WindowsUvcControls : IUvcControls
             NodeId = nodeId,
         };
 
-        var ksControl = QueryInterface<IKsControl>(handle);
-        try
+        lock (_disposeLock)
         {
-            var hr = ksControl.KsProperty(
+            ThrowIfDisposed();
+
+            var hr = KsControl.KsProperty(
                 ref node,
                 Marshal.SizeOf<KspNode>(),
                 IntPtr.Zero,
@@ -405,16 +403,11 @@ internal sealed class WindowsUvcControls : IUvcControls
             }
             return bytesReturned;
         }
-        finally
-        {
-            _ = Marshal.ReleaseComObject(ksControl);
-        }
     }
 
     /// <summary>
     /// Reads data from a UVC Extension Unit control via Kernel Streaming.
     /// </summary>
-    /// <param name="handle">A valid <see cref="SafeVideoDeviceHandle"/>.</param>
     /// <param name="extensionGuid">The GUID of the extension unit property set.</param>
     /// <param name="nodeId">The topology node ID of the extension unit.</param>
     /// <param name="control">
@@ -423,14 +416,8 @@ internal sealed class WindowsUvcControls : IUvcControls
     /// <param name="data">A buffer to receive the control data.</param>
     /// <returns>The number of bytes actually returned by the device.</returns>
     /// <exception cref="COMException">The device returned an error.</exception>
-    /// <exception cref="InvalidCastException">The device does not support IKsControl.</exception>
-    private static int GetExtensionUnit(
-        SafeVideoDeviceHandle handle,
-        Guid extensionGuid,
-        uint nodeId,
-        uint control,
-        Span<byte> data
-    )
+    /// <exception cref="InvalidOperationException">The device does not support IKsControl.</exception>
+    private int GetExtensionUnit(Guid extensionGuid, uint nodeId, uint control, Span<byte> data)
     {
         var node = new KspNode
         {
@@ -443,14 +430,15 @@ internal sealed class WindowsUvcControls : IUvcControls
             NodeId = nodeId,
         };
 
-        var buffer = new byte[data.Length];
-        var pinned = GCHandle.Alloc(buffer, GCHandleType.Pinned);
-        try
+        lock (_disposeLock)
         {
-            var ksControl = QueryInterface<IKsControl>(handle);
+            ThrowIfDisposed();
+
+            var buffer = new byte[data.Length];
+            var pinned = GCHandle.Alloc(buffer, GCHandleType.Pinned);
             try
             {
-                var hr = ksControl.KsProperty(
+                var hr = KsControl.KsProperty(
                     ref node,
                     Marshal.SizeOf<KspNode>(),
                     pinned.AddrOfPinnedObject(),
@@ -463,19 +451,14 @@ internal sealed class WindowsUvcControls : IUvcControls
             }
             finally
             {
-                _ = Marshal.ReleaseComObject(ksControl);
+                pinned.Free();
             }
-        }
-        finally
-        {
-            pinned.Free();
         }
     }
 
     /// <summary>
     /// Writes data to a UVC Extension Unit control via Kernel Streaming.
     /// </summary>
-    /// <param name="handle">A valid <see cref="SafeVideoDeviceHandle"/>.</param>
     /// <param name="extensionGuid">The GUID of the extension unit property set.</param>
     /// <param name="nodeId">The topology node ID of the extension unit.</param>
     /// <param name="control">
@@ -483,9 +466,8 @@ internal sealed class WindowsUvcControls : IUvcControls
     /// </param>
     /// <param name="data">The control data to write to the device.</param>
     /// <exception cref="COMException">The device returned an error.</exception>
-    /// <exception cref="InvalidCastException">The device does not support IKsControl.</exception>
-    private static void SetExtensionUnit(
-        SafeVideoDeviceHandle handle,
+    /// <exception cref="InvalidOperationException">The device does not support IKsControl.</exception>
+    private void SetExtensionUnit(
         Guid extensionGuid,
         uint nodeId,
         uint control,
@@ -503,14 +485,15 @@ internal sealed class WindowsUvcControls : IUvcControls
             NodeId = nodeId,
         };
 
-        var buffer = data.ToArray();
-        var pinned = GCHandle.Alloc(buffer, GCHandleType.Pinned);
-        try
+        lock (_disposeLock)
         {
-            var ksControl = QueryInterface<IKsControl>(handle);
+            ThrowIfDisposed();
+
+            var buffer = data.ToArray();
+            var pinned = GCHandle.Alloc(buffer, GCHandleType.Pinned);
             try
             {
-                var hr = ksControl.KsProperty(
+                var hr = KsControl.KsProperty(
                     ref node,
                     Marshal.SizeOf<KspNode>(),
                     pinned.AddrOfPinnedObject(),
@@ -521,14 +504,30 @@ internal sealed class WindowsUvcControls : IUvcControls
             }
             finally
             {
-                _ = Marshal.ReleaseComObject(ksControl);
+                pinned.Free();
             }
-        }
-        finally
-        {
-            pinned.Free();
         }
     }
 
-    public void Dispose() => _handle.Dispose();
+    public void Dispose()
+    {
+        lock (_disposeLock)
+        {
+            if (_disposed)
+                return;
+
+            _disposed = true;
+
+            if (_topologyInfo is not null)
+                _ = Marshal.ReleaseComObject(_topologyInfo);
+            if (_ksControl is not null)
+                _ = Marshal.ReleaseComObject(_ksControl);
+            if (_videoProcAmp is not null)
+                _ = Marshal.ReleaseComObject(_videoProcAmp);
+            if (_cameraControl is not null)
+                _ = Marshal.ReleaseComObject(_cameraControl);
+
+            _handle.Dispose();
+        }
+    }
 }
