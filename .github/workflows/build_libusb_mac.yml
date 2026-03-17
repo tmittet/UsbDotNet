@@ -74,7 +74,7 @@ jobs:
           fi
 
       - name: Checkout (this repo)
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Fetch libusb source
         run: |
@@ -168,7 +168,7 @@ jobs:
 
       - name: Upload artifact (macOS)
         if: matrix.platform == 'macos'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: libusb-macos-${{ matrix.arch }}-dylib
           path: ${{ env.BUILD_DIR }}/libusb-macos-${{ matrix.arch }}.tar.gz

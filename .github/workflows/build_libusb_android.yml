@@ -61,7 +61,7 @@ jobs:
           fi
 
       - name: Checkout (this repo)
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Fetch libusb source
         run: |
@@ -93,7 +93,7 @@ jobs:
             NDK_LIBS_OUT="${NDK_LIBS_DIR}"
 
       - name: Upload artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: libusb-android-${{ matrix.app_abi }}-${{ env.APP_PLATFORM }}
           path: ${{ env.NDK_LIBS_DIR }}/
