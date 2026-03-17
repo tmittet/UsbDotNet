@@ -58,7 +58,7 @@ jobs:
           fi
 
       - name: Checkout (this repo)
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Fetch libusb source
         shell: bash
@@ -99,7 +99,7 @@ jobs:
           cp "$hdr" "$dest/include/libusb-1.0/"
 
       - name: Upload artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: libusb-windows-${{ matrix.arch }}-dll
           path: ${{ env.BUILD_DIR }}/windows-${{ matrix.arch }}/
