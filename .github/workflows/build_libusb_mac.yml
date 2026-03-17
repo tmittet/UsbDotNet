@@ -39,16 +39,16 @@ jobs:
             macos_deployment: "11.0"
 
           # Mac Catalyst (macabi)
-          # - name: Mac Catalyst arm64 (macabi)
-          #   runner: macos-latest
-          #   platform: mac-catalyst
-          #   arch: arm64
-          #   ios_target: "15.0"
-          # - name: Mac Catalyst x64 (macabi)
-          #   runner: macos-13
-          #   platform: mac-catalyst
-          #   arch: x86_64
-          #   ios_target: "15.0"
+          - name: Mac Catalyst arm64 (macabi)
+            runner: macos-latest
+            platform: mac-catalyst
+            arch: arm64
+            ios_target: "15.0"
+          - name: Mac Catalyst x64 (macabi)
+            runner: macos-15-intel
+            platform: mac-catalyst
+            arch: x86_64
+            ios_target: "15.0"
 
     name: ${{ matrix.name }}
     runs-on: ${{ matrix.runner }}
@@ -134,37 +134,59 @@ jobs:
           set -euxo pipefail
           SDK="$(xcrun --sdk macosx --show-sdk-path)"
           SRC="${SRC_DIR}/libusb"
-          OUT="${BUILD_DIR}/macabi-${{ matrix.arch }}"
-          mkdir -p "$OUT"
+          OBJ_DIR="${BUILD_DIR}/obj-macabi-${{ matrix.arch }}"
+          PREFIX="${STAGE_DIR}/maccatalyst-${{ matrix.arch }}"
+          mkdir -p "$OBJ_DIR" "$PREFIX/include/libusb-1.0" "$PREFIX/lib"
 
           # Minimal config header (bypassing autotools for macabi)
-          cat > "${SRC}/config.h" <<'CONF'
-          #define OS_DARWIN 1
-          #define DEFAULT_LOG_LEVEL 3
-          #define THREADS_POSIX 1
-          #define HAVE_MACH_ABSOLUTE_TIME 1
-          #define HAVE_CLOCK_GETTIME 1
-          #define HAVE_POLL 1
-          CONF
+          printf '%s\n' \
+            '#define PLATFORM_POSIX 1' \
+            '#define OS_DARWIN 1' \
+            '#define DEFAULT_VISIBILITY __attribute__((visibility("default")))' \
+            '#define DEFAULT_LOG_LEVEL 3' \
+            '#define THREADS_POSIX 1' \
+            '#define HAVE_MACH_ABSOLUTE_TIME 1' \
+            '#define HAVE_CLOCK_GETTIME 1' \
+            '#define HAVE_POLL 1' \
+            > "${SRC}/config.h"
 
-          COMMON="-isysroot ${SDK} -target ${{ matrix.arch }}-apple-ios${{ matrix.ios_target }}-macabi -I${SRC_DIR}/libusb -O2 -fPIC -DHAVE_CONFIG_H"
+          # Patch out APIs unavailable in Mac Catalyst (hard error, can't suppress with flags)
+          sed -i '' 's/kresult = IOServiceAuthorize.*/kresult = KERN_SUCCESS; \/\/ macabi: patched out unavailable API/' "${SRC}/os/darwin_usb.c"
+
+          TARGET="${{ matrix.arch }}-apple-ios${{ matrix.ios_target }}-macabi"
+          COMMON="-isysroot ${SDK} -target ${TARGET} -I${SRC} -O2 -fPIC -DHAVE_CONFIG_H"
 
           CORE_SRCS=(
             "${SRC}/core.c" "${SRC}/descriptor.c" "${SRC}/hotplug.c"
             "${SRC}/io.c"   "${SRC}/strerror.c"   "${SRC}/sync.c"
-            "${SRC}/os/poll_posix.c" "${SRC}/os/threads_posix.c" "${SRC}/os/events_posix.c"
+            "${SRC}/os/threads_posix.c" "${SRC}/os/events_posix.c"
           )
           DARWIN_SRCS=("${SRC}/os/darwin_usb.c")
 
           OBJ=()
           for f in "${CORE_SRCS[@]}" "${DARWIN_SRCS[@]}"; do
-            o="${OUT}/$(basename "${f%.c}").o"
+            o="${OBJ_DIR}/$(basename "${f%.c}").o"
             clang $COMMON -c "$f" -o "$o"
             OBJ+=("$o")
           done
 
-          # Build dynamic lib for macabi
-          # TODO
+          # Link dynamic library
+          clang -dynamiclib -target "${TARGET}" -isysroot "${SDK}" \
+            -install_name @rpath/libusb-1.0.dylib \
+            -framework IOKit -framework CoreFoundation -framework Security \
+            -lobjc \
+            -o "${PREFIX}/lib/libusb-1.0.dylib" \
+            "${OBJ[@]}"
+
+          # Copy public header
+          cp "${SRC}/libusb.h" "${PREFIX}/include/libusb-1.0/"
+
+          # Verify output
+          file "${PREFIX}/lib/libusb-1.0.dylib"
+
+          # Package
+          tar -czf "${BUILD_DIR}/libusb-maccatalyst-${{ matrix.arch }}.tar.gz" \
+            -C "${STAGE_DIR}" "maccatalyst-${{ matrix.arch }}"
 
       - name: Upload artifact (macOS)
         if: matrix.platform == 'macos'
@@ -172,4 +194,12 @@ jobs:
         with:
           name: libusb-macos-${{ matrix.arch }}-dylib
           path: ${{ env.BUILD_DIR }}/libusb-macos-${{ matrix.arch }}.tar.gz
+          if-no-files-found: error
+
+      - name: Upload artifact (Mac Catalyst)
+        if: matrix.platform == 'mac-catalyst'
+        uses: actions/upload-artifact@v7
+        with:
+          name: libusb-maccatalyst-${{ matrix.arch }}-dylib
+          path: ${{ env.BUILD_DIR }}/libusb-maccatalyst-${{ matrix.arch }}.tar.gz
           if-no-files-found: error
