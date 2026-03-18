@@ -31,11 +31,13 @@ jobs:
             runner: macos-latest
             platform: macos
             arch: arm64
+            host_triple: aarch64-apple-darwin
             macos_deployment: "11.0"
           - name: macOS x64
             runner: macos-15-intel
             platform: macos
             arch: x86_64
+            host_triple: x86_64-apple-darwin
             macos_deployment: "11.0"
 
           # Mac Catalyst (macabi)
@@ -43,11 +45,13 @@ jobs:
             runner: macos-latest
             platform: mac-catalyst
             arch: arm64
+            host_triple: aarch64-apple-darwin
             ios_target: "15.0"
           - name: Mac Catalyst x64 (macabi)
             runner: macos-15-intel
             platform: mac-catalyst
             arch: x86_64
+            host_triple: x86_64-apple-darwin
             ios_target: "15.0"
 
     name: ${{ matrix.name }}
@@ -99,101 +103,161 @@ jobs:
           brew list autoconf    >/dev/null 2>&1 || brew install autoconf
           brew list automake    >/dev/null 2>&1 || brew install automake
           brew list libtool     >/dev/null 2>&1 || brew install libtool
-          brew list pkg-config  >/dev/null 2>&1 || brew install pkg-config
 
       - name: Prepare build folders
         run: |
           rm -rf "$BUILD_DIR" "$STAGE_DIR"
           mkdir -p "$BUILD_DIR" "$STAGE_DIR"
 
-      # ---------- macOS (Autotools -> dynamic .dylib) ----------
+      # ---------- macOS native (Autotools -> dynamic .dylib) ----------
       - name: Build libusb macOS (${{ matrix.arch }})
         if: matrix.platform == 'macos'
-        working-directory: ${{ env.SRC_DIR }}
         shell: bash
         env:
           MACOSX_DEPLOYMENT_TARGET: ${{ matrix.macos_deployment }}
         run: |
           set -euxo pipefail
-          ./autogen.sh
-          export CC="clang -arch ${{ matrix.arch }}"
-          export CFLAGS="-O2 -pipe"
-          export LDFLAGS="-Wl,-headerpad_max_install_names -Wl,-install_name,@rpath/libusb-1.0.dylib"
-          ./configure --disable-dependency-tracking --prefix="${STAGE_DIR}/macos-${{ matrix.arch }}"
+          cd "$SRC_DIR"
+          ./bootstrap.sh
+
+          PREFIX="${STAGE_DIR}/macos-${{ matrix.arch }}"
+          mkdir -p "$BUILD_DIR/macos-${{ matrix.arch }}"
+          cd "$BUILD_DIR/macos-${{ matrix.arch }}"
+
+          "${SRC_DIR}/configure" \
+            --host="${{ matrix.host_triple }}" \
+            --disable-dependency-tracking \
+            --disable-examples-build \
+            --disable-tests-build \
+            --prefix="$PREFIX" \
+            CC="clang -arch ${{ matrix.arch }}" \
+            CFLAGS="-O2 -pipe" \
+            LDFLAGS="-Wl,-headerpad_max_install_names -Wl,-install_name,@rpath/libusb-1.0.dylib"
+
           make -j"$(sysctl -n hw.ncpu)"
           make install
 
-          # Package headers + dynamic lib (and static if produced)
-          tar -czf "${BUILD_DIR}/libusb-macos-${{ matrix.arch }}.tar.gz" -C "${STAGE_DIR}" "macos-${{ matrix.arch }}"
+          # Collapse libtool's versioned file + symlink into a single dylib
+          LIB="${PREFIX}/lib"
+          VERSIONED=$(find "$LIB" -name 'libusb-*.dylib' ! -type l | head -1)
+          if [[ -n "$VERSIONED" && "$VERSIONED" != "${LIB}/libusb-1.0.dylib" ]]; then
+            rm -f "${LIB}/libusb-1.0.dylib"
+            mv "$VERSIONED" "${LIB}/libusb-1.0.dylib"
+          fi
+          # Remove libtool metadata
+          rm -f "${LIB}"/libusb-1.0.la
+          # Verify
+          file "${LIB}/libusb-1.0.dylib"
+          otool -l "${LIB}/libusb-1.0.dylib" | grep -A3 LC_BUILD_VERSION || true
 
       # ---------- Mac Catalyst (macabi -> dynamic .dylib) ----------
-      - name: Build libusb Catalyst (${{ matrix.arch }}) dynamic
+      - name: Build libusb Catalyst (${{ matrix.arch }})
         if: matrix.platform == 'mac-catalyst'
         shell: bash
         run: |
           set -euxo pipefail
           SDK="$(xcrun --sdk macosx --show-sdk-path)"
+          TARGET="${{ matrix.arch }}-apple-ios${{ matrix.ios_target }}-macabi"
           SRC="${SRC_DIR}/libusb"
           OBJ_DIR="${BUILD_DIR}/obj-macabi-${{ matrix.arch }}"
           PREFIX="${STAGE_DIR}/maccatalyst-${{ matrix.arch }}"
           mkdir -p "$OBJ_DIR" "$PREFIX/include/libusb-1.0" "$PREFIX/lib"
 
-          # Minimal config header (bypassing autotools for macabi)
-          printf '%s\n' \
-            '#define PLATFORM_POSIX 1' \
-            '#define OS_DARWIN 1' \
-            '#define DEFAULT_VISIBILITY __attribute__((visibility("default")))' \
-            '#define DEFAULT_LOG_LEVEL 3' \
-            '#define THREADS_POSIX 1' \
-            '#define HAVE_MACH_ABSOLUTE_TIME 1' \
-            '#define HAVE_CLOCK_GETTIME 1' \
-            '#define HAVE_POLL 1' \
-            > "${SRC}/config.h"
+          # Generate config.h via autotools against the macabi target, then discard the build.
+          # configure exits non-zero when IOKit checks fail under macabi, but we only keep config.h
+          cd "$SRC_DIR"
+          ./bootstrap.sh
+          CONF_DIR="${BUILD_DIR}/conf-macabi-${{ matrix.arch }}"
+          mkdir -p "$CONF_DIR" && cd "$CONF_DIR"
+          set +e
+          "${SRC_DIR}/configure" \
+            --host="${{ matrix.host_triple }}" \
+            --disable-dependency-tracking \
+            --disable-examples-build \
+            --disable-tests-build \
+            --prefix="/tmp/unused" \
+            CC="clang -arch ${{ matrix.arch }} -target ${TARGET} -isysroot ${SDK}" \
+            CFLAGS="-O2"
+          CONFIGURE_EXIT=$?
+          set -e
+          if [[ ! -f "${CONF_DIR}/config.h" ]]; then
+            echo "::error::configure did not produce config.h (exit ${CONFIGURE_EXIT})"
+            exit 1
+          fi
+          # Copy the generated config.h into the source tree for our manual compile
+          cp "${CONF_DIR}/config.h" "${SRC}/config.h"
 
-          # Patch out APIs unavailable in Mac Catalyst (hard error, can't suppress with flags)
-          sed -i '' 's/kresult = IOServiceAuthorize.*/kresult = KERN_SUCCESS; \/\/ macabi: patched out unavailable API/' "${SRC}/os/darwin_usb.c"
+          # Wrap IOServiceAuthorize in a Mac Catalyst guard
+          grep -q 'IOServiceAuthorize' "${SRC}/os/darwin_usb.c" || {
+            echo "::error::IOServiceAuthorize not found in darwin_usb.c — check libusb version"
+            exit 1
+          }
+          sed -i '' \
+            's/kresult = IOServiceAuthorize[[:space:]]*(\(.*\));/#if !TARGET_OS_MACCATALYST\n  kresult = IOServiceAuthorize (\1);\n#else\n  kresult = KERN_SUCCESS; \/* macabi: IOServiceAuthorize unavailable *\/\n#endif/' \
+            "${SRC}/os/darwin_usb.c"
+          # Verify the patch was actually applied
+          grep -q 'TARGET_OS_MACCATALYST' "${SRC}/os/darwin_usb.c" || {
+            echo "::error::sed patch did not apply — IOServiceAuthorize guard not found after patch"
+            exit 1
+          }
 
-          TARGET="${{ matrix.arch }}-apple-ios${{ matrix.ios_target }}-macabi"
-          COMMON="-isysroot ${SDK} -target ${TARGET} -I${SRC} -O2 -fPIC -DHAVE_CONFIG_H"
-
-          CORE_SRCS=(
-            "${SRC}/core.c" "${SRC}/descriptor.c" "${SRC}/hotplug.c"
-            "${SRC}/io.c"   "${SRC}/strerror.c"   "${SRC}/sync.c"
-            "${SRC}/os/threads_posix.c" "${SRC}/os/events_posix.c"
+          # Collect sources from Makefile.am so the list stays correct across libusb releases
+          CORE_SRCS=()
+          while IFS= read -r f; do
+            [[ "$f" == *.c ]] && CORE_SRCS+=("${SRC_DIR}/libusb/${f}")
+          done < <(
+            awk '/^libusb_1_0_la_SOURCES/,/[^\\]$/' "${SRC_DIR}/libusb/Makefile.am" \
+              | grep -oE '[a-z_/]+\.c'
           )
+
+          # The POSIX thread/event backend is conditionally included by autotools (THREADS_POSIX)
+          # and not listed in libusb_1_0_la_SOURCES, so it is not picked up by the awk pass above.
+          # Add it explicitly; macOS always uses the POSIX backend.
+          CORE_SRCS+=(
+            "${SRC_DIR}/libusb/os/events_posix.c"
+            "${SRC_DIR}/libusb/os/threads_posix.c"
+          )
+
           DARWIN_SRCS=("${SRC}/os/darwin_usb.c")
+
+          COMMON="-isysroot ${SDK} -target ${TARGET} -arch ${{ matrix.arch }} \
+                  -I${SRC_DIR}/libusb -I${CONF_DIR} \
+                  -O2 -fPIC -DHAVE_CONFIG_H \
+                  -DTARGET_OS_MACCATALYST=1"
 
           OBJ=()
           for f in "${CORE_SRCS[@]}" "${DARWIN_SRCS[@]}"; do
+            [[ -f "$f" ]] || { echo "::error::Source not found: $f"; exit 1; }
             o="${OBJ_DIR}/$(basename "${f%.c}").o"
+            # shellcheck disable=SC2086
             clang $COMMON -c "$f" -o "$o"
             OBJ+=("$o")
           done
 
-          # Link dynamic library
-          clang -dynamiclib -target "${TARGET}" -isysroot "${SDK}" \
+          # ---- Link ----
+          clang -dynamiclib \
+            -target "${TARGET}" \
+            -isysroot "${SDK}" \
+            -arch "${{ matrix.arch }}" \
             -install_name @rpath/libusb-1.0.dylib \
-            -framework IOKit -framework CoreFoundation -framework Security \
+            -framework IOKit \
+            -framework CoreFoundation \
+            -framework Security \
             -lobjc \
             -o "${PREFIX}/lib/libusb-1.0.dylib" \
             "${OBJ[@]}"
-
           # Copy public header
           cp "${SRC}/libusb.h" "${PREFIX}/include/libusb-1.0/"
-
-          # Verify output
+          # Verify
           file "${PREFIX}/lib/libusb-1.0.dylib"
-
-          # Package
-          tar -czf "${BUILD_DIR}/libusb-maccatalyst-${{ matrix.arch }}.tar.gz" \
-            -C "${STAGE_DIR}" "maccatalyst-${{ matrix.arch }}"
+          otool -l "${PREFIX}/lib/libusb-1.0.dylib" | grep -A3 LC_BUILD_VERSION || true
 
       - name: Upload artifact (macOS)
         if: matrix.platform == 'macos'
         uses: actions/upload-artifact@v7
         with:
           name: libusb-macos-${{ matrix.arch }}-dylib
-          path: ${{ env.BUILD_DIR }}/libusb-macos-${{ matrix.arch }}.tar.gz
+          path: ${{ env.STAGE_DIR }}/macos-${{ matrix.arch }}
           if-no-files-found: error
 
       - name: Upload artifact (Mac Catalyst)
@@ -201,5 +265,48 @@ jobs:
         uses: actions/upload-artifact@v7
         with:
           name: libusb-maccatalyst-${{ matrix.arch }}-dylib
-          path: ${{ env.BUILD_DIR }}/libusb-maccatalyst-${{ matrix.arch }}.tar.gz
+          path: ${{ env.STAGE_DIR }}/maccatalyst-${{ matrix.arch }}
+          if-no-files-found: error
+
+  # ---------- Assemble universal binaries ----------
+  lipo:
+    needs: build
+    runs-on: macos-latest
+    strategy:
+      matrix:
+        include:
+          - name: macOS
+            platform: macos
+          - name: Mac Catalyst
+            platform: maccatalyst
+
+    steps:
+      - name: Download arm64 artifact
+        uses: actions/download-artifact@v8
+        with:
+          name: libusb-${{ matrix.platform }}-arm64-dylib
+          path: input/arm64
+
+      - name: Download x64 artifact
+        uses: actions/download-artifact@v8
+        with:
+          name: libusb-${{ matrix.platform }}-x86_64-dylib
+          path: input/x86_64
+
+      - name: Create universal binary
+        run: |
+          mkdir -p output/lib output/include/libusb-1.0
+          lipo -create \
+            input/arm64/lib/libusb-1.0.dylib \
+            input/x86_64/lib/libusb-1.0.dylib \
+            -output output/lib/libusb-1.0.dylib
+          # Headers are arch-independent; use either copy
+          cp -r input/arm64/include/ output/include/
+          lipo -info output/lib/libusb-1.0.dylib
+
+      - name: Upload universal artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: libusb-${{ matrix.platform }}-universal-dylib
+          path: output
           if-no-files-found: error
