@@ -19,27 +19,33 @@ internal sealed class UnixUvcControls : IUvcControls
     }
 
     /// <inheritdoc />
-    public int GetCameraControl(UvcCameraControl cameraControl, out UvcControlType controlType)
+    public UsbResult GetCameraControl(
+        UvcCameraControl cameraControl,
+        out int value,
+        out UvcControlType controlType
+    )
     {
         controlType = UvcControlType.Manual;
-        return ReadCameraControl(cameraControl, UvcControlRequest.GetCurrent);
+        return ReadCameraControl(cameraControl, UvcControlRequest.GetCurrent, out value);
     }
 
     /// <inheritdoc />
-    public void SetCameraControl(
+    public UsbResult SetCameraControl(
         UvcCameraControl cameraControl,
         int value,
         UvcControlType controlType = UvcControlType.Manual
     )
     {
-        var cameraControlEntityId = GetCameraControlEntityIdOrThrow();
+        if (!TryGetCameraControlEntityId(out var cameraControlEntityId))
+            return UsbResult.NotSupported;
+
         var (control, bufferSize, offset) = UvcTransfer.GetCameraControlDescriptor(cameraControl);
 
         if (cameraControl is not UvcCameraControl.Pan and not UvcCameraControl.Tilt)
         {
             var buffer = new byte[bufferSize];
             UvcTransfer.WriteInt(buffer, 0, bufferSize, value);
-            var result = _device.ControlWriteUvc(
+            return _device.ControlWriteUvc(
                 buffer,
                 out _,
                 UvcControlRequest.SetCurrent,
@@ -47,21 +53,9 @@ internal sealed class UnixUvcControls : IUvcControls
                 cameraControlEntityId,
                 control
             );
-            UvcTransfer.ThrowIfFailed(
-                result,
-                $"ControlWriteUvc(request=SetCurrent, control={cameraControl})"
-            );
-            return;
         }
 
         // Pan and Tilt share an 8-byte control; do a read-modify-write to preserve the other axis
-        if (bufferSize != 8)
-        {
-            throw new UsbException(
-                "SetCameraControl failed: "
-                    + $"Unexpected buffer size {bufferSize} for {cameraControl} control; expected 8."
-            );
-        }
         var ptBuffer = new byte[8];
         var readResult = _device.ControlReadUvc(
             ptBuffer,
@@ -71,12 +65,11 @@ internal sealed class UnixUvcControls : IUvcControls
             cameraControlEntityId,
             control
         );
-        UvcTransfer.ThrowIfFailed(
-            readResult,
-            $"ControlReadUvc(request=GetCurrent, control={cameraControl})"
-        );
+        if (readResult != UsbResult.Success)
+            return readResult;
+
         BinaryPrimitives.WriteInt32LittleEndian(ptBuffer.AsSpan(offset, 4), value);
-        var writeResult = _device.ControlWriteUvc(
+        return _device.ControlWriteUvc(
             ptBuffer,
             out _,
             UvcControlRequest.SetCurrent,
@@ -84,14 +77,10 @@ internal sealed class UnixUvcControls : IUvcControls
             cameraControlEntityId,
             control
         );
-        UvcTransfer.ThrowIfFailed(
-            writeResult,
-            $"ControlWriteUvc(request=SetCurrent, control={cameraControl})"
-        );
     }
 
     /// <inheritdoc />
-    public void GetCameraControlRange(
+    public UsbResult GetCameraControlRange(
         UvcCameraControl cameraControl,
         out int minValue,
         out int maxValue,
@@ -100,16 +89,43 @@ internal sealed class UnixUvcControls : IUvcControls
         out UvcControlType capsFlags
     )
     {
-        minValue = ReadCameraControl(cameraControl, UvcControlRequest.GetMinimum);
-        maxValue = ReadCameraControl(cameraControl, UvcControlRequest.GetMaximum);
-        stepSize = ReadCameraControl(cameraControl, UvcControlRequest.GetResolution);
-        defaultValue = ReadCameraControl(cameraControl, UvcControlRequest.GetDefault);
         capsFlags = UvcControlType.Manual;
+
+        var result = ReadCameraControl(cameraControl, UvcControlRequest.GetMinimum, out minValue);
+        if (result != UsbResult.Success)
+        {
+            maxValue = stepSize = defaultValue = 0;
+            return result;
+        }
+
+        result = ReadCameraControl(cameraControl, UvcControlRequest.GetMaximum, out maxValue);
+        if (result != UsbResult.Success)
+        {
+            stepSize = defaultValue = 0;
+            return result;
+        }
+
+        result = ReadCameraControl(cameraControl, UvcControlRequest.GetResolution, out stepSize);
+        if (result != UsbResult.Success)
+        {
+            defaultValue = 0;
+            return result;
+        }
+
+        result = ReadCameraControl(cameraControl, UvcControlRequest.GetDefault, out defaultValue);
+        return result;
     }
 
-    private int ReadCameraControl(UvcCameraControl cameraControl, UvcControlRequest request)
+    private UsbResult ReadCameraControl(
+        UvcCameraControl cameraControl,
+        UvcControlRequest request,
+        out int value
+    )
     {
-        var cameraControlEntityId = GetCameraControlEntityIdOrThrow();
+        value = 0;
+        if (!TryGetCameraControlEntityId(out var cameraControlEntityId))
+            return UsbResult.NotSupported;
+
         var (control, bufferSize, offset) = UvcTransfer.GetCameraControlDescriptor(cameraControl);
         var buffer = new byte[bufferSize];
         var result = _device.ControlReadUvc(
@@ -120,48 +136,60 @@ internal sealed class UnixUvcControls : IUvcControls
             cameraControlEntityId,
             control
         );
-        UvcTransfer.ThrowIfFailed(
-            result,
-            $"ControlReadUvc(request={request}, control={cameraControl})"
-        );
+        if (result != UsbResult.Success)
+            return result;
+
         // The UVC spec returns the full buffer for pan & tilt; extract the int at the right offset
-        return UvcTransfer.ReadInt(buffer, offset, bufferSize <= 4 ? bufferSize : 4);
+        value = UvcTransfer.ReadInt(buffer, offset, bufferSize <= 4 ? bufferSize : 4);
+        return UsbResult.Success;
     }
 
     /// <inheritdoc />
-    public int GetImageSetting(UvcImageSetting imageSetting, out UvcControlType controlType)
+    public UsbResult GetImageSetting(
+        UvcImageSetting imageSetting,
+        out int value,
+        out UvcControlType controlType
+    )
     {
         controlType = UvcControlType.Manual;
-        return ReadImageSetting(imageSetting, UvcControlRequest.GetCurrent);
+        return ReadImageSetting(imageSetting, UvcControlRequest.GetCurrent, out value);
     }
 
     /// <inheritdoc />
-    public void SetImageSetting(
+    public UsbResult SetImageSetting(
         UvcImageSetting imageSetting,
         int value,
         UvcControlType controlType = UvcControlType.Manual
     )
     {
-        var imageSettingEntityId = GetImageSettingEntityIdOrThrow();
-        var (control, bufferSize) = UvcTransfer.GetImageSettingDescriptor(imageSetting);
+        if (!TryGetImageSettingEntityId(out var imageSettingEntityId))
+            return UsbResult.NotSupported;
+
+        if (
+            !UvcTransfer.TryGetImageSettingDescriptor(
+                imageSetting,
+                out var controlId,
+                out var bufferSize
+            )
+        )
+        {
+            return UsbResult.NotSupported;
+        }
+
         var buffer = new byte[bufferSize];
         UvcTransfer.WriteInt(buffer, 0, bufferSize, value);
-        var result = _device.ControlWriteUvc(
+        return _device.ControlWriteUvc(
             buffer,
             out _,
             UvcControlRequest.SetCurrent,
             _interfaceNumber,
             imageSettingEntityId,
-            control
-        );
-        UvcTransfer.ThrowIfFailed(
-            result,
-            $"ControlWriteUvc(request=SetCurrent, setting={imageSetting})"
+            controlId
         );
     }
 
     /// <inheritdoc />
-    public void GetImageSettingRange(
+    public UsbResult GetImageSettingRange(
         UvcImageSetting imageSetting,
         out int min,
         out int max,
@@ -170,17 +198,54 @@ internal sealed class UnixUvcControls : IUvcControls
         out UvcControlType controlType
     )
     {
-        min = ReadImageSetting(imageSetting, UvcControlRequest.GetMinimum);
-        max = ReadImageSetting(imageSetting, UvcControlRequest.GetMaximum);
-        step = ReadImageSetting(imageSetting, UvcControlRequest.GetResolution);
-        defaultValue = ReadImageSetting(imageSetting, UvcControlRequest.GetDefault);
         controlType = UvcControlType.Manual;
+
+        var result = ReadImageSetting(imageSetting, UvcControlRequest.GetMinimum, out min);
+        if (result != UsbResult.Success)
+        {
+            max = step = defaultValue = 0;
+            return result;
+        }
+
+        result = ReadImageSetting(imageSetting, UvcControlRequest.GetMaximum, out max);
+        if (result != UsbResult.Success)
+        {
+            step = defaultValue = 0;
+            return result;
+        }
+
+        result = ReadImageSetting(imageSetting, UvcControlRequest.GetResolution, out step);
+        if (result != UsbResult.Success)
+        {
+            defaultValue = 0;
+            return result;
+        }
+
+        result = ReadImageSetting(imageSetting, UvcControlRequest.GetDefault, out defaultValue);
+        return result;
     }
 
-    private int ReadImageSetting(UvcImageSetting imageSetting, UvcControlRequest request)
+    private UsbResult ReadImageSetting(
+        UvcImageSetting imageSetting,
+        UvcControlRequest request,
+        out int value
+    )
     {
-        var imageSettingEntityId = GetImageSettingEntityIdOrThrow();
-        var (control, bufferSize) = UvcTransfer.GetImageSettingDescriptor(imageSetting);
+        value = 0;
+        if (!TryGetImageSettingEntityId(out var imageSettingEntityId))
+            return UsbResult.NotSupported;
+
+        if (
+            !UvcTransfer.TryGetImageSettingDescriptor(
+                imageSetting,
+                out var controlId,
+                out var bufferSize
+            )
+        )
+        {
+            return UsbResult.NotSupported;
+        }
+
         var buffer = new byte[bufferSize];
         var result = _device.ControlReadUvc(
             buffer,
@@ -188,113 +253,123 @@ internal sealed class UnixUvcControls : IUvcControls
             request,
             _interfaceNumber,
             imageSettingEntityId,
-            control
+            controlId
         );
-        UvcTransfer.ThrowIfFailed(
-            result,
-            $"ControlReadUvc(request={request}, control={imageSetting})"
-        );
-        return UvcTransfer.ReadInt(buffer, 0, bufferSize);
+        if (result != UsbResult.Success)
+        {
+            return result;
+        }
+
+        value = UvcTransfer.ReadInt(buffer, 0, bufferSize);
+        return UsbResult.Success;
     }
 
     /// <inheritdoc />
-    public int GetExtensionUnitLength(Guid extensionGuid, uint control)
+    public UsbResult GetExtensionUnitLength(Guid extensionGuid, uint control, out int length)
     {
-        var entityId = GetExtensionUnitEntityId(extensionGuid);
-        return GetExtensionUnitLength(entityId, control);
-    }
+        length = 0;
+        if (!TryGetExtensionUnitEntityId(extensionGuid, out var entityId))
+            return UsbResult.NotSupported;
 
-    /// <inheritdoc />
-    public int GetExtensionUnit(Guid extensionGuid, uint control, Span<byte> data)
-    {
-        var entityId = GetExtensionUnitEntityId(extensionGuid);
-        return GetExtensionUnit(entityId, control, data);
-    }
-
-    /// <inheritdoc />
-    public void SetExtensionUnit(Guid extensionGuid, uint control, ReadOnlySpan<byte> data)
-    {
-        var entityId = GetExtensionUnitEntityId(extensionGuid);
-        SetExtensionUnit(entityId, control, data);
-    }
-
-    private int GetExtensionUnit(uint entityId, uint control, Span<byte> data)
-    {
-        var result = _device.ControlReadUvc(
-            data,
-            out var bytesRead,
-            UvcControlRequest.GetCurrent,
-            _interfaceNumber,
-            (byte)entityId,
-            (byte)control
-        );
-        UvcTransfer.ThrowIfFailed(
-            result,
-            $"ControlReadUvc(request=GetCurrent, entityId=0x{entityId:X2} control=0x{control:X2})"
-        );
-        return bytesRead;
-    }
-
-    private void SetExtensionUnit(uint entityId, uint control, ReadOnlySpan<byte> data)
-    {
-        var result = _device.ControlWriteUvc(
-            data,
-            out _,
-            UvcControlRequest.SetCurrent,
-            _interfaceNumber,
-            (byte)entityId,
-            (byte)control
-        );
-        UvcTransfer.ThrowIfFailed(
-            result,
-            $"ControlWriteUvc(request=SetCurrent, entityId=0x{entityId:X2} control=0x{control:X2})"
-        );
-    }
-
-    private int GetExtensionUnitLength(uint entityId, uint control)
-    {
         Span<byte> buffer = stackalloc byte[2];
         var result = _device.ControlReadUvc(
             buffer,
             out _,
             UvcControlRequest.GetLength,
             _interfaceNumber,
-            (byte)entityId,
+            entityId,
             (byte)control
         );
-        UvcTransfer.ThrowIfFailed(
-            result,
-            $"ControlReadUvc(request=GetCurrent, entityId=0x{entityId:X2} control=0x{control:X2})"
-        );
-        return BinaryPrimitives.ReadUInt16LittleEndian(buffer);
+        if (result != UsbResult.Success)
+        {
+            return result;
+        }
+
+        length = BinaryPrimitives.ReadUInt16LittleEndian(buffer);
+        return UsbResult.Success;
     }
 
-    private byte GetCameraControlEntityIdOrThrow() =>
-        _cameraControlEntityId ??=
-            _device.GetUvcCameraControlEntityId(_interfaceNumber)
-            ?? throw new NotSupportedException(
-                "Camera control request is not supported; "
-                    + "no camera terminal entity was found in the UVC descriptors."
-            );
+    /// <inheritdoc />
+    public UsbResult GetExtensionUnit(
+        Guid extensionGuid,
+        uint control,
+        Span<byte> data,
+        out int bytesRead
+    )
+    {
+        bytesRead = 0;
+        if (!TryGetExtensionUnitEntityId(extensionGuid, out var entityId))
+            return UsbResult.NotSupported;
 
-    private byte GetImageSettingEntityIdOrThrow() =>
-        _imageSettingEntityId ??=
-            _device.GetUvcImageSettingEntityId(_interfaceNumber)
-            ?? throw new NotSupportedException(
-                "Image setting request is not supported; "
-                    + "no processing unit entity was found in the UVC descriptors."
-            );
-
-    private byte GetExtensionUnitEntityId(Guid extensionGuid) =>
-        _extensionUnitEntityIds.GetOrAdd(
-            extensionGuid,
-            guid =>
-                _device.GetUvcExtensionUnitEntityId(_interfaceNumber, guid)
-                ?? throw new NotSupportedException(
-                    $"Extension unit request is not supported; "
-                        + $"no entity ID matching '{guid}' was found in the UVC descriptors."
-                )
+        var result = _device.ControlReadUvc(
+            data,
+            out var read,
+            UvcControlRequest.GetCurrent,
+            _interfaceNumber,
+            entityId,
+            (byte)control
         );
+        if (result != UsbResult.Success)
+        {
+            return result;
+        }
+
+        bytesRead = read;
+        return UsbResult.Success;
+    }
+
+    /// <inheritdoc />
+    public UsbResult SetExtensionUnit(Guid extensionGuid, uint control, ReadOnlySpan<byte> data) =>
+        TryGetExtensionUnitEntityId(extensionGuid, out var entityId)
+            ? _device.ControlWriteUvc(
+                data,
+                out _,
+                UvcControlRequest.SetCurrent,
+                _interfaceNumber,
+                entityId,
+                (byte)control
+            )
+            : UsbResult.NotSupported;
+
+    private bool TryGetCameraControlEntityId(out byte entityId)
+    {
+        _cameraControlEntityId ??= _device.GetUvcCameraControlEntityId(_interfaceNumber);
+        if (_cameraControlEntityId is { } id)
+        {
+            entityId = id;
+            return true;
+        }
+        entityId = 0;
+        return false;
+    }
+
+    private bool TryGetImageSettingEntityId(out byte entityId)
+    {
+        _imageSettingEntityId ??= _device.GetUvcImageSettingEntityId(_interfaceNumber);
+        if (_imageSettingEntityId is { } id)
+        {
+            entityId = id;
+            return true;
+        }
+        entityId = 0;
+        return false;
+    }
+
+    private bool TryGetExtensionUnitEntityId(Guid extensionGuid, out byte entityId)
+    {
+        // Can't use GetOrAdd with a factory that might fail, so check first
+        if (_extensionUnitEntityIds.TryGetValue(extensionGuid, out entityId))
+            return true;
+
+        var resolved = _device.GetUvcExtensionUnitEntityId(_interfaceNumber, extensionGuid);
+        if (resolved is byte id)
+        {
+            entityId = _extensionUnitEntityIds.GetOrAdd(extensionGuid, id);
+            return true;
+        }
+        entityId = 0;
+        return false;
+    }
 
     // Device is not owned; no-op dispose.
     public void Dispose() { }

@@ -1,4 +1,5 @@
-﻿using UsbDotNet.Extensions.Uvc;
+using UsbDotNet.Core;
+using UsbDotNet.Extensions.Uvc;
 using UsbDotNet.LibUsbNative;
 
 namespace UsbDotNet.Extensions.Tests.Uvc;
@@ -48,11 +49,13 @@ public sealed class Given_a_supported_Huddly_USB_device_with_UVC : IDisposable
         using var uvcControls = OpenFirstUvcControls(device);
 
         var readBuffer = new byte[8];
-        var bytesRead = uvcControls.GetExtensionUnit(
+        var result = uvcControls.GetExtensionUnit(
             ExtensionUnitId,
             SoftwareVersionXuControl,
-            readBuffer
+            readBuffer,
+            out var bytesRead
         );
+        result.Should().Be(UsbResult.Success);
         readBuffer[3].Should().Be(1, because: "all IQ devices have major version 1");
         readBuffer[2]
             .Should()

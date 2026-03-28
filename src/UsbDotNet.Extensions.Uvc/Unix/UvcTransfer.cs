@@ -59,6 +59,35 @@ internal static class UvcTransfer
             _ => throw new ArgumentOutOfRangeException(nameof(property), property, null),
         };
 
+    /// <summary>
+    /// Tries to get the UVC control selector and data buffer size for an ImageSetting.
+    /// Returns false for <see cref="UvcImageSetting.ColorEnable"/> on Linux/macOS.
+    /// </summary>
+    internal static bool TryGetImageSettingDescriptor(
+        UvcImageSetting property,
+        out byte controlId,
+        out int bufferSize
+    )
+    {
+        var (supported, control, size) = property switch
+        {
+            UvcImageSetting.BacklightCompensation => (true, (byte)0x01, 2),
+            UvcImageSetting.Brightness => (true, (byte)0x02, 2),
+            UvcImageSetting.Contrast => (true, (byte)0x03, 2),
+            UvcImageSetting.Gain => (true, (byte)0x04, 2),
+            UvcImageSetting.PowerLineFrequency => (true, (byte)0x05, 1),
+            UvcImageSetting.Hue => (true, (byte)0x06, 2),
+            UvcImageSetting.Saturation => (true, (byte)0x07, 2),
+            UvcImageSetting.Sharpness => (true, (byte)0x08, 2),
+            UvcImageSetting.Gamma => (true, (byte)0x09, 2),
+            UvcImageSetting.WhiteBalance => (true, (byte)0x0A, 2),
+            UvcImageSetting.ColorEnable => (false, (byte)0, 0),
+        };
+        controlId = control;
+        bufferSize = size;
+        return supported;
+    }
+
     internal static int ReadInt(byte[] buffer, int offset, int size) =>
         size switch
         {
