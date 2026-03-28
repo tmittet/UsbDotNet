@@ -64,18 +64,13 @@ internal sealed class WindowsUvcControl : IUvcControl
             {
                 return UsbResult.NotSupported;
             }
-            try
+            var hr = _cameraControl.Get((int)cameraControl, out value, out var rawFlags);
+            if (hr == 0)
             {
-                var hr = _cameraControl.Get((int)cameraControl, out value, out var rawFlags);
-                if (hr != 0)
-                    return MapHResult(hr);
                 controlType = (UvcControlType)rawFlags;
                 return UsbResult.Success;
             }
-            catch (COMException ex)
-            {
-                return MapHResult(ex.HResult);
-            }
+            return MapHResult(hr);
         }
     }
 
@@ -95,15 +90,8 @@ internal sealed class WindowsUvcControl : IUvcControl
             {
                 return UsbResult.NotSupported;
             }
-            try
-            {
-                var hr = _cameraControl.Set((int)cameraControl, value, (int)controlType);
-                return hr == 0 ? UsbResult.Success : MapHResult(hr);
-            }
-            catch (COMException ex)
-            {
-                return MapHResult(ex.HResult);
-            }
+            var hr = _cameraControl.Set((int)cameraControl, value, (int)controlType);
+            return hr == 0 ? UsbResult.Success : MapHResult(hr);
         }
     }
 
@@ -129,25 +117,20 @@ internal sealed class WindowsUvcControl : IUvcControl
             {
                 return UsbResult.NotSupported;
             }
-            try
+            var hr = _cameraControl.GetRange(
+                (int)cameraControl,
+                out minValue,
+                out maxValue,
+                out stepSize,
+                out defaultValue,
+                out var rawFlags
+            );
+            if (hr == 0)
             {
-                var hr = _cameraControl.GetRange(
-                    (int)cameraControl,
-                    out minValue,
-                    out maxValue,
-                    out stepSize,
-                    out defaultValue,
-                    out var rawFlags
-                );
-                if (hr != 0)
-                    return MapHResult(hr);
                 controlType = (UvcControlType)rawFlags;
                 return UsbResult.Success;
             }
-            catch (COMException ex)
-            {
-                return MapHResult(ex.HResult);
-            }
+            return MapHResult(hr);
         }
     }
 
@@ -169,18 +152,13 @@ internal sealed class WindowsUvcControl : IUvcControl
             {
                 return UsbResult.NotSupported;
             }
-            try
+            var hr = _videoProcAmp.Get((int)imageSetting, out value, out var rawFlags);
+            if (hr == 0)
             {
-                var hr = _videoProcAmp.Get((int)imageSetting, out value, out var rawFlags);
-                if (hr != 0)
-                    return MapHResult(hr);
                 controlType = (UvcControlType)rawFlags;
                 return UsbResult.Success;
             }
-            catch (COMException ex)
-            {
-                return MapHResult(ex.HResult);
-            }
+            return MapHResult(hr);
         }
     }
 
@@ -200,15 +178,8 @@ internal sealed class WindowsUvcControl : IUvcControl
             {
                 return UsbResult.NotSupported;
             }
-            try
-            {
-                var hr = _videoProcAmp.Set((int)imageSetting, value, (int)controlType);
-                return hr == 0 ? UsbResult.Success : MapHResult(hr);
-            }
-            catch (COMException ex)
-            {
-                return MapHResult(ex.HResult);
-            }
+            var hr = _videoProcAmp.Set((int)imageSetting, value, (int)controlType);
+            return hr == 0 ? UsbResult.Success : MapHResult(hr);
         }
     }
 
@@ -234,25 +205,20 @@ internal sealed class WindowsUvcControl : IUvcControl
             {
                 return UsbResult.NotSupported;
             }
-            try
+            var hr = _videoProcAmp.GetRange(
+                (int)imageSetting,
+                out minValue,
+                out maxValue,
+                out stepSize,
+                out defaultValue,
+                out var rawFlags
+            );
+            if (hr == 0)
             {
-                var hr = _videoProcAmp.GetRange(
-                    (int)imageSetting,
-                    out minValue,
-                    out maxValue,
-                    out stepSize,
-                    out defaultValue,
-                    out var rawFlags
-                );
-                if (hr != 0)
-                    return MapHResult(hr);
                 capsFlags = (UvcControlType)rawFlags;
                 return UsbResult.Success;
             }
-            catch (COMException ex)
-            {
-                return MapHResult(ex.HResult);
-            }
+            return MapHResult(hr);
         }
     }
 
@@ -263,16 +229,10 @@ internal sealed class WindowsUvcControl : IUvcControl
     public UsbResult GetExtensionUnitLength(Guid extensionGuid, uint control, out int length)
     {
         length = 0;
-        try
-        {
-            return TryGetCachedExtensionUnitNodeId(extensionGuid, control, out var nodeId)
-                ? GetExtensionUnitLength(extensionGuid, nodeId, control, out length)
-                : UsbResult.NotSupported;
-        }
-        catch (COMException ex)
-        {
-            return MapHResult(ex.HResult);
-        }
+        var result = GetCachedExtensionUnitNodeId(extensionGuid, control, out var nodeId);
+        return result == UsbResult.Success
+            ? GetExtensionUnitLength(extensionGuid, nodeId, control, out length)
+            : result;
     }
 
     /// <summary>Reads data from a UVC Extension Unit control via Kernel Streaming.</summary>
@@ -284,31 +244,19 @@ internal sealed class WindowsUvcControl : IUvcControl
     )
     {
         bytesRead = 0;
-        try
-        {
-            return TryGetCachedExtensionUnitNodeId(extensionGuid, control, out var nodeId)
-                ? GetExtensionUnit(extensionGuid, nodeId, control, data, out bytesRead)
-                : UsbResult.NotSupported;
-        }
-        catch (COMException ex)
-        {
-            return MapHResult(ex.HResult);
-        }
+        var result = GetCachedExtensionUnitNodeId(extensionGuid, control, out var nodeId);
+        return result == UsbResult.Success
+            ? GetExtensionUnit(extensionGuid, nodeId, control, data, out bytesRead)
+            : result;
     }
 
     /// <summary>Writes data to a UVC Extension Unit control via Kernel Streaming.</summary>
     public UsbResult SetExtensionUnit(Guid extensionGuid, uint control, ReadOnlySpan<byte> data)
     {
-        try
-        {
-            return TryGetCachedExtensionUnitNodeId(extensionGuid, control, out var nodeId)
-                ? SetExtensionUnit(extensionGuid, nodeId, control, data)
-                : UsbResult.NotSupported;
-        }
-        catch (COMException ex)
-        {
-            return MapHResult(ex.HResult);
-        }
+        var result = GetCachedExtensionUnitNodeId(extensionGuid, control, out var nodeId);
+        return result == UsbResult.Success
+            ? SetExtensionUnit(extensionGuid, nodeId, control, data)
+            : result;
     }
 
     private void ThrowIfDisposed()
@@ -317,19 +265,19 @@ internal sealed class WindowsUvcControl : IUvcControl
             throw new ObjectDisposedException(nameof(WindowsUvcControl));
     }
 
-    private bool TryGetCachedExtensionUnitNodeId(Guid extensionGuid, uint control, out uint nodeId)
+    private UsbResult GetCachedExtensionUnitNodeId(
+        Guid extensionGuid,
+        uint control,
+        out uint nodeId
+    )
     {
         if (_extensionUnitNodeIds.TryGetValue(extensionGuid, out nodeId))
-            return true;
+            return UsbResult.Success;
 
-        var resolved = GetExtensionUnitNodeId(extensionGuid, control);
-        if (resolved is uint id)
-        {
-            nodeId = _extensionUnitNodeIds.GetOrAdd(extensionGuid, id);
-            return true;
-        }
-        nodeId = 0;
-        return false;
+        var result = GetExtensionUnitNodeId(extensionGuid, control, out nodeId);
+        if (result == UsbResult.Success)
+            nodeId = _extensionUnitNodeIds.GetOrAdd(extensionGuid, nodeId);
+        return result;
     }
 
     /// <summary>
@@ -343,15 +291,25 @@ internal sealed class WindowsUvcControl : IUvcControl
     /// The Windows API does not provide a reliable way to directly query which node corresponds to
     /// a given extension.
     /// </summary>
-    private uint? GetExtensionUnitNodeId(Guid extensionGuid, uint control)
+    private UsbResult GetExtensionUnitNodeId(Guid extensionGuid, uint control, out uint nodeId)
     {
-        foreach (var nodeId in GetExtensionUnitNodeIds())
+        nodeId = 0;
+        var result = GetExtensionUnitNodeIds(out var candidates);
+        if (result != UsbResult.Success)
+            return result;
+
+        foreach (var candidate in candidates)
         {
-            var result = GetExtensionUnitLength(extensionGuid, nodeId, control, out _);
-            if (result == UsbResult.Success)
-                return nodeId;
+            if (
+                GetExtensionUnitLength(extensionGuid, candidate, control, out _)
+                == UsbResult.Success
+            )
+            {
+                nodeId = candidate;
+                return UsbResult.Success;
+            }
         }
-        return null;
+        return UsbResult.NotSupported;
     }
 
     /// <summary>
@@ -360,28 +318,24 @@ internal sealed class WindowsUvcControl : IUvcControl
     /// <remarks>
     /// Uses <c>IKsTopologyInfo</c> to enumerate all nodes in the DirectShow filter.
     /// </remarks>
-    /// <returns>
-    /// A list of all the node <see cref="DeviceSpecificNode"/> node IDs.
-    /// </returns>
-    /// <exception cref="COMException">
-    /// The device returned an error from <c>IKsTopologyInfo</c>.
-    /// </exception>
-    private List<uint> GetExtensionUnitNodeIds()
+    private UsbResult GetExtensionUnitNodeIds(out List<uint> xuNodes)
     {
-        var xuNodes = new List<uint>();
+        xuNodes = new List<uint>();
         lock (_disposeLock)
         {
             ThrowIfDisposed();
             if (_topologyInfo is null)
-                return xuNodes;
+                return UsbResult.NotSupported;
 
             var hr = _topologyInfo.get_NumNodes(out var numNodes);
-            Marshal.ThrowExceptionForHR(hr);
+            if (hr != 0)
+                return MapHResult(hr);
 
             for (uint nodeId = 0; nodeId < numNodes; nodeId++)
             {
                 hr = _topologyInfo.get_NodeType(nodeId, out var nodeType);
-                Marshal.ThrowExceptionForHR(hr);
+                if (hr != 0)
+                    return MapHResult(hr);
 
                 if (nodeType == DeviceSpecificNode)
                 {
@@ -389,7 +343,7 @@ internal sealed class WindowsUvcControl : IUvcControl
                 }
             }
         }
-        return xuNodes;
+        return UsbResult.Success;
     }
 
     /// <summary>
@@ -430,11 +384,12 @@ internal sealed class WindowsUvcControl : IUvcControl
             );
 
             // ErrorMoreData (0x800700EA) and ErrorInsufficientBuffer (0x8007007A) expected
-            if (hr is not 0 and not ErrorMoreData and not ErrorInsufficientBuffer)
-                return MapHResult(hr);
-
-            length = bytesReturned;
-            return UsbResult.Success;
+            if (hr is 0 or ErrorMoreData or ErrorInsufficientBuffer)
+            {
+                length = bytesReturned;
+                return UsbResult.Success;
+            }
+            return MapHResult(hr);
         }
     }
 
@@ -478,11 +433,13 @@ internal sealed class WindowsUvcControl : IUvcControl
                     buffer.Length,
                     out var returned
                 );
-                if (hr != 0)
-                    return MapHResult(hr);
-                buffer.AsSpan(0, returned).CopyTo(data);
-                bytesRead = returned;
-                return UsbResult.Success;
+                if (hr == 0)
+                {
+                    buffer.AsSpan(0, returned).CopyTo(data);
+                    bytesRead = returned;
+                    return UsbResult.Success;
+                }
+                return MapHResult(hr);
             }
             finally
             {
