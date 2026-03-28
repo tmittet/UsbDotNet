@@ -27,7 +27,7 @@ namespace UsbDotNet.Extensions.Uvc;
 /// <para/>
 /// All methods throw <see cref="ObjectDisposedException"/> if called after disposal.
 /// </remarks>
-public interface IUvcControls : IDisposable
+public interface IUvcControl : IDisposable
 {
     /// <summary>Gets the current value and control mode of a Camera Terminal control.</summary>
     /// <param name="cameraControl">The camera control to query.</param>

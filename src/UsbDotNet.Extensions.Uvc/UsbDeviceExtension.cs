@@ -112,24 +112,24 @@ public static class UsbDeviceExtension
     /// The UVC VideoControl interface number from the device configuration descriptor.
     /// </param>
     /// <returns>
-    /// An <see cref="IUvcControls"/> bound to the specified interface,
+    /// An <see cref="IUvcControl"/> bound to the specified interface,
     /// backed by Kernel Streaming on Windows or by libusb UVC control transfers on Linux and macOS.
     /// </returns>
     /// <remarks>
     /// On Windows: If possible call <see cref="OpenUvcControls(IUsbDevice, byte)"/> from an STA
     /// (Single-Threaded Apartment) thread, as DirectShow components are apartment-threaded.
     /// Alternatively, make sure the thread calling OpenUvcControls lives as long as the lifetime
-    /// of the returned <see cref="IUvcControls"/> instance. If not, DirectShow calls may fail.
+    /// of the returned <see cref="IUvcControl"/> instance. If not, DirectShow calls may fail.
     /// </remarks>
     /// <exception cref="ArgumentNullException"><paramref name="device"/> is null.</exception>
     /// <exception cref="InvalidOperationException">
     /// On Windows: no matching DirectShow video device found.
     /// </exception>
-    public static IUvcControls OpenUvcControls(this IUsbDevice device, byte interfaceNumber)
+    public static IUvcControl OpenUvcControls(this IUsbDevice device, byte interfaceNumber)
     {
         ArgumentNullException.ThrowIfNull(device);
         return OperatingSystem.IsWindows()
-            ? new WindowsUvcControls(SafeVideoDeviceHandle.Open(device, interfaceNumber))
-            : new UnixUvcControls(device, interfaceNumber);
+            ? new WindowsUvcControl(SafeVideoDeviceHandle.Open(device, interfaceNumber))
+            : new UnixUvcControl(device, interfaceNumber);
     }
 }

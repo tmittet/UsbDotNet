@@ -9,7 +9,7 @@ namespace UsbDotNet.Extensions.Uvc.Windows;
 /// Windows UVC control implementation using DirectShow and Kernel Streaming COM interfaces.
 /// </summary>
 [SupportedOSPlatform("windows")]
-internal sealed class WindowsUvcControls : IUvcControls
+internal sealed class WindowsUvcControl : IUvcControl
 {
     private const int ErrorInsufficientBuffer = unchecked((int)0x8007007A);
     private const int ErrorMoreData = unchecked((int)0x800700EA);
@@ -26,7 +26,7 @@ internal sealed class WindowsUvcControls : IUvcControls
     private readonly object _disposeLock = new();
     private bool _disposed;
 
-    internal WindowsUvcControls(SafeVideoDeviceHandle handle)
+    internal WindowsUvcControl(SafeVideoDeviceHandle handle)
     {
         _handle = handle;
 
@@ -311,7 +311,7 @@ internal sealed class WindowsUvcControls : IUvcControls
     private void ThrowIfDisposed()
     {
         if (_disposed)
-            throw new ObjectDisposedException(nameof(WindowsUvcControls));
+            throw new ObjectDisposedException(nameof(WindowsUvcControl));
     }
 
     private bool TryGetCachedExtensionUnitNodeId(Guid extensionGuid, uint control, out uint nodeId)

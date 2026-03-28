@@ -345,7 +345,7 @@ public sealed class Given_a_video_class_USB_device_with_UVC : IDisposable
     private static Descriptor.IUsbInterfaceDescriptor GetFirstUvcInterface(IUsbDevice device) =>
         device.GetInterfaceDescriptorList(UsbClass.Video, UvcInterfaceSubClass).First();
 
-    private static IUvcControls OpenFirstUvcControls(IUsbDevice device)
+    private static IUvcControl OpenFirstUvcControls(IUsbDevice device)
     {
         var uvcInterface = GetFirstUvcInterface(device);
         return device.OpenUvcControls(uvcInterface.InterfaceNumber);

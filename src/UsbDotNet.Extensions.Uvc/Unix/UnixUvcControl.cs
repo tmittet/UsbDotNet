@@ -4,7 +4,7 @@ using UsbDotNet.Core;
 
 namespace UsbDotNet.Extensions.Uvc.Unix;
 
-internal sealed class UnixUvcControls : IUvcControls
+internal sealed class UnixUvcControl : IUvcControl
 {
     private readonly IUsbDevice _device;
     private readonly byte _interfaceNumber;
@@ -12,7 +12,7 @@ internal sealed class UnixUvcControls : IUvcControls
     private byte? _cameraControlEntityId,
         _imageSettingEntityId;
 
-    internal UnixUvcControls(IUsbDevice device, byte interfaceNumber)
+    internal UnixUvcControl(IUsbDevice device, byte interfaceNumber)
     {
         _device = device;
         _interfaceNumber = interfaceNumber;
