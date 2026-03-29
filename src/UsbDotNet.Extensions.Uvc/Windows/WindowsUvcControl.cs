@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Runtime.Versioning;
 using Microsoft.Extensions.Logging;
@@ -495,7 +496,7 @@ internal sealed class WindowsUvcControl : IUvcControl
         }
     }
 
-    private static UsbResult MapHResult(int hr)
+    private UsbResult MapHResult(int hResult, [CallerMemberName] string caller = "")
     {
         // Standard COM errors
         const int eNotImpl = unchecked((int)0x80004001);
@@ -518,9 +519,11 @@ internal sealed class WindowsUvcControl : IUvcControl
         const int eNotFound = unchecked((int)0x80070490);
         const int eSetNotFound = unchecked((int)0x80070492);
 
-        return hr switch
+        if (hResult == 0)
+            return UsbResult.Success;
+
+        var result = hResult switch
         {
-            0 => UsbResult.Success,
             eNotImpl or eNoInterface or eSetNotFound => UsbResult.NotSupported,
             eInvalidArg or ePointer => UsbResult.InvalidParameter,
             eAccessDenied => UsbResult.AccessDenied,
@@ -534,6 +537,14 @@ internal sealed class WindowsUvcControl : IUvcControl
             eFail or eGenFailure => UsbResult.IoError,
             _ => UsbResult.OtherError,
         };
+        _logger.LogDebug(
+            "{Caller} failed. {UsbResult} (0x{HResult:X8}): {Message}",
+            caller,
+            result,
+            hResult,
+            Marshal.GetExceptionForHR(hResult)?.Message
+        );
+        return result;
     }
 
     public void Dispose()
