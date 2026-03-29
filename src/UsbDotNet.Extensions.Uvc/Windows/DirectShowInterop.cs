@@ -65,14 +65,14 @@ internal interface IMoniker
     // IMoniker
     void BindToObject(
         IntPtr pbc,
-        IMoniker pmkToLeft,
+        IMoniker? pmkToLeft,
         ref Guid riid,
         [MarshalAs(UnmanagedType.Interface)] out object ppvResult
     );
 
     void BindToStorage(
         IntPtr pbc,
-        IMoniker pmkToLeft,
+        IMoniker? pmkToLeft,
         ref Guid riid,
         [MarshalAs(UnmanagedType.Interface)] out object ppvResult
     );

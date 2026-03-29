@@ -203,7 +203,7 @@ internal sealed class SafeVideoDeviceHandle : SafeHandle
         {
             // Read DevicePath from the moniker's property bag.
             var iidPropertyBag = DirectShowGuids.IPropertyBag;
-            moniker.BindToStorage(IntPtr.Zero, null!, ref iidPropertyBag, out var bagObj);
+            moniker.BindToStorage(IntPtr.Zero, null, ref iidPropertyBag, out var bagObj);
             var propertyBag = (IPropertyBag)bagObj;
 
             try
@@ -231,7 +231,7 @@ internal sealed class SafeVideoDeviceHandle : SafeHandle
 
                 // Match found — bind to the DirectShow filter object.
                 var iidBaseFilter = DirectShowGuids.IBaseFilter;
-                moniker.BindToObject(IntPtr.Zero, null!, ref iidBaseFilter, out var filterObj);
+                moniker.BindToObject(IntPtr.Zero, null, ref iidBaseFilter, out var filterObj);
 
                 // Get a raw IUnknown pointer (calls AddRef).
                 var ptr = Marshal.GetIUnknownForObject(filterObj);
