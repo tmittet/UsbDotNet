@@ -42,7 +42,7 @@ internal sealed class UnixUvcControl : IUvcControl
         if (!TryGetCameraControlEntityId(out var cameraControlEntityId))
             return UsbResult.NotSupported;
 
-        var (control, bufferSize, offset) = UvcTransfer.GetCameraControlDescriptor(cameraControl);
+        var (control, bufferSize, offset) = cameraControl.GetCameraControlDescriptor();
 
         if (cameraControl is not UvcCameraControl.Pan and not UvcCameraControl.Tilt)
         {
@@ -129,7 +129,7 @@ internal sealed class UnixUvcControl : IUvcControl
         if (!TryGetCameraControlEntityId(out var cameraControlEntityId))
             return UsbResult.NotSupported;
 
-        var (control, bufferSize, offset) = UvcTransfer.GetCameraControlDescriptor(cameraControl);
+        var (control, bufferSize, offset) = cameraControl.GetCameraControlDescriptor();
         var buffer = new byte[bufferSize];
         var result = _device.ControlReadUvc(
             buffer,
@@ -168,16 +168,8 @@ internal sealed class UnixUvcControl : IUvcControl
         if (!TryGetImageSettingEntityId(out var imageSettingEntityId))
             return UsbResult.NotSupported;
 
-        if (
-            !UvcTransfer.TryGetImageSettingDescriptor(
-                imageSetting,
-                out var controlId,
-                out var bufferSize
-            )
-        )
-        {
+        if (!imageSetting.TryGetImageSettingDescriptor(out var controlId, out var bufferSize))
             return UsbResult.NotSupported;
-        }
 
         var buffer = new byte[bufferSize];
         UvcTransfer.WriteInt(buffer, 0, bufferSize, value);
@@ -238,16 +230,8 @@ internal sealed class UnixUvcControl : IUvcControl
         if (!TryGetImageSettingEntityId(out var imageSettingEntityId))
             return UsbResult.NotSupported;
 
-        if (
-            !UvcTransfer.TryGetImageSettingDescriptor(
-                imageSetting,
-                out var controlId,
-                out var bufferSize
-            )
-        )
-        {
+        if (!imageSetting.TryGetImageSettingDescriptor(out var controlId, out var bufferSize))
             return UsbResult.NotSupported;
-        }
 
         var buffer = new byte[bufferSize];
         var result = _device.ControlReadUvc(

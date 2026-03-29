@@ -4,7 +4,6 @@ namespace UsbDotNet.Extensions.Uvc;
 /// Video processing amplifier properties (KSPROPERTY_VIDEOPROCAMP_*) on Windows;
 /// mapped to UVC processing unit control selectors on Linux and macOS.
 /// </summary>
-#pragma warning disable CA1027 // Mark enums with FlagsAttribute
 public enum UvcImageSetting
 {
     /// <summary>Brightness level (UVC control 0x02).</summary>
@@ -40,6 +39,5 @@ public enum UvcImageSetting
     /// <summary>
     /// Power line frequency for anti-flicker; 0=disabled, 1=50Hz, 2=60Hz  (UVC control 0x05).
     /// </summary>
-    PowerLineFrequency = 0x013,
+    PowerLineFrequency = 0x13, // The jump in value is intentional, 0x13 should be correct
 }
-#pragma warning restore CA1027 // Mark enums with FlagsAttribute

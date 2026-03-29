@@ -1,5 +1,4 @@
 using System.Buffers.Binary;
-using UsbDotNet.Core;
 
 namespace UsbDotNet.Extensions.Uvc.Unix;
 
@@ -19,7 +18,7 @@ internal static class UvcTransfer
     /// A read-modify-write is required when setting one axis to preserve the other.
     /// </remarks>
     internal static (byte control, int bufferSize, int valueOffset) GetCameraControlDescriptor(
-        UvcCameraControl property
+        this UvcCameraControl property
     ) =>
         property switch
         {
@@ -34,37 +33,11 @@ internal static class UvcTransfer
         };
 
     /// <summary>
-    /// Returns the UVC control selector and data buffer size in bytes
-    /// for an ImageSetting (processing unit) control request.
-    /// </summary>
-    internal static (byte control, int bufferSize) GetImageSettingDescriptor(
-        UvcImageSetting property
-    ) =>
-        property switch
-        {
-            UvcImageSetting.BacklightCompensation => (0x01, 2), // PU_BACKLIGHT_COMPENSATION_CONTROL
-            UvcImageSetting.Brightness => (0x02, 2), // PU_BRIGHTNESS_CONTROL
-            UvcImageSetting.Contrast => (0x03, 2), // PU_CONTRAST_CONTROL
-            UvcImageSetting.Gain => (0x04, 2), // PU_GAIN_CONTROL
-            UvcImageSetting.PowerLineFrequency => (0x05, 1), // PU_POWER_LINE_FREQUENCY_CONTROL
-            UvcImageSetting.Hue => (0x06, 2), // PU_HUE_CONTROL
-            UvcImageSetting.Saturation => (0x07, 2), // PU_SATURATION_CONTROL
-            UvcImageSetting.Sharpness => (0x08, 2), // PU_SHARPNESS_CONTROL
-            UvcImageSetting.Gamma => (0x09, 2), // PU_GAMMA_CONTROL
-            UvcImageSetting.WhiteBalance => (0x0A, 2), // PU_WHITE_BALANCE_TEMPERATURE_CONTROL
-            UvcImageSetting.ColorEnable => throw new NotSupportedException(
-                $"{nameof(UvcImageSetting.ColorEnable)} has no UVC Processing Unit "
-                    + "equivalent and is not supported on Linux and macOS."
-            ),
-            _ => throw new ArgumentOutOfRangeException(nameof(property), property, null),
-        };
-
-    /// <summary>
     /// Tries to get the UVC control selector and data buffer size for an ImageSetting.
     /// Returns false for <see cref="UvcImageSetting.ColorEnable"/> on Linux/macOS.
     /// </summary>
     internal static bool TryGetImageSettingDescriptor(
-        UvcImageSetting property,
+        this UvcImageSetting property,
         out byte controlId,
         out int bufferSize
     )
@@ -113,11 +86,5 @@ internal static class UvcTransfer
             default:
                 throw new ArgumentOutOfRangeException(nameof(size));
         }
-    }
-
-    internal static void ThrowIfFailed(UsbResult result, string operation)
-    {
-        if (result != UsbResult.Success)
-            throw new UsbException(result, $"UVC {operation} failed: {result}.");
     }
 }
