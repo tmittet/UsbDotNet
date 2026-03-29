@@ -124,7 +124,16 @@ public static class UsbDeviceExtension
     /// </remarks>
     /// <exception cref="ArgumentNullException"><paramref name="device"/> is null.</exception>
     /// <exception cref="InvalidOperationException">
-    /// On Windows: no matching DirectShow video device found.
+    /// Windows only; common causes:
+    /// <list type="bullet">
+    /// <item>no matching DirectShow video interface was found</item>
+    /// <item>the device has been disconnected</item>
+    /// <item>
+    /// the device was just connected and Windows has not yet
+    /// loaded the driver or registered the DirectShow filter
+    /// </item>
+    /// <item>the device is in firmware-update/DFU mode with no active UVC function</item>
+    /// </list>
     /// </exception>
     public static IUvcControl OpenUvcControl(this IUsbDevice device, byte interfaceNumber)
     {

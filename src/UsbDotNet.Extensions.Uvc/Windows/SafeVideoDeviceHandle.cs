@@ -57,7 +57,16 @@ internal sealed class SafeVideoDeviceHandle : SafeHandle
     /// </returns>
     /// <exception cref="ArgumentNullException"><paramref name="device"/> is null.</exception>
     /// <exception cref="InvalidOperationException">
-    /// No matching video device was found or COM initialization failed.
+    /// No matching DirectShow video device was found. Common causes:
+    /// <list type="bullet">
+    /// <item>no matching DirectShow video interface was found</item>
+    /// <item>the device has been disconnected</item>
+    /// <item>
+    /// the device was just connected and Windows has not yet
+    /// loaded the driver or registered the DirectShow filter
+    /// </item>
+    /// <item>the device is in firmware-update/DFU mode with no active UVC function</item>
+    /// </list>
     /// </exception>
     public static SafeVideoDeviceHandle Open(IUsbDevice device, byte interfaceNumber)
     {
@@ -65,69 +74,19 @@ internal sealed class SafeVideoDeviceHandle : SafeHandle
         return Open(device.Descriptor, device.GetSerialNumber(), interfaceNumber);
     }
 
-    /// <summary>
-    /// Opens a DirectShow video device matching the given USB device descriptor and serial number.
-    /// </summary>
-    /// <param name="descriptor">The USB device descriptor providing VID and PID for matching.</param>
-    /// <param name="serialNumber">
-    /// The device serial number, used together with VID/PID to uniquely identify the device.
-    /// Required to safely disambiguate when multiple devices of the same VID/PID are connected.
-    /// </param>
-    /// <param name="interfaceNumber">
-    /// The UVC VideoControl interface number. Used to match the <c>MI_xx</c> component of the
-    /// DirectShow device path on devices with multiple Video Interface Collections.
-    /// Devices with only one camera (no <c>MI_xx</c> in their path) are matched regardless.
-    /// </param>
-    /// <returns>
-    /// A <see cref="SafeVideoDeviceHandle"/> wrapping the DirectShow IBaseFilter for the matched device.
-    /// </returns>
-    /// <exception cref="ArgumentNullException">
-    /// <paramref name="descriptor"/> or <paramref name="serialNumber"/> is null.
-    /// </exception>
-    /// <exception cref="ArgumentException"><paramref name="serialNumber"/> is empty.</exception>
-    /// <exception cref="InvalidOperationException">
-    /// No matching video device was found or COM initialization failed.
-    /// </exception>
-    public static SafeVideoDeviceHandle Open(
+    private static SafeVideoDeviceHandle Open(
         IUsbDeviceDescriptor descriptor,
         string serialNumber,
         byte interfaceNumber
-    )
-    {
-        ArgumentNullException.ThrowIfNull(descriptor);
-        return Open(descriptor.VendorId, descriptor.ProductId, serialNumber, interfaceNumber);
-    }
+    ) => Open(descriptor.VendorId, descriptor.ProductId, serialNumber, interfaceNumber);
 
-    /// <summary>
-    /// Opens a DirectShow video device matching the given USB vendor ID, product ID, and serial number.
-    /// </summary>
-    /// <param name="vendorId">The USB vendor ID (VID) to match.</param>
-    /// <param name="productId">The USB product ID (PID) to match.</param>
-    /// <param name="serialNumber">
-    /// The device serial number, used together with VID/PID to uniquely identify the device.
-    /// Required to safely disambiguate when multiple devices of the same VID/PID are connected.
-    /// </param>
-    /// <param name="interfaceNumber">
-    /// The UVC VideoControl interface number. Used to match the <c>MI_xx</c> component of the
-    /// DirectShow device path on devices with multiple Video Interface Collections.
-    /// Devices with only one camera (no <c>MI_xx</c> in their path) are matched regardless.
-    /// </param>
-    /// <returns>
-    /// A <see cref="SafeVideoDeviceHandle"/> wrapping the DirectShow IBaseFilter for the matched device.
-    /// </returns>
-    /// <exception cref="ArgumentNullException"><paramref name="serialNumber"/> is null.</exception>
-    /// <exception cref="ArgumentException"><paramref name="serialNumber"/> is empty.</exception>
-    /// <exception cref="InvalidOperationException">
-    /// No matching video device was found or COM initialization failed.
-    /// </exception>
-    public static SafeVideoDeviceHandle Open(
+    private static SafeVideoDeviceHandle Open(
         ushort vendorId,
         ushort productId,
         string serialNumber,
         byte interfaceNumber
     )
     {
-        ArgumentNullException.ThrowIfNull(serialNumber);
         if (serialNumber.Length == 0)
             throw new ArgumentException("Value cannot be empty.", nameof(serialNumber));
         var devEnumType = Type.GetTypeFromCLSID(
