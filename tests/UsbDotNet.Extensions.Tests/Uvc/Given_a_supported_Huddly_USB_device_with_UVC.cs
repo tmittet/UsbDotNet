@@ -46,10 +46,10 @@ public sealed class Given_a_supported_Huddly_USB_device_with_UVC : IDisposable
     public void It_successfully_reads_device_version()
     {
         using var device = _deviceSource.OpenUsbDeviceOrSkip();
-        using var uvcControls = OpenFirstUvcControls(device);
+        using var uvc = OpenFirstUvcControl(device);
 
         var readBuffer = new byte[8];
-        var result = uvcControls.GetExtensionUnit(
+        var result = uvc.GetExtensionUnit(
             ExtensionUnitId,
             SoftwareVersionXuControl,
             readBuffer,
@@ -66,10 +66,10 @@ public sealed class Given_a_supported_Huddly_USB_device_with_UVC : IDisposable
     private static Descriptor.IUsbInterfaceDescriptor GetFirstUvcInterface(IUsbDevice device) =>
         device.GetInterfaceDescriptorList(UsbClass.Video, UvcInterfaceSubClass).First();
 
-    private static IUvcControl OpenFirstUvcControls(IUsbDevice device)
+    private static IUvcControl OpenFirstUvcControl(IUsbDevice device)
     {
         var uvcInterface = GetFirstUvcInterface(device);
-        return device.OpenUvcControls(uvcInterface.InterfaceNumber);
+        return device.OpenUvcControl(uvcInterface.InterfaceNumber);
     }
 
     public void Dispose()

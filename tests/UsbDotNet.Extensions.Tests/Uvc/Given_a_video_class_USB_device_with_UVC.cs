@@ -182,7 +182,7 @@ public sealed class Given_a_video_class_USB_device_with_UVC : IDisposable
     public void GetCameraControlRange_returns_valid_range(UvcCameraControl control)
     {
         using var device = _deviceSource.OpenUsbDeviceOrSkip();
-        using var uvc = OpenFirstUvcControls(device);
+        using var uvc = OpenFirstUvcControl(device);
         var result = uvc.GetCameraControlRange(
             control,
             out var min,
@@ -213,7 +213,7 @@ public sealed class Given_a_video_class_USB_device_with_UVC : IDisposable
     public void GetCameraControl_returns_value_within_reported_range(UvcCameraControl control)
     {
         using var device = _deviceSource.OpenUsbDeviceOrSkip();
-        using var uvc = OpenFirstUvcControls(device);
+        using var uvc = OpenFirstUvcControl(device);
         uvc.GetCameraControlRange(control, out var min, out var max, out _, out _, out _)
             .Should()
             .Be(UsbResult.Success);
@@ -236,7 +236,7 @@ public sealed class Given_a_video_class_USB_device_with_UVC : IDisposable
     public void SetCameraControl_should_roundtrip_value(UvcCameraControl control)
     {
         using var device = _deviceSource.OpenUsbDeviceOrSkip();
-        using var uvc = OpenFirstUvcControls(device);
+        using var uvc = OpenFirstUvcControl(device);
         uvc.GetCameraControlRange(control, out var min, out var max, out var step, out _, out _)
             .Should()
             .Be(UsbResult.Success);
@@ -267,7 +267,7 @@ public sealed class Given_a_video_class_USB_device_with_UVC : IDisposable
     public void GetImageSettingRange_returns_valid_range(UvcImageSetting setting)
     {
         using var device = _deviceSource.OpenUsbDeviceOrSkip();
-        using var uvc = OpenFirstUvcControls(device);
+        using var uvc = OpenFirstUvcControl(device);
         var result = uvc.GetImageSettingRange(
             setting,
             out var min,
@@ -295,7 +295,7 @@ public sealed class Given_a_video_class_USB_device_with_UVC : IDisposable
     public void GetImageSetting_returns_value_within_reported_range(UvcImageSetting setting)
     {
         using var device = _deviceSource.OpenUsbDeviceOrSkip();
-        using var uvc = OpenFirstUvcControls(device);
+        using var uvc = OpenFirstUvcControl(device);
         uvc.GetImageSettingRange(setting, out var min, out var max, out _, out _, out _)
             .Should()
             .Be(UsbResult.Success);
@@ -317,7 +317,7 @@ public sealed class Given_a_video_class_USB_device_with_UVC : IDisposable
     public void SetImageSetting_should_roundtrip_value(UvcImageSetting setting)
     {
         using var device = _deviceSource.OpenUsbDeviceOrSkip();
-        using var uvc = OpenFirstUvcControls(device);
+        using var uvc = OpenFirstUvcControl(device);
         uvc.GetImageSettingRange(setting, out var min, out var max, out var step, out _, out _)
             .Should()
             .Be(UsbResult.Success);
@@ -345,10 +345,10 @@ public sealed class Given_a_video_class_USB_device_with_UVC : IDisposable
     private static Descriptor.IUsbInterfaceDescriptor GetFirstUvcInterface(IUsbDevice device) =>
         device.GetInterfaceDescriptorList(UsbClass.Video, UvcInterfaceSubClass).First();
 
-    private static IUvcControl OpenFirstUvcControls(IUsbDevice device)
+    private static IUvcControl OpenFirstUvcControl(IUsbDevice device)
     {
         var uvcInterface = GetFirstUvcInterface(device);
-        return device.OpenUvcControls(uvcInterface.InterfaceNumber);
+        return device.OpenUvcControl(uvcInterface.InterfaceNumber);
     }
 
     public void Dispose()

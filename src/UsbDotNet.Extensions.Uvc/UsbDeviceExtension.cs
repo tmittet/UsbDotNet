@@ -117,16 +117,16 @@ public static class UsbDeviceExtension
     /// backed by Kernel Streaming on Windows or by libusb UVC control transfers on Linux and macOS.
     /// </returns>
     /// <remarks>
-    /// On Windows: If possible call <see cref="OpenUvcControls(IUsbDevice, byte)"/> from an STA
+    /// On Windows: If possible call <see cref="OpenUvcControl(IUsbDevice, byte)"/> from an STA
     /// (Single-Threaded Apartment) thread, as DirectShow components are apartment-threaded.
-    /// Alternatively, make sure the thread calling OpenUvcControls lives as long as the lifetime
+    /// Alternatively, make sure the thread calling OpenUvcControl lives as long as the lifetime
     /// of the returned <see cref="IUvcControl"/> instance. If not, DirectShow calls may fail.
     /// </remarks>
     /// <exception cref="ArgumentNullException"><paramref name="device"/> is null.</exception>
     /// <exception cref="InvalidOperationException">
     /// On Windows: no matching DirectShow video device found.
     /// </exception>
-    public static IUvcControl OpenUvcControls(this IUsbDevice device, byte interfaceNumber)
+    public static IUvcControl OpenUvcControl(this IUsbDevice device, byte interfaceNumber)
     {
         ArgumentNullException.ThrowIfNull(device);
         return OperatingSystem.IsWindows()
