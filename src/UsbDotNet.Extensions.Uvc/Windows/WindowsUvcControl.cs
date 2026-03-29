@@ -27,7 +27,7 @@ internal sealed class WindowsUvcControl : IUvcControl
     private readonly IKsControl? _ksControl;
     private readonly IKsTopologyInfo? _topologyInfo;
 
-    private readonly object _disposeLock = new();
+    private readonly ReaderWriterLockSlim _disposeLock = new();
     private bool _disposed;
 
     internal WindowsUvcControl(SafeVideoDeviceHandle handle, ILogger<WindowsUvcControl> logger)
@@ -58,7 +58,8 @@ internal sealed class WindowsUvcControl : IUvcControl
     {
         value = 0;
         controlType = default;
-        lock (_disposeLock)
+        _disposeLock.EnterReadLock();
+        try
         {
             ThrowIfDisposed();
             if (_cameraControl is null)
@@ -73,6 +74,10 @@ internal sealed class WindowsUvcControl : IUvcControl
             }
             return MapHResult(hr);
         }
+        finally
+        {
+            _disposeLock.ExitReadLock();
+        }
     }
 
     /// <summary>
@@ -84,7 +89,8 @@ internal sealed class WindowsUvcControl : IUvcControl
         UvcControlType controlType = UvcControlType.Manual
     )
     {
-        lock (_disposeLock)
+        _disposeLock.EnterReadLock();
+        try
         {
             ThrowIfDisposed();
             if (_cameraControl is null)
@@ -93,6 +99,10 @@ internal sealed class WindowsUvcControl : IUvcControl
             }
             var hr = _cameraControl.Set((int)cameraControl, value, (int)controlType);
             return hr == 0 ? UsbResult.Success : MapHResult(hr);
+        }
+        finally
+        {
+            _disposeLock.ExitReadLock();
         }
     }
 
@@ -111,7 +121,8 @@ internal sealed class WindowsUvcControl : IUvcControl
     {
         minValue = maxValue = stepSize = defaultValue = 0;
         controlType = default;
-        lock (_disposeLock)
+        _disposeLock.EnterReadLock();
+        try
         {
             ThrowIfDisposed();
             if (_cameraControl is null)
@@ -133,6 +144,10 @@ internal sealed class WindowsUvcControl : IUvcControl
             }
             return MapHResult(hr);
         }
+        finally
+        {
+            _disposeLock.ExitReadLock();
+        }
     }
 
     /// <summary>
@@ -146,7 +161,8 @@ internal sealed class WindowsUvcControl : IUvcControl
     {
         value = 0;
         controlType = default;
-        lock (_disposeLock)
+        _disposeLock.EnterReadLock();
+        try
         {
             ThrowIfDisposed();
             if (_videoProcAmp is null)
@@ -161,6 +177,10 @@ internal sealed class WindowsUvcControl : IUvcControl
             }
             return MapHResult(hr);
         }
+        finally
+        {
+            _disposeLock.ExitReadLock();
+        }
     }
 
     /// <summary>
@@ -172,7 +192,8 @@ internal sealed class WindowsUvcControl : IUvcControl
         UvcControlType controlType = UvcControlType.Manual
     )
     {
-        lock (_disposeLock)
+        _disposeLock.EnterReadLock();
+        try
         {
             ThrowIfDisposed();
             if (_videoProcAmp is null)
@@ -181,6 +202,10 @@ internal sealed class WindowsUvcControl : IUvcControl
             }
             var hr = _videoProcAmp.Set((int)imageSetting, value, (int)controlType);
             return hr == 0 ? UsbResult.Success : MapHResult(hr);
+        }
+        finally
+        {
+            _disposeLock.ExitReadLock();
         }
     }
 
@@ -199,7 +224,8 @@ internal sealed class WindowsUvcControl : IUvcControl
     {
         minValue = maxValue = stepSize = defaultValue = 0;
         capsFlags = default;
-        lock (_disposeLock)
+        _disposeLock.EnterReadLock();
+        try
         {
             ThrowIfDisposed();
             if (_videoProcAmp is null)
@@ -220,6 +246,10 @@ internal sealed class WindowsUvcControl : IUvcControl
                 return UsbResult.Success;
             }
             return MapHResult(hr);
+        }
+        finally
+        {
+            _disposeLock.ExitReadLock();
         }
     }
 
@@ -322,7 +352,8 @@ internal sealed class WindowsUvcControl : IUvcControl
     private UsbResult GetExtensionUnitNodeIds(out List<uint> xuNodes)
     {
         xuNodes = new List<uint>();
-        lock (_disposeLock)
+        _disposeLock.EnterReadLock();
+        try
         {
             ThrowIfDisposed();
             if (_topologyInfo is null)
@@ -343,6 +374,10 @@ internal sealed class WindowsUvcControl : IUvcControl
                     xuNodes.Add(nodeId);
                 }
             }
+        }
+        finally
+        {
+            _disposeLock.ExitReadLock();
         }
         return UsbResult.Success;
     }
@@ -370,7 +405,8 @@ internal sealed class WindowsUvcControl : IUvcControl
             NodeId = nodeId,
         };
 
-        lock (_disposeLock)
+        _disposeLock.EnterReadLock();
+        try
         {
             ThrowIfDisposed();
             if (_ksControl is null)
@@ -391,6 +427,10 @@ internal sealed class WindowsUvcControl : IUvcControl
                 return UsbResult.Success;
             }
             return MapHResult(hr);
+        }
+        finally
+        {
+            _disposeLock.ExitReadLock();
         }
     }
 
@@ -417,7 +457,8 @@ internal sealed class WindowsUvcControl : IUvcControl
             NodeId = nodeId,
         };
 
-        lock (_disposeLock)
+        _disposeLock.EnterReadLock();
+        try
         {
             ThrowIfDisposed();
             if (_ksControl is null)
@@ -447,6 +488,10 @@ internal sealed class WindowsUvcControl : IUvcControl
                 pinned.Free();
             }
         }
+        finally
+        {
+            _disposeLock.ExitReadLock();
+        }
     }
 
     /// <summary>
@@ -470,7 +515,8 @@ internal sealed class WindowsUvcControl : IUvcControl
             NodeId = nodeId,
         };
 
-        lock (_disposeLock)
+        _disposeLock.EnterReadLock();
+        try
         {
             ThrowIfDisposed();
             if (_ksControl is null)
@@ -493,6 +539,10 @@ internal sealed class WindowsUvcControl : IUvcControl
             {
                 pinned.Free();
             }
+        }
+        finally
+        {
+            _disposeLock.ExitReadLock();
         }
     }
 
@@ -549,7 +599,8 @@ internal sealed class WindowsUvcControl : IUvcControl
 
     public void Dispose()
     {
-        lock (_disposeLock)
+        _disposeLock.EnterWriteLock();
+        try
         {
             if (_disposed)
                 return;
@@ -559,5 +610,10 @@ internal sealed class WindowsUvcControl : IUvcControl
             _ = Marshal.ReleaseComObject(_directShowObject);
             _handle.Dispose();
         }
+        finally
+        {
+            _disposeLock.ExitWriteLock();
+        }
+        _disposeLock.Dispose();
     }
 }
