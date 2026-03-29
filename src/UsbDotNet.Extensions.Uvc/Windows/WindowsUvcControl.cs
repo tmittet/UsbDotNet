@@ -21,6 +21,7 @@ internal sealed class WindowsUvcControl : IUvcControl
     private readonly ILogger _logger;
     private readonly ConcurrentDictionary<Guid, uint> _extensionUnitNodeIds = new();
 
+    private readonly object _directShowObject;
     private readonly IAMCameraControl? _cameraControl;
     private readonly IAMVideoProcAmp? _videoProcAmp;
     private readonly IKsControl? _ksControl;
@@ -39,12 +40,11 @@ internal sealed class WindowsUvcControl : IUvcControl
                 ? throw new ObjectDisposedException(nameof(SafeVideoDeviceHandle))
                 : handle.DangerousGetHandle();
 
-        var directShowObject = Marshal.GetObjectForIUnknown(unknownDevice);
-
-        _cameraControl = directShowObject as IAMCameraControl;
-        _videoProcAmp = directShowObject as IAMVideoProcAmp;
-        _ksControl = directShowObject as IKsControl;
-        _topologyInfo = directShowObject as IKsTopologyInfo;
+        _directShowObject = Marshal.GetObjectForIUnknown(unknownDevice);
+        _cameraControl = _directShowObject as IAMCameraControl;
+        _videoProcAmp = _directShowObject as IAMVideoProcAmp;
+        _ksControl = _directShowObject as IKsControl;
+        _topologyInfo = _directShowObject as IKsTopologyInfo;
     }
 
     /// <summary>
@@ -556,15 +556,7 @@ internal sealed class WindowsUvcControl : IUvcControl
 
             _disposed = true;
 
-            if (_topologyInfo is not null)
-                _ = Marshal.ReleaseComObject(_topologyInfo);
-            if (_ksControl is not null)
-                _ = Marshal.ReleaseComObject(_ksControl);
-            if (_videoProcAmp is not null)
-                _ = Marshal.ReleaseComObject(_videoProcAmp);
-            if (_cameraControl is not null)
-                _ = Marshal.ReleaseComObject(_cameraControl);
-
+            _ = Marshal.ReleaseComObject(_directShowObject);
             _handle.Dispose();
         }
     }
