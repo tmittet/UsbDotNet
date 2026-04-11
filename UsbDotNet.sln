@@ -61,6 +61,12 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "UsbDotNet.LibUsbNative.Devi
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "UsbDotNet.Core", "src\UsbDotNet.Core\UsbDotNet.Core.csproj", "{FC957597-AE2B-4F27-6EC6-DBBF5601A2DD}"
 EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Shared", "Shared", "{182308FD-7AB7-4A24-8BAE-5DD646CD0484}"
+	ProjectSection(SolutionItems) = preProject
+		tests\UsbDotNet.Tests.Shared\HLink.cs = tests\UsbDotNet.Tests.Shared\HLink.cs
+		tests\UsbDotNet.Tests.Shared\UsbDotNet.Tests.Shared.props = tests\UsbDotNet.Tests.Shared\UsbDotNet.Tests.Shared.props
+	EndProjectSection
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -205,6 +211,7 @@ Global
 		{7708B660-3B89-DCCD-62D1-DB0DC210BA5F} = {D5E2E026-05AB-49B8-A8DB-5DFEF339FDE4}
 		{55A88F4D-C933-85BD-92D3-A8B6B0D1CBC7} = {C4C3F697-DBEA-4E05-8593-C7C2972E1A37}
 		{75A61D89-2A8F-D43C-DB4F-09858614C402} = {C4C3F697-DBEA-4E05-8593-C7C2972E1A37}
+		{182308FD-7AB7-4A24-8BAE-5DD646CD0484} = {D5E2E026-05AB-49B8-A8DB-5DFEF339FDE4}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {90DCAD80-DFC8-4E0E-8E33-E205541FCE94}
