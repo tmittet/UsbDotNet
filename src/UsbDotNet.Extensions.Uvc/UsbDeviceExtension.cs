@@ -22,15 +22,19 @@ public static class UsbDeviceExtension
     /// <param name="timeout">Timeout before giving up due to no response being received</param>
     /// <exception cref="ArgumentException">Thrown when the destination buffer is too large.</exception>
     /// <returns>
-    /// Success = The read operation completed successfully.<br />
-    /// IO = The read operation failed.<br />
-    /// InvalidParameter = The transfer size is larger than OS or hardware can support.<br />
-    /// NoDevice = The device has been disconnected.<br />
-    /// ResourceBusy = Halt condition detected (endpoint stalled) or control request not supported.<br />
-    /// Timeout = The read operation timed out.<br />
-    /// Overflow = The device sent more data than expected.<br />
-    /// Interrupted = The read operation was canceled.<br />
-    /// NotSupported = The transfer flags are not supported by the operating system.<br />
+    /// <list>
+    /// <item>Success = The read operation completed successfully.</item>
+    /// <item>IO = The read operation failed.</item>
+    /// <item>InvalidParameter = Transfer size is larger than OS or hardware can support.</item>
+    /// <item>NoDevice = The device has been disconnected.</item>
+    /// <item>
+    /// PipeError = Halt condition detected (endpoint stalled) or control request not supported.
+    /// </item>
+    /// <item>Timeout = The read operation timed out.</item>
+    /// <item>Overflow = The device sent more data than expected.</item>
+    /// <item>Interrupted = The read operation was canceled.</item>
+    /// <item>NotSupported = The transfer flags are not supported by the operating system.</item>
+    /// </list>
     /// </returns>
     public static UsbResult ControlReadUvc(
         this IUsbDevice device,
@@ -68,15 +72,19 @@ public static class UsbDeviceExtension
     /// <param name="timeout">Timeout before giving up due to no response being received</param>
     /// <exception cref="ArgumentException">Thrown when the source payload is too large.</exception>
     /// <returns>
-    /// Success = The write operation completed successfully.<br />
-    /// IO = The write operation failed.<br />
-    /// InvalidParameter = The transfer size is larger than OS or hardware can support.<br />
-    /// NoDevice = The device has been disconnected.<br />
-    /// ResourceBusy = Halt condition detected (endpoint stalled) or control request not supported.<br />
-    /// Timeout = The write operation timed out.<br />
-    /// Overflow = The host sent more data than expected.<br />
-    /// Interrupted = The write operation was canceled.<br />
-    /// NotSupported = The transfer flags are not supported by the operating system.<br />
+    /// <list>
+    /// <item>Success = The write operation completed successfully.</item>
+    /// <item>IO = The write operation failed.</item>
+    /// <item>InvalidParameter = Transfer size is larger than OS or hardware can support.</item>
+    /// <item>NoDevice = The device has been disconnected.</item>
+    /// <item>
+    /// PipeError = Halt condition detected (endpoint stalled) or control request not supported.
+    /// </item>
+    /// <item>Timeout = The write operation timed out.</item>
+    /// <item>Overflow = The host sent more data than expected.</item>
+    /// <item>Interrupted = The write operation was canceled.</item>
+    /// <item>NotSupported = The transfer flags are not supported by the operating system.</item>
+    /// </list>
     /// </returns>
     public static UsbResult ControlWriteUvc(
         this IUsbDevice device,
