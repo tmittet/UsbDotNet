@@ -46,7 +46,7 @@ public interface IUsbInterface : IDisposable
     /// <item>InvalidParameter = Transfer size is larger than OS or hardware can support.</item>
     /// <item>NoDevice = The device has been disconnected.</item>
     /// <item>
-    /// ResourceBusy = Halt condition detected (endpoint stalled) or control request not supported.
+    /// PipeError = Halt condition detected (endpoint stalled) or control request not supported.
     /// </item>
     /// <item>Timeout = The read operation timed out.</item>
     /// <item>Overflow = The device sent more data than expected.</item>
@@ -76,7 +76,7 @@ public interface IUsbInterface : IDisposable
     /// <item>InvalidParameter = Transfer size is larger than OS or hardware can support.</item>
     /// <item>NoDevice = The device has been disconnected.</item>
     /// <item>
-    /// ResourceBusy = Halt condition detected (endpoint stalled) or control request not supported.
+    /// PipeError = Halt condition detected (endpoint stalled) or control request not supported.
     /// </item>
     /// <item>Timeout = The write operation timed out.</item>
     /// <item>Overflow = The host sent more data than expected.</item>
