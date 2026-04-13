@@ -40,15 +40,19 @@ public interface IUsbInterface : IDisposable
     /// Thrown when no input endpoint is found for this interface.
     /// </exception>
     /// <returns>
-    /// Success = The read operation completed successfully.<br />
-    /// IO = The read operation failed.<br />
-    /// InvalidParameter = Transfer size is larger than OS or hardware can support.<br />
-    /// NoDevice = The device has been disconnected.<br />
-    /// ResourceBusy = Halt condition detected (endpoint stalled) or control request not supported.<br />
-    /// Timeout = The read operation timed out.<br />
-    /// Overflow = The device sent more data than requested.<br />
-    /// Interrupted = The read operation was canceled.<br />
-    /// NotSupported = The transfer flags are not supported by the operating system.<br />
+    /// <list>
+    /// <item>Success = The read operation completed successfully.</item>
+    /// <item>IO = The read operation failed.</item>
+    /// <item>InvalidParameter = Transfer size is larger than OS or hardware can support.</item>
+    /// <item>NoDevice = The device has been disconnected.</item>
+    /// <item>
+    /// ResourceBusy = Halt condition detected (endpoint stalled) or control request not supported.
+    /// </item>
+    /// <item>Timeout = The read operation timed out.</item>
+    /// <item>Overflow = The device sent more data than expected.</item>
+    /// <item>Interrupted = The read operation was canceled.</item>
+    /// <item>NotSupported = The transfer flags are not supported by the operating system.</item>
+    /// </list>
     /// </returns>
     UsbResult BulkRead(Span<byte> destination, out int bytesRead, int timeout = Timeout.Infinite);
 
@@ -66,15 +70,19 @@ public interface IUsbInterface : IDisposable
     /// Thrown when no output endpoint is found for this interface.
     /// </exception>
     /// <returns>
-    /// Success = The write operation completed successfully.<br />
-    /// IO = The write operation failed.<br />
-    /// InvalidParameter = Transfer size is larger than OS or hardware can support.<br />
-    /// NoDevice = The device has been disconnected.<br />
-    /// ResourceBusy = Halt condition detected (endpoint stalled) or control request not supported.<br />
-    /// Timeout = The write operation timed out.<br />
-    /// Overflow = The host sent more data than expected.<br />
-    /// Interrupted = The write operation was canceled.<br />
-    /// NotSupported = The transfer flags are not supported by the operating system.<br />
+    /// <list>
+    /// <item>Success = The write operation completed successfully.</item>
+    /// <item>IO = The write operation failed.</item>
+    /// <item>InvalidParameter = Transfer size is larger than OS or hardware can support.</item>
+    /// <item>NoDevice = The device has been disconnected.</item>
+    /// <item>
+    /// ResourceBusy = Halt condition detected (endpoint stalled) or control request not supported.
+    /// </item>
+    /// <item>Timeout = The write operation timed out.</item>
+    /// <item>Overflow = The host sent more data than expected.</item>
+    /// <item>Interrupted = The write operation was canceled.</item>
+    /// <item>NotSupported = The transfer flags are not supported by the operating system.</item>
+    /// </list>
     /// </returns>
     UsbResult BulkWrite(
         ReadOnlySpan<byte> source,

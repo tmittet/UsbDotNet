@@ -26,6 +26,7 @@ public interface IUsbDevice : IDisposable
     /// Reads the manufacturer from the device if required; otherwise a cached value is returned.
     /// To read uncached call device.ReadStringDescriptor(device.Descriptor.ManufacturerIndex).
     /// </summary>
+    /// <exception cref="UsbException">Thrown when the descriptor read operation fails.</exception>
     /// <exception cref="ObjectDisposedException">Thrown when the UsbDevice is disposed.</exception>
     string GetManufacturer();
 
@@ -33,6 +34,7 @@ public interface IUsbDevice : IDisposable
     /// Reads the product name from the device if required; otherwise a cached value is returned.
     /// To read uncached, call device.ReadStringDescriptor(device.Descriptor.ProductIndex).
     /// </summary>
+    /// <exception cref="UsbException">Thrown when the descriptor read operation fails.</exception>
     /// <exception cref="ObjectDisposedException">Thrown when the UsbDevice is disposed.</exception>
     string GetProduct();
 
@@ -40,13 +42,17 @@ public interface IUsbDevice : IDisposable
     /// Reads the serial number from the device if required; otherwise a cached value is returned.
     /// To read uncached, call device.ReadStringDescriptor(device.Descriptor.SerialNumberIndex).
     /// </summary>
+    /// <exception cref="UsbException">Thrown when the descriptor read operation fails.</exception>
     /// <exception cref="ObjectDisposedException">Thrown when the UsbDevice is disposed.</exception>
     string GetSerialNumber();
 
     /// <summary>
     /// Reads a string descriptor from the device, using the first language supported by the device.
+    /// <para>
     /// NOTE: On some devices it may fail even for basic fields like serial number (at index 0).
+    /// </para>
     /// </summary>
+    /// <exception cref="UsbException">Thrown when the descriptor read operation fails.</exception>
     /// <exception cref="ObjectDisposedException">Thrown when the UsbDevice is disposed.</exception>
     string ReadStringDescriptor(byte descriptorIndex);
 
@@ -61,17 +67,23 @@ public interface IUsbDevice : IDisposable
     /// <param name="value">The value field for the setup packet</param>
     /// <param name="index">The index field for the setup packet</param>
     /// <param name="timeout">Timeout before giving up due to no response being received</param>
-    /// <exception cref="ArgumentException">Thrown when the destination buffer is too large.</exception>
+    /// <exception cref="ArgumentOutOfRangeException">
+    /// Thrown when the destination buffer is too large.
+    /// </exception>
     /// <returns>
-    /// Success = The read operation completed successfully.<br />
-    /// IO = The read operation failed.<br />
-    /// InvalidParameter = Transfer size is larger than OS or hardware can support.<br />
-    /// NoDevice = The device has been disconnected.<br />
-    /// ResourceBusy = Halt condition detected (endpoint stalled) or control request not supported.<br />
-    /// Timeout = The read operation timed out.<br />
-    /// Overflow = The device sent more data than expected.<br />
-    /// Interrupted = The read operation was canceled.<br />
-    /// NotSupported = The transfer flags are not supported by the operating system.<br />
+    /// <list>
+    /// <item>Success = The read operation completed successfully.</item>
+    /// <item>IO = The read operation failed.</item>
+    /// <item>InvalidParameter = Transfer size is larger than OS or hardware can support.</item>
+    /// <item>NoDevice = The device has been disconnected.</item>
+    /// <item>
+    /// ResourceBusy = Halt condition detected (endpoint stalled) or control request not supported.
+    /// </item>
+    /// <item>Timeout = The read operation timed out.</item>
+    /// <item>Overflow = The device sent more data than expected.</item>
+    /// <item>Interrupted = The read operation was canceled.</item>
+    /// <item>NotSupported = The transfer flags are not supported by the operating system.</item>
+    /// </list>
     /// </returns>
     UsbResult ControlRead(
         Span<byte> destination,
@@ -95,17 +107,23 @@ public interface IUsbDevice : IDisposable
     /// <param name="value">The value field for the setup packet</param>
     /// <param name="index">The index field for the setup packet</param>
     /// <param name="timeout">Timeout before giving up due to no response being received</param>
-    /// <exception cref="ArgumentException">Thrown when the source payload is too large.</exception>
+    /// <exception cref="ArgumentOutOfRangeException">
+    /// Thrown when the source payload is too large.
+    /// </exception>
     /// <returns>
-    /// Success = The write operation completed successfully.<br />
-    /// IO = The write operation failed.<br />
-    /// InvalidParameter = Transfer size is larger than OS or hardware can support.<br />
-    /// NoDevice = The device has been disconnected.<br />
-    /// ResourceBusy = Halt condition detected (endpoint stalled) or control request not supported.<br />
-    /// Timeout = The write operation timed out.<br />
-    /// Overflow = The host sent more data than expected.<br />
-    /// Interrupted = The write operation was canceled.<br />
-    /// NotSupported = The transfer flags are not supported by the operating system.<br />
+    /// <list>
+    /// <item>Success = The write operation completed successfully.</item>
+    /// <item>IO = The write operation failed.</item>
+    /// <item>InvalidParameter = Transfer size is larger than OS or hardware can support.</item>
+    /// <item>NoDevice = The device has been disconnected.</item>
+    /// <item>
+    /// ResourceBusy = Halt condition detected (endpoint stalled) or control request not supported.
+    /// </item>
+    /// <item>Timeout = The write operation timed out.</item>
+    /// <item>Overflow = The host sent more data than expected.</item>
+    /// <item>Interrupted = The write operation was canceled.</item>
+    /// <item>NotSupported = The transfer flags are not supported by the operating system.</item>
+    /// </list>
     /// </returns>
     UsbResult ControlWrite(
         ReadOnlySpan<byte> source,
@@ -134,9 +152,13 @@ public interface IUsbDevice : IDisposable
 
     /// <summary>
     /// WARNING: Use very carefully! Performs a USB port reset to reconnect/reinitialize the device.
+    /// <para>
     /// The system will attempt to restore the previous configuration and alternate settings after
     /// the reset has completed. If the reset fails, the descriptors change, or the previous state
     /// cannot be restored, the device will appear to be disconnected and reconnected.
+    /// </para>
     /// </summary>
+    /// <exception cref="UsbException">Thrown when the reset operation fails.</exception>
+    /// <exception cref="ObjectDisposedException">Thrown when the UsbDevice is disposed.</exception>
     void Reset();
 }

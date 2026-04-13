@@ -92,11 +92,12 @@ public interface IUsbDeviceDescriptor
 
     /// <summary>
     /// The number of the port that the device is connected to.
-    ///
+    /// <para>
     /// The number returned by this call is usually guaranteed to be uniquely tied to a physical
     /// port, meaning that different devices plugged on the same physical port should return the
     /// same port number. But there is no guarantee that the port number returned by this call will
     /// remain the same, or even match the order in which ports are numbered on the HUB/HCD.
+    /// </para>
     /// </summary>
     byte PortNumber { get; }
 }

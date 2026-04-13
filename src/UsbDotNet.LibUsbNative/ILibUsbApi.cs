@@ -1,4 +1,4 @@
-﻿using UsbDotNet.LibUsbNative.Enums;
+using UsbDotNet.LibUsbNative.Enums;
 using UsbDotNet.LibUsbNative.Functions;
 using UsbDotNet.LibUsbNative.Structs;
 
@@ -13,8 +13,9 @@ public interface ILibUsbApi
     /// Initialize libusb. This function must be called before calling any other libusb function.
     /// If you do not provide an output location for a context pointer, a default context will be
     /// created. If there was already a default context, it will be reused.
-    ///
+    /// <para>
     /// NOTE: Deprecated function. Equivalent to calling libusb_init_context with no options.
+    /// </para>
     /// </summary>
     libusb_error libusb_init(out IntPtr ctx);
 
@@ -24,18 +25,24 @@ public interface ILibUsbApi
     void libusb_exit(IntPtr ctx);
 
     /// <summary>
-    /// Set an option in the library. Use this function to configure a specific option. Some options
-    /// require one or more arguments to be provided. Consult each option's documentation for
-    /// specific requirements. If the context ctx is NULL, the option will be added to a list of
-    /// default options that will be applied to all subsequently created contexts.
+    /// Set an option in the library. Use this function to configure a specific option.
+    /// <para>
+    /// Some options require one or more arguments to be provided. Consult each option's
+    /// documentation for specific requirements. If the context ctx is NULL, the option will be
+    /// added to a list of default options that will be applied to all subsequently created
+    /// contexts.
+    /// </para>
     /// </summary>
     libusb_error libusb_set_option(IntPtr ctx, libusb_option usbOption, int value);
 
     /// <summary>
-    /// Set an option in the library. Use this function to configure a specific option. Some options
-    /// require one or more arguments to be provided. Consult each option's documentation for
-    /// specific requirements. If the context ctx is NULL, the option will be added to a list of
-    /// default options that will be applied to all subsequently created contexts.
+    /// Set an option in the library. Use this function to configure a specific option.
+    /// <para>
+    /// Some options require one or more arguments to be provided. Consult each option's
+    /// documentation for specific requirements. If the context ctx is NULL, the option will be
+    /// added to a list of default options that will be applied to all subsequently created
+    /// contexts.
+    /// </para>
     /// </summary>
     libusb_error libusb_set_option(IntPtr ctx, libusb_option usbOption, IntPtr value);
 
@@ -77,16 +84,20 @@ public interface ILibUsbApi
     /// you are done with them, and then free the list with libusb_free_device_list(). Note that
     /// libusb_free_device_list() can unref all the devices for you. Be careful not to unreference
     /// a device you are about to open until after you have opened it.
-    /// This return value of this function indicates the number of devices in the resultant list.
-    /// The list is actually one element larger, as it is NULL-terminated.
+    /// <para>
+    /// The return value of this function is the number of devices in the resultant list on success,
+    /// or a negative <see cref="libusb_error"/> value on failure. The list is one element larger,
+    /// as it is NULL-terminated.
+    /// </para>
     /// </summary>
     libusb_error libusb_get_device_list(IntPtr ctx, out IntPtr list);
 
     /// <summary>
     /// Frees a list of devices previously discovered using libusb_get_device_list().
-    ///
+    /// <para>
     /// NOTE: If the unref_devices parameter is set, the reference count of each device
     /// in the list is decremented by 1.
+    /// </para>
     /// </summary>
     /// <param name="list">The list to free.</param>
     /// <param name="unref_devices">Whether to unref the devices in the list; 0 or 1.</param>
@@ -106,8 +117,9 @@ public interface ILibUsbApi
     /// <summary>
     /// Get the USB device descriptor for a given device.
     /// This is a non-blocking function; the device descriptor is cached in memory.
-    ///
+    /// <para>
     /// NOTE: Since libusb-1.0.16, this function always succeeds.
+    /// </para>
     /// </summary>
     libusb_error libusb_get_device_descriptor(IntPtr dev, out libusb_device_descriptor desc);
 
@@ -141,11 +153,12 @@ public interface ILibUsbApi
 
     /// <summary>
     /// Get the number of the port that a device is connected to.
-    ///
+    /// <para>
     /// The number returned by this call is usually guaranteed to be uniquely tied to a physical
     /// port, meaning that different devices plugged on the same physical port should return the
     /// same port number. But there is no guarantee that the port number returned by this call will
     /// remain the same, or even match the order in which ports are numbered on the HUB/HCD.
+    /// </para>
     /// </summary>
     byte libusb_get_port_number(IntPtr dev);
 
@@ -164,20 +177,24 @@ public interface ILibUsbApi
     /// Claim an interface on a given device handle. You must claim the interface you wish to use
     /// before you can perform I/O on any of its endpoints. It is legal to attempt to claim an
     /// already-claimed interface, in which case libusb just returns 0 without doing anything.
+    /// <para>
     /// If auto_detach_kernel_driver is set to 1 for dev, the kernel driver will be detached
     /// if necessary, on failure the detach error is returned. Claiming of interfaces is a purely
     /// logical operation; it does not cause any requests to be sent over the bus.Interface claiming
     /// is used to instruct the underlying operating system that your application wishes to take
     /// ownership of the interface.
+    /// </para>
     /// </summary>
     libusb_error libusb_claim_interface(IntPtr handle, byte interface_number);
 
     /// <summary>
     /// Release an interface previously claimed with libusb_claim_interface(). You should release
     /// all claimed interfaces before closing a device handle. This is a blocking function.
+    /// <para>
     /// A SET_INTERFACE control request will be sent to the device, resetting interface state to the
     /// first alternate setting. If auto_detach_kernel_driver is set to 1 for dev, the kernel driver
     /// will be re-attached after releasing the interface.
+    /// </para>
     /// </summary>
     libusb_error libusb_release_interface(IntPtr handle, byte interface_number);
 
@@ -194,14 +211,17 @@ public interface ILibUsbApi
     );
 
     /// <summary>
-    /// Perform a USB port reset to reinitialize a device. The system will attempt to restore the
-    /// previous configuration and alternate settings after the reset has completed. If the reset
-    /// fails, the descriptors change, or the previous state cannot be restored, the device will
-    /// appear to be disconnected and reconnected. This means that the device handle is no longer
-    /// valid (you should close it) and rediscover the device. A return code of
-    /// LIBUSB_ERROR_NOT_FOUND indicates when this is the case.
-    ///
+    /// Perform a USB port reset to reinitialize a device.
+    /// <para>
+    /// The system will attempt to restore the previous configuration and alternate settings after
+    /// the reset has completed. If the reset fails, the descriptors change, or the previous state
+    /// cannot be restored, the device will appear to be disconnected and reconnected. This means
+    /// that the device handle is no longer valid (you should close it) and rediscover the device.
+    /// A return code of LIBUSB_ERROR_NOT_FOUND indicates when this is the case.
+    /// </para>
+    /// <para>
     /// NOTE: This is a blocking function which usually incurs a noticeable delay.
+    /// </para>
     /// </summary>
     libusb_error libusb_reset_device(IntPtr handle);
 
@@ -209,26 +229,33 @@ public interface ILibUsbApi
     /// Allocate a libusb transfer with a specified number of isochronous packet descriptors. The
     /// returned transfer is pre-initialized for you. When the new transfer is no longer needed, it
     /// should be freed with libusb_free_transfer().
-    ///
+    /// <para>
     /// Transfers intended for non-isochronous endpoints (e.g. control, bulk, interrupt) should
     /// specify an iso_packets count of zero. For transfers intended for isochronous endpoints,
     /// specify an appropriate number of packet descriptors to be allocated as part of the transfer.
     /// The returned transfer is not specially initialized for isochronous I/O; you are still
     /// required to set the num_iso_packets and type fields accordingly.
-    ///
+    /// </para>
+    /// <para>
     /// It is safe to allocate a transfer with some isochronous packets and then use it on a
     /// non-isochronous endpoint. If you do this, ensure that at time of submission, num_iso_packets
     /// is 0 and that type is set appropriately.
+    /// </para>
     /// </summary>
     IntPtr libusb_alloc_transfer(int iso_packets);
 
     /// <summary>
     /// Free a transfer structure. This should be called for all transfers allocated with
-    /// libusb_alloc_transfer(). If the LIBUSB_TRANSFER_FREE_BUFFER flag is set and the transfer
-    /// buffer is non-NULL, this function will also free the transfer buffer using the standard
-    /// system memory allocator(e.g.free()). It is legal to call this function with a NULL transfer.
-    /// In this case, the function will simply return safely. It is not legal to free an active
-    /// transfer (one which has been submitted and has not yet completed).
+    /// libusb_alloc_transfer().
+    /// <para>
+    /// If the LIBUSB_TRANSFER_FREE_BUFFER flag is set and the transfer buffer is non-NULL, this
+    /// function will also free the transfer buffer using the standard system memory allocator
+    /// (e.g. free()). It is legal to call this function with a NULL transfer. In this case, the
+    /// function will simply return safely.
+    /// </para>
+    /// <para>
+    /// It's not legal to free an active transfer (one which is submitted but not yet completed).
+    /// </para>
     /// </summary>
     void libusb_free_transfer(IntPtr transfer);
 
@@ -236,24 +263,29 @@ public interface ILibUsbApi
     /// Submit a transfer. This function will fire off the USB transfer and then return immediately.
     /// </summary>
     /// <returns>
-    /// 0 on success<br />
-    /// LIBUSB_ERROR_NO_DEVICE if the device has been disconnected.<br />
-    /// LIBUSB_ERROR_BUSY if the transfer has already been submitted.<br />
-    /// LIBUSB_ERROR_NOT_SUPPORTED if the transfer flags are not supported by the OS.<br />
+    /// <list>
+    /// <item>0 on success.</item>
+    /// <item>LIBUSB_ERROR_NO_DEVICE if the device has been disconnected.</item>
+    /// <item>LIBUSB_ERROR_BUSY if the transfer has already been submitted.</item>
+    /// <item>LIBUSB_ERROR_NOT_SUPPORTED if the transfer flags are not supported by the OS.</item>
+    /// <item>
     /// LIBUSB_ERROR_INVALID_PARAM if the transfer size is larger than the OS and/or hardware can
-    /// support (see Transfer length limitations) another LIBUSB_ERROR code on other failure.<br />
+    /// support (see Transfer length limitations) another LIBUSB_ERROR code on other failure.
+    /// </item>
+    /// </list>
     /// </returns>
     libusb_error libusb_submit_transfer(IntPtr transfer);
 
     /// <summary>
     /// Asynchronously cancel a previously submitted transfer. This function returns immediately,
-    /// but this does not indicate cancellation is complete.Your callback function will be invoked
+    /// but this does not indicate cancellation is complete. Your callback function will be invoked
     /// at some later time with a transfer status of LIBUSB_TRANSFER_CANCELLED.
-    ///
+    /// <para>
     /// NOTE: This function behaves differently on Darwin-based systems (macOS and iOS):
     /// Calling this function for one transfer will cause all transfers on the same endpoint to be
     /// cancelled. Your callback function will be invoked with a transfer status of
     /// LIBUSB_TRANSFER_CANCELLED for each transfer that was cancelled.
+    /// </para>
     /// </summary>
     /// <returns>
     /// LIBUSB_ERROR_NOT_FOUND if the transfer is not in progress, already complete, or already
@@ -266,6 +298,7 @@ public interface ILibUsbApi
     /// callback will fire when a matching event occurs on a matching device. The callback is armed
     /// until either it is deregistered with libusb_hotplug_deregister_callback() or the supplied
     /// callback returns 1 to indicate it is finished processing events.
+    /// <para>
     /// If the LIBUSB_HOTPLUG_ENUMERATE is passed the callback will be called with a
     /// LIBUSB_HOTPLUG_EVENT_DEVICE_ARRIVED for all devices already plugged into the machine. Note
     /// that libusb modifies its internal device list from a separate thread, while calling hotplug
@@ -275,6 +308,7 @@ public interface ILibUsbApi
     /// twice for the arrival of the same device, once from libusb_hotplug_register_callback() and
     /// once from libusb_handle_events(); and/or your callback may be called for the removal of a
     /// device for which an arrived call was never made.
+    /// </para>
     /// </summary>
     libusb_error libusb_hotplug_register_callback(
         IntPtr ctx,
