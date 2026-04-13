@@ -1,0 +1,6 @@
+<Project>
+    <ItemGroup>
+        <Compile Include="$(MSBuildThisFileDirectory)HLink.cs" Link="HLink.cs" />
+        <Using Include="Microsoft.Extensions.Logging" />
+    </ItemGroup>
+</Project>

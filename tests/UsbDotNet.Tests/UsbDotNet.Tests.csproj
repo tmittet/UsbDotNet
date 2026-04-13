@@ -30,4 +30,5 @@
         <ProjectReference Include="..\..\src\UsbDotNet\UsbDotNet.csproj" />
         <ProjectReference Include="..\UsbDotNet.TestInfrastructure\UsbDotNet.TestInfrastructure.csproj" />
     </ItemGroup>
+    <Import Project="..\UsbDotNet.Tests.Shared\UsbDotNet.Tests.Shared.props" />
 </Project>

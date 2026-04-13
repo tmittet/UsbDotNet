@@ -1,7 +1,8 @@
-﻿using System.Text;
+using System.Text;
 using UsbDotNet.Core;
 using UsbDotNet.Descriptor;
 using UsbDotNet.LibUsbNative;
+using UsbDotNet.Tests.Shared;
 
 namespace UsbDotNet.Tests.UsbDevice;
 
@@ -144,6 +145,22 @@ public sealed class Given_a_supported_Huddly_USB_device : IDisposable
         readError.Should().Be(UsbResult.Success);
         readLength.Should().Be(expectedSaluteBytes.Length);
         buffer.Should().BeEquivalentTo(expectedSaluteBytes);
+    }
+
+    [SkippableFact]
+    public void GetUptime_returns_positive_uptime_from_Huddly_device()
+    {
+        using var device = _deviceSource.OpenUsbDeviceOrSkip();
+        using var usbInterface = device.ClaimInterface(UsbClass.VendorSpecific);
+
+        var hlink = new HLink(usbInterface);
+        hlink.Handshake();
+        var payload = hlink.Query("camctrl/uptime");
+
+        payload.Should().HaveCount(8, "uptime is a 64-bit double");
+        var uptime = BitConverter.ToDouble(payload);
+        uptime.Should().BePositive();
+        _logger.LogInformation("Device uptime: {Uptime}.", TimeSpan.FromSeconds(uptime));
     }
 
     [SkippableTheory(Timeout = 10000)]
