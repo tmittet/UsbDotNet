@@ -29,24 +29,31 @@ internal sealed class HLink(IUsbInterface usb, ILogger<HLink>? logger = null)
     )
     {
         // Reset (two empty writes, as per protocol)
-        usb.BulkWrite([], 0, out _, writeTimeout);
-        usb.BulkWrite([], 0, out _, writeTimeout);
+        var resetResult1 = usb.BulkWrite([], 0, out _, writeTimeout);
+        var resetResult2 = usb.BulkWrite([], 0, out _, writeTimeout);
+
+        if (resetResult1 != UsbResult.Success || resetResult2 != UsbResult.Success)
+            throw new IOException($"HLink reset write failed: {resetResult1}, {resetResult2}.");
 
         // Flush any stale data from previous sessions
         _readBuffer = [];
         var flushBuf = new byte[32 * 1024];
-        while (usb.BulkRead(flushBuf, out var n, readTimeout) == UsbResult.Success && n > 0) { }
+        while (usb.BulkRead(flushBuf, out var n, readTimeout) == UsbResult.Success && n > 0)
+            logger?.LogDebug("Flushed {Bytes} bytes of stale HLink data.", n);
 
         // Send salute (single 0x00 byte)
-        usb.BulkWrite([0x00], 1, out _, writeTimeout);
+        var saluteWriteResult = usb.BulkWrite([0x00], 1, out _, writeTimeout);
+        if (saluteWriteResult != UsbResult.Success)
+            throw new IOException($"HLink salute write failed: {saluteWriteResult}.");
 
         // Expect "HLink v0" response
         var response = new byte[8];
-        var result = usb.BulkRead(response, out var bytesRead, readTimeout);
-        if (result != UsbResult.Success)
-            throw new IOException($"HLink salute read failed: {result}");
-        if (Encoding.UTF8.GetString(response, 0, bytesRead) != "HLink v0")
-            throw new IOException("Unexpected HLink salute response");
+        var saluteReadResult = usb.BulkRead(response, out var bytesRead, readTimeout);
+        if (saluteReadResult != UsbResult.Success)
+            throw new IOException($"HLink salute read failed: {saluteReadResult}.");
+        var saluteResponse = Encoding.UTF8.GetString(response, 0, bytesRead);
+        if (saluteResponse != "HLink v0")
+            throw new IOException($"Unexpected HLink salute response '{saluteResponse}'.");
     }
 
     /// <summary>
@@ -72,7 +79,7 @@ internal sealed class HLink(IUsbInterface usb, ILogger<HLink>? logger = null)
         }
         finally
         {
-            Send("hlink-mb-unsubscribe", topicBytes, responseTimeout);
+            Send("hlink-mb-unsubscribe", topicBytes, sendTimeout);
         }
     }
 
@@ -88,9 +95,9 @@ internal sealed class HLink(IUsbInterface usb, ILogger<HLink>? logger = null)
         payload.CopyTo(packet, HeaderSize + nameBytes.Length);
         var result = usb.BulkWrite(packet, packet.Length, out _, timeout);
         if (result == UsbResult.Timeout)
-            throw new TimeoutException($"HLink send '{msgName}' timed out after {timeout} ms");
+            throw new TimeoutException($"HLink send '{msgName}' timed out after {timeout} ms.");
         if (result != UsbResult.Success)
-            throw new IOException($"HLink send '{msgName}' failed: {result}");
+            throw new IOException($"HLink send '{msgName}' failed: {result}.");
     }
 
     /// <summary>
@@ -125,7 +132,7 @@ internal sealed class HLink(IUsbInterface usb, ILogger<HLink>? logger = null)
                 continue;
             }
             if (result != UsbResult.Success)
-                throw new IOException($"HLink receive failed: {result}");
+                throw new IOException($"HLink receive failed: {result}.");
 
             // Accumulate received bytes; we may need several reads before a complete
             // HLink message is available.
@@ -135,7 +142,7 @@ internal sealed class HLink(IUsbInterface usb, ILogger<HLink>? logger = null)
             _readBuffer = combined;
         }
 
-        throw new TimeoutException($"HLink reply '{topic}' not received within {timeout} ms");
+        throw new TimeoutException($"HLink reply '{topic}' not received within {timeout} ms.");
     }
 
     /// <summary>
