@@ -85,8 +85,9 @@ public interface ILibUsbApi
     /// libusb_free_device_list() can unref all the devices for you. Be careful not to unreference
     /// a device you are about to open until after you have opened it.
     /// <para>
-    /// This return value of this function indicates the number of devices in the resultant list.
-    /// The list is actually one element larger, as it is NULL-terminated.
+    /// The return value of this function is the number of devices in the resultant list on success,
+    /// or a negative <see cref="libusb_error"/> value on failure. The list is one element larger,
+    /// as it is NULL-terminated.
     /// </para>
     /// </summary>
     libusb_error libusb_get_device_list(IntPtr ctx, out IntPtr list);
@@ -249,7 +250,7 @@ public interface ILibUsbApi
     /// <para>
     /// If the LIBUSB_TRANSFER_FREE_BUFFER flag is set and the transfer buffer is non-NULL, this
     /// function will also free the transfer buffer using the standard system memory allocator
-    /// (e.g.free()). It is legal to call this function with a NULL transfer. In this case, the
+    /// (e.g. free()). It is legal to call this function with a NULL transfer. In this case, the
     /// function will simply return safely.
     /// </para>
     /// <para>
@@ -277,7 +278,7 @@ public interface ILibUsbApi
 
     /// <summary>
     /// Asynchronously cancel a previously submitted transfer. This function returns immediately,
-    /// but this does not indicate cancellation is complete.Your callback function will be invoked
+    /// but this does not indicate cancellation is complete. Your callback function will be invoked
     /// at some later time with a transfer status of LIBUSB_TRANSFER_CANCELLED.
     /// <para>
     /// NOTE: This function behaves differently on Darwin-based systems (macOS and iOS):

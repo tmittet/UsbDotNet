@@ -67,7 +67,9 @@ public interface IUsbDevice : IDisposable
     /// <param name="value">The value field for the setup packet</param>
     /// <param name="index">The index field for the setup packet</param>
     /// <param name="timeout">Timeout before giving up due to no response being received</param>
-    /// <exception cref="ArgumentException">Thrown when the destination buffer is too large.</exception>
+    /// <exception cref="ArgumentOutOfRangeException">
+    /// Thrown when the destination buffer is too large.
+    /// </exception>
     /// <returns>
     /// <list>
     /// <item>Success = The read operation completed successfully.</item>
@@ -105,7 +107,9 @@ public interface IUsbDevice : IDisposable
     /// <param name="value">The value field for the setup packet</param>
     /// <param name="index">The index field for the setup packet</param>
     /// <param name="timeout">Timeout before giving up due to no response being received</param>
-    /// <exception cref="ArgumentException">Thrown when the source payload is too large.</exception>
+    /// <exception cref="ArgumentOutOfRangeException">
+    /// Thrown when the source payload is too large.
+    /// </exception>
     /// <returns>
     /// <list>
     /// <item>Success = The write operation completed successfully.</item>
