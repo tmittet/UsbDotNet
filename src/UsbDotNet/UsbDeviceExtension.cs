@@ -17,9 +17,9 @@ public static class UsbDeviceExtension
     /// </para>
     /// </summary>
     /// <param name="device">A UsbDevice instance.</param>
-    /// <param name="withClass">Interface class filter.</param>
-    /// <param name="withSubClass">Optional interface sub-class filter.</param>
-    /// <param name="withProtocol">Optional interface protocol filter.</param>
+    /// <param name="interfaceClass">Interface class filter.</param>
+    /// <param name="subClass">Optional interface sub-class filter.</param>
+    /// <param name="protocol">Optional interface protocol filter.</param>
     /// <exception cref="ArgumentException">
     /// Thrown when the USB interface is already claimed.
     /// </exception>
@@ -34,19 +34,19 @@ public static class UsbDeviceExtension
     /// </exception>
     public static IUsbInterface ClaimInterface(
         this IUsbDevice device,
-        UsbClass withClass,
-        byte? withSubClass = null,
-        byte? withProtocol = null
+        UsbClass interfaceClass,
+        byte? subClass = null,
+        byte? protocol = null
     )
     {
         var usbInterface = device
-            .GetInterfaceDescriptorList(withClass, withSubClass, withProtocol)
+            .GetInterfaceDescriptorList(interfaceClass, subClass, protocol)
             .OrderBy(i => i.InterfaceNumber)
             .ThenBy(i => i.AlternateSetting)
             .FirstOrDefault();
         return usbInterface is null
             ? throw new InvalidOperationException(
-                $"Device '{device}' {withClass} interface not found."
+                $"Device '{device}' {interfaceClass} interface not found."
             )
             : device.ClaimInterface(usbInterface);
     }
@@ -55,24 +55,24 @@ public static class UsbDeviceExtension
     /// Get a flat list of interface descriptors and alternate settings matching given parameters.
     /// </summary>
     /// <param name="device">A UsbDevice instance.</param>
-    /// <param name="withClass">Interface class filter.</param>
-    /// <param name="withSubClass">Optional interface sub-class filter.</param>
-    /// <param name="withProtocol">Optional interface protocol filter.</param>
+    /// <param name="interfaceClass">Interface class filter.</param>
+    /// <param name="subClass">Optional interface sub-class filter.</param>
+    /// <param name="protocol">Optional interface protocol filter.</param>
     /// <returns>A list of matching interface descriptors.</returns>
     public static IReadOnlyCollection<IUsbInterfaceDescriptor> GetInterfaceDescriptorList(
         this IUsbDevice device,
-        UsbClass withClass,
-        byte? withSubClass = null,
-        byte? withProtocol = null
+        UsbClass interfaceClass,
+        byte? subClass = null,
+        byte? protocol = null
     ) =>
         // Flatten the interface descriptors
         device
             .ConfigDescriptor.Interfaces.SelectMany(i => i.Value.Values)
             // Apply filters
             .Where(i =>
-                i.InterfaceClass == withClass
-                && (withSubClass is null || i.InterfaceSubClass == withSubClass.Value)
-                && (withProtocol is null || i.InterfaceProtocol == withProtocol.Value)
+                i.InterfaceClass == interfaceClass
+                && (subClass is null || i.InterfaceSubClass == subClass.Value)
+                && (protocol is null || i.InterfaceProtocol == protocol.Value)
             )
             .ToImmutableList();
 
@@ -80,9 +80,9 @@ public static class UsbDeviceExtension
     /// Get interface descriptors matching given parameters.
     /// </summary>
     /// <param name="device">A UsbDevice instance.</param>
-    /// <param name="withClass">Interface class filter.</param>
-    /// <param name="withSubClass">Optional interface sub-class filter.</param>
-    /// <param name="withProtocol">Optional interface protocol filter.</param>
+    /// <param name="interfaceClass">Interface class filter.</param>
+    /// <param name="subClass">Optional interface sub-class filter.</param>
+    /// <param name="protocol">Optional interface protocol filter.</param>
     /// <returns>
     /// A dictionary of USB interface descriptors grouped by interface number. For each interface
     /// number, the value is a dictionary of alternate interface descriptors keyed by the alternate
@@ -94,25 +94,25 @@ public static class UsbDeviceExtension
         IDictionary<byte, IUsbInterfaceDescriptor>
     > GetInterfaceDescriptors(
         this IUsbDevice device,
-        UsbClass withClass,
-        byte? withSubClass = null,
-        byte? withProtocol = null
-    ) => device.GetInterfaceDescriptorList(withClass, withSubClass, withProtocol).Regroup();
+        UsbClass interfaceClass,
+        byte? subClass = null,
+        byte? protocol = null
+    ) => device.GetInterfaceDescriptorList(interfaceClass, subClass, protocol).Regroup();
 
     /// <summary>
     /// Check if device has an interface matching given parameters.
     /// </summary>
     /// <param name="device">A UsbDevice instance.</param>
-    /// <param name="withClass">Interface class filter.</param>
-    /// <param name="withSubClass">Optional interface sub-class filter.</param>
-    /// <param name="withProtocol">Optional interface protocol filter.</param>
+    /// <param name="interfaceClass">Interface class filter.</param>
+    /// <param name="subClass">Optional interface sub-class filter.</param>
+    /// <param name="protocol">Optional interface protocol filter.</param>
     /// <returns>True when one or more matching interfaces are found.</returns>
     public static bool HasInterface(
         this IUsbDevice device,
-        UsbClass withClass,
-        byte? withSubClass = null,
-        byte? withProtocol = null
-    ) => device.GetInterfaceDescriptorList(withClass, withSubClass, withProtocol).Count != 0;
+        UsbClass interfaceClass,
+        byte? subClass = null,
+        byte? protocol = null
+    ) => device.GetInterfaceDescriptorList(interfaceClass, subClass, protocol).Count != 0;
 
     /// <summary>
     /// Regroup interface descriptors into a nested dictionary of USB interface
