@@ -1,4 +1,4 @@
-﻿using UsbDotNet.Descriptor;
+using UsbDotNet.Descriptor;
 using UsbDotNet.LibUsbNative;
 
 namespace UsbDotNet.Tests.Usb;
@@ -7,6 +7,8 @@ namespace UsbDotNet.Tests.Usb;
 public sealed class Given_a_supported_Huddly_USB_device : IDisposable
 {
     private const ushort HuddlyVendorId = 0x2BD9;
+    private const byte HLinkSubClass = 0x00;
+
     private readonly ILibUsb _libusb;
     private readonly ILoggerFactory _loggerFactory;
     private readonly ILogger<Given_a_supported_Huddly_USB_device> _logger;
@@ -28,6 +30,7 @@ public sealed class Given_a_supported_Huddly_USB_device : IDisposable
                 UsbClass.VendorSpecific,
                 TestDeviceAccess.BulkRead | TestDeviceAccess.BulkWrite
             );
+            _deviceSource.SetRequiredInterfaceSubClass(HLinkSubClass);
         }
         catch
         {
