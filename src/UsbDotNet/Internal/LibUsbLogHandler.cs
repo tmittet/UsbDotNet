@@ -85,8 +85,24 @@ internal static class LibUsbLogHandler
     private static bool LogAsDebugOverride(libusb_log_level level, string message) =>
         IsWindows
         && (
-            // Frequent when devices are disconnected during enumeration on Windows
+            // Very frequent on some systems during device enumeration on Windows
             (
+                level is libusb_log_level.LIBUSB_LOG_LEVEL_INFO
+                && message.StartsWith(
+                    "libusb: info [winusb_get_device_list] The following device has no driver:",
+                    StringComparison.Ordinal
+                )
+            )
+            // Very frequent on some systems during device enumeration on Windows
+            || (
+                level is libusb_log_level.LIBUSB_LOG_LEVEL_WARNING
+                && message.StartsWith(
+                    "libusb: warning [set_composite_interface] failure to read interface number for",
+                    StringComparison.Ordinal
+                )
+            )
+            // Frequent when devices are disconnected during enumeration on Windows
+            || (
                 level is libusb_log_level.LIBUSB_LOG_LEVEL_WARNING
                 && message.StartsWith(
                     "libusb: warning [winusb_get_device_list] could not detect installation state of driver for",

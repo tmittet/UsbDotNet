@@ -72,7 +72,7 @@ public sealed class Usb : IUsb
     }
 
     /// <inheritdoc/>
-    public void Initialize(LogLevel logLevel = LogLevel.Warning)
+    public void Initialize(LogLevel nativeLibraryLogLevel = LogLevel.Warning)
     {
         lock (_lock)
         {
@@ -85,7 +85,7 @@ public sealed class Usb : IUsb
             _context = _libUsb.CreateContext();
             _logger.LogInformation("LibUsb v{LibUsbVersion} initialized.", GetVersion());
 
-            InitializeLibUsbLogHandler(_context, logLevel);
+            InitializeLibUsbLogHandler(_context, nativeLibraryLogLevel);
             _eventLoop = new LibUsbEventLoop(_loggerFactory, _context);
             _eventLoop.Start();
         }
