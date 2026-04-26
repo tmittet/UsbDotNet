@@ -1,0 +1,14 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+    <PropertyGroup>
+        <OutputType>Exe</OutputType>
+        <TargetFrameworks>net10.0</TargetFrameworks>
+        <!-- CA1812: internal types (worker, options) are instantiated via DI / reflection. -->
+        <NoWarn>$(NoWarn);CA1303;CA1812</NoWarn>
+    </PropertyGroup>
+    <ItemGroup>
+        <PackageReference Include="Microsoft.Extensions.Hosting" />
+    </ItemGroup>
+    <ItemGroup>
+        <ProjectReference Include="..\..\src\UsbDotNet\UsbDotNet.csproj" />
+    </ItemGroup>
+</Project>
