@@ -20,7 +20,6 @@ public sealed class Given_a_vendor_class_USB_device : IDisposable
         _usb = new UsbDotNet.Usb(
             _libusb,
             _loggerFactory,
-            _loggerFactory.CreateLogger<UsbDotNet.Usb>(),
             new UsbDotNetOptions { NativeLibraryLogLevel = LogLevel.Information }
         );
         try

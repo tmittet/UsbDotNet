@@ -18,6 +18,7 @@ public static class UsbDotNetServiceCollectionExtensions
     /// Registers <see cref="IUsb"/> and a default <see cref="ILibUsb"/> as singletons.
     /// Loggers for <see cref="Usb"/> and its sub-components are resolved from the
     /// <see cref="ILoggerFactory"/> registered in the service collection.
+    /// <para>NOTE: Call IUsb.Initialize() before enumerating or opening devices.</para>
     /// </summary>
     /// <param name="services">The service collection.</param>
     /// <param name="configure">
@@ -42,7 +43,7 @@ public static class UsbDotNetServiceCollectionExtensions
             var loggerFactory = sp.GetRequiredService<ILoggerFactory>();
             var libUsb = sp.GetRequiredService<ILibUsb>();
             var options = sp.GetRequiredService<IOptions<UsbDotNetOptions>>().Value;
-            return new Usb(libUsb, loggerFactory, loggerFactory.CreateLogger<Usb>(), options);
+            return new Usb(libUsb, loggerFactory, options);
         });
         return services;
     }

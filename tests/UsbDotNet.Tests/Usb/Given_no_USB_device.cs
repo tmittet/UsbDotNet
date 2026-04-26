@@ -17,7 +17,6 @@ public sealed class Given_no_USB_device : IDisposable
         new(
             _libusb,
             _loggerFactory,
-            _loggerFactory.CreateLogger<UsbDotNet.Usb>(),
             new UsbDotNetOptions { NativeLibraryLogLevel = nativeLogLevel }
         );
 
