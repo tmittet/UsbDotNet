@@ -1,7 +1,9 @@
-﻿using UsbDotNet.Core;
+using UsbDotNet.Core;
+using UsbDotNet.Extensions.Uvc.Unix;
+using UsbDotNet.Extensions.Uvc.Windows;
 using UsbDotNet.Transfer;
 
-namespace UsbDotNet.Extensions.ControlTransfer.Uvc;
+namespace UsbDotNet.Extensions.Uvc;
 
 public static class UsbDeviceExtension
 {
@@ -21,7 +23,7 @@ public static class UsbDeviceExtension
     /// <returns>
     /// Success = The read operation completed successfully.<br />
     /// IO = The read operation failed.<br />
-    /// InvalidParameter = Transfer size is larger than OS or hardware can support.<br />
+    /// InvalidParameter = TransferCameraControl size is larger than OS or hardware can support.<br />
     /// NoDevice = The device has been disconnected.<br />
     /// ResourceBusy = Halt condition detected (endpoint stalled) or control request not supported.<br />
     /// Timeout = The read operation timed out.<br />
@@ -33,7 +35,7 @@ public static class UsbDeviceExtension
         this IUsbDevice device,
         Span<byte> destination,
         out ushort bytesRead,
-        ControlRequestUvc request,
+        UvcControlRequest request,
         byte interfaceNumber,
         byte entityId,
         byte controlSelector,
@@ -67,7 +69,7 @@ public static class UsbDeviceExtension
     /// <returns>
     /// Success = The write operation completed successfully.<br />
     /// IO = The write operation failed.<br />
-    /// InvalidParameter = Transfer size is larger than OS or hardware can support.<br />
+    /// InvalidParameter = TransferCameraControl size is larger than OS or hardware can support.<br />
     /// NoDevice = The device has been disconnected.<br />
     /// ResourceBusy = Halt condition detected (endpoint stalled) or control request not supported.<br />
     /// Timeout = The write operation timed out.<br />
@@ -79,7 +81,7 @@ public static class UsbDeviceExtension
         this IUsbDevice device,
         ReadOnlySpan<byte> source,
         out int bytesWritten,
-        ControlRequestUvc request,
+        UvcControlRequest request,
         byte interfaceNumber,
         byte entityId,
         byte controlSelector,
@@ -96,4 +98,30 @@ public static class UsbDeviceExtension
             (ushort)(entityId << 8 | interfaceNumber),
             timeout
         );
+
+    /// <summary>
+    /// Opens cross-platform access to the specified UVC control interface.
+    /// </summary>
+    /// <remarks>
+    /// On Windows, each Open method enumerates DirectShow video devices to obtain a
+    /// <see cref="SafeVideoDeviceHandle"/>. The device must be open so the serial number can be read.
+    /// On Linux and macOS the USB device is accessed directly via libusb control transfers.
+    /// </remarks>
+    /// <param name="device">An open USB device.</param>
+    /// <param name="interfaceNumber">
+    /// The UVC VideoControl interface number from the device configuration descriptor.
+    /// </param>
+    /// <returns>
+    /// An <see cref="IUvcControls"/> bound to the specified interface,
+    /// backed by Kernel Streaming on Windows or by libusb UVC control transfers on Linux and macOS.
+    /// </returns>
+    /// <exception cref="ArgumentNullException"><paramref name="device"/> is <see langword="null"/>.</exception>
+    /// <exception cref="InvalidOperationException">On Windows: no matching DirectShow video device found.</exception>
+    public static IUvcControls OpenUvcControls(this IUsbDevice device, byte interfaceNumber)
+    {
+        ArgumentNullException.ThrowIfNull(device);
+        return OperatingSystem.IsWindows()
+            ? new WindowsUvcControls(SafeVideoDeviceHandle.Open(device, interfaceNumber))
+            : new UnixUvcControls(device, interfaceNumber);
+    }
 }

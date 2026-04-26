@@ -1,10 +1,11 @@
-﻿namespace UsbDotNet.Extensions.ControlTransfer.Uvc;
+namespace UsbDotNet.Extensions.Uvc;
 
 /// <summary>
 /// USB Video Class (UVC) control request codes. These are used in class-specific
 /// control transfers to get/set control values, ranges, and metadata.
 /// </summary>
-public enum ControlRequestUvc : byte
+#pragma warning disable CA1008 // Enums should have zero value
+public enum UvcControlRequest : byte
 {
     /// <summary>
     /// Set the current value of a control (Host -> Device)
@@ -115,3 +116,4 @@ public enum ControlRequestUvc : byte
     /// </summary>
     GetDefaultAll = 0x97,
 }
+#pragma warning restore CA1008 // Enums should have zero value

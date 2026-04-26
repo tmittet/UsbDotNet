@@ -29,6 +29,7 @@
     <ItemGroup>
         <ProjectReference Include="..\..\src\UsbDotNet.Core\UsbDotNet.Core.csproj" />
         <ProjectReference Include="..\..\src\UsbDotNet.Extensions\UsbDotNet.Extensions.csproj" />
+        <ProjectReference Include="..\..\src\UsbDotNet.Extensions.Uvc\UsbDotNet.Extensions.Uvc.csproj" />
         <ProjectReference Include="..\..\src\UsbDotNet\UsbDotNet.csproj" />
         <ProjectReference Include="..\UsbDotNet.TestInfrastructure\UsbDotNet.TestInfrastructure.csproj" />
     </ItemGroup>
