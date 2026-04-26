@@ -1,6 +1,7 @@
 using System.Collections.Concurrent;
 using System.Runtime.InteropServices;
 using System.Runtime.Versioning;
+using Microsoft.Extensions.Logging;
 using UsbDotNet.Core;
 
 namespace UsbDotNet.Extensions.Uvc.Windows;
@@ -16,6 +17,7 @@ internal sealed class WindowsUvcControl : IUvcControl
     public static readonly Guid DeviceSpecificNode = new("941C7AC0-C559-11D0-8A2B-00A0C9255AC1");
 
     private readonly SafeVideoDeviceHandle _handle;
+    private readonly ILogger _logger;
     private readonly ConcurrentDictionary<Guid, uint> _extensionUnitNodeIds = new();
 
     private readonly IAMCameraControl? _cameraControl;
@@ -26,9 +28,10 @@ internal sealed class WindowsUvcControl : IUvcControl
     private readonly object _disposeLock = new();
     private bool _disposed;
 
-    internal WindowsUvcControl(SafeVideoDeviceHandle handle)
+    internal WindowsUvcControl(SafeVideoDeviceHandle handle, ILogger<WindowsUvcControl> logger)
     {
         _handle = handle;
+        _logger = logger;
 
         var unknownDevice =
             handle.IsInvalid || handle.IsClosed

@@ -1,3 +1,4 @@
+using Microsoft.Extensions.Logging;
 using UsbDotNet.Core;
 using UsbDotNet.Extensions.Uvc.Unix;
 using UsbDotNet.Extensions.Uvc.Windows;
@@ -129,7 +130,14 @@ public static class UsbDeviceExtension
     {
         ArgumentNullException.ThrowIfNull(device);
         return OperatingSystem.IsWindows()
-            ? new WindowsUvcControl(SafeVideoDeviceHandle.Open(device, interfaceNumber))
-            : new UnixUvcControl(device, interfaceNumber);
+            ? new WindowsUvcControl(
+                SafeVideoDeviceHandle.Open(device, interfaceNumber),
+                device.LoggerFactory.CreateLogger<WindowsUvcControl>()
+            )
+            : new UnixUvcControl(
+                device,
+                interfaceNumber,
+                device.LoggerFactory.CreateLogger<UnixUvcControl>()
+            );
     }
 }

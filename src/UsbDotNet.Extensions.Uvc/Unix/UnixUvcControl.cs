@@ -1,5 +1,6 @@
 using System.Buffers.Binary;
 using System.Collections.Concurrent;
+using Microsoft.Extensions.Logging;
 using UsbDotNet.Core;
 
 namespace UsbDotNet.Extensions.Uvc.Unix;
@@ -8,14 +9,16 @@ internal sealed class UnixUvcControl : IUvcControl
 {
     private readonly IUsbDevice _device;
     private readonly byte _interfaceNumber;
+    private readonly ILogger _logger;
     private readonly ConcurrentDictionary<Guid, byte> _extensionUnitEntityIds = new();
     private byte? _cameraControlEntityId,
         _imageSettingEntityId;
 
-    internal UnixUvcControl(IUsbDevice device, byte interfaceNumber)
+    internal UnixUvcControl(IUsbDevice device, byte interfaceNumber, ILogger logger)
     {
         _device = device;
         _interfaceNumber = interfaceNumber;
+        _logger = logger;
     }
 
     /// <inheritdoc />
