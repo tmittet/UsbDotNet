@@ -21,6 +21,7 @@ public sealed class Usb : IUsb
     private readonly ILibUsb _libUsb;
     private readonly ILoggerFactory _loggerFactory;
     private readonly ILogger<Usb> _logger;
+    private readonly UsbDotNetOptions _options;
     private readonly ConcurrentDictionary<string, UsbDevice> _openDevices = new();
 #pragma warning disable CA2213 // Disposable fields should be disposed
     // CA2213 false positive
@@ -41,7 +42,7 @@ public sealed class Usb : IUsb
     }
 
     /// <summary>
-    /// Creates UsbDotNet with optional LibUsb instance and logging builder.
+    /// Creates UsbDotNet with optional LibUsb instance, logging builder, and options.
     /// Consider using DI; registering via IServiceCollection.AddUsbDotNet() instead.
     /// <para>NOTE: Call Initialize() before enumerating or opening devices.</para>
     /// </summary>
@@ -52,16 +53,23 @@ public sealed class Usb : IUsb
     /// Optional logging builder; e.g. <c>builder =&gt; builder.AddConsole()</c>.
     /// If null, logging is disabled.
     /// </param>
+    /// <param name="configureOptions">
+    /// Optional <see cref="UsbDotNetOptions"/> configurator; e.g.
+    /// <c>options =&gt; options.NativeLibraryLogLevel = LogLevel.Information</c>.
+    /// </param>
     public static Usb Create(
         ILibUsb? libUsb = null,
-        Action<ILoggingBuilder>? configureLogging = null
+        Action<ILoggingBuilder>? configureLogging = null,
+        Action<UsbDotNetOptions>? configureOptions = null
     )
     {
         var provider = new ServiceCollection()
             .AddLogging(configureLogging ?? (_ => { }))
             .BuildServiceProvider();
         var loggerFactory = provider.GetRequiredService<ILoggerFactory>();
-        return new Usb(libUsb, loggerFactory, loggerFactory.CreateLogger<Usb>());
+        var options = new UsbDotNetOptions();
+        configureOptions?.Invoke(options);
+        return new Usb(libUsb, loggerFactory, loggerFactory.CreateLogger<Usb>(), options);
     }
 
     /// <summary>
@@ -69,7 +77,12 @@ public sealed class Usb : IUsb
     /// <para>NOTE: Call Initialize() before enumerating or opening devices.</para>
     /// </summary>
     public Usb()
-        : this(libUsb: null, NullLoggerFactory.Instance, NullLogger<Usb>.Instance) { }
+        : this(
+            libUsb: null,
+            NullLoggerFactory.Instance,
+            NullLogger<Usb>.Instance,
+            new UsbDotNetOptions()
+        ) { }
 
     /// <summary>
     /// Creates UsbDotNet with optional LibUsb instance and logging.
@@ -89,10 +102,16 @@ public sealed class Usb : IUsb
         : this(
             libUsb,
             loggerFactory ?? NullLoggerFactory.Instance,
-            (loggerFactory ?? NullLoggerFactory.Instance).CreateLogger<Usb>()
+            (loggerFactory ?? NullLoggerFactory.Instance).CreateLogger<Usb>(),
+            new UsbDotNetOptions()
         ) { }
 
-    internal Usb(ILibUsb? libUsb, ILoggerFactory loggerFactory, ILogger<Usb> logger)
+    internal Usb(
+        ILibUsb? libUsb,
+        ILoggerFactory loggerFactory,
+        ILogger<Usb> logger,
+        UsbDotNetOptions options
+    )
     {
         if (Interlocked.CompareExchange(ref _instances, 1, 0) != 0)
         {
@@ -105,6 +124,7 @@ public sealed class Usb : IUsb
             _libUsb = libUsb ?? new LibUsb();
             _loggerFactory = loggerFactory;
             _logger = logger;
+            _options = options;
             LibUsbLogHandler.SetLogger(_logger);
         }
         catch (Exception)
@@ -115,7 +135,7 @@ public sealed class Usb : IUsb
     }
 
     /// <inheritdoc/>
-    public void Initialize(LogLevel nativeLibraryLogLevel = LogLevel.Warning)
+    public void Initialize()
     {
         lock (_lock)
         {
@@ -128,13 +148,24 @@ public sealed class Usb : IUsb
             _context = _libUsb.CreateContext();
             _logger.LogInformation("LibUsb v{LibUsbVersion} initialized.", GetVersion());
 
-            InitializeLibUsbLogHandler(_context, nativeLibraryLogLevel);
+            InitializeLibUsbLogHandler(_context, _options.NativeLibraryLogLevel);
             _eventLoop = new LibUsbEventLoop(
                 _loggerFactory.CreateLogger<LibUsbEventLoop>(),
                 _context
             );
             _eventLoop.Start();
         }
+    }
+
+    /// <inheritdoc/>
+    [Obsolete(
+        "Configure native LogLevel via UsbDotNetOptions when constructing via Usb.Create or DI,"
+            + "and call parameterless Initialize(). This overload will be removed in a future version."
+    )]
+    public void Initialize(LogLevel nativeLibraryLogLevel)
+    {
+        _options.NativeLibraryLogLevel = nativeLibraryLogLevel;
+        Initialize();
     }
 
     private void InitializeLibUsbLogHandler(ISafeContext context, LogLevel logLevel)

@@ -13,11 +13,23 @@ public interface IUsb : IDisposable
 {
     /// <summary>
     /// Initializes the USB library (libusb), attaches a log callback and starts the
-    /// background thread that handles USB events and drives async transfers.
+    /// background thread that handles USB events and drives async transfers. The libusb
+    /// native log level is read from <see cref="UsbDotNetOptions.NativeLibraryLogLevel"/>
+    /// supplied at construction.
+    /// </summary>
+    /// <exception cref="ObjectDisposedException">Thrown when the Usb type is disposed.</exception>
+    void Initialize();
+
+    /// <summary>
+    /// Initializes the USB library with an explicit native log level.
     /// </summary>
     /// <param name="nativeLibraryLogLevel">The desired log level for the libusb native library.</param>
     /// <exception cref="ObjectDisposedException">Thrown when the Usb type is disposed.</exception>
-    void Initialize(LogLevel nativeLibraryLogLevel = LogLevel.Warning);
+    [Obsolete(
+        "Configure NativeLibraryLogLevel via UsbDotNetOptions when constructing Usb, and call the"
+            + "parameterless Initialize() instead. This overload will be removed in a future version."
+    )]
+    void Initialize(LogLevel nativeLibraryLogLevel);
 
     /// <summary>
     /// Hotplug events are supported on macOS, Linux and Windows.

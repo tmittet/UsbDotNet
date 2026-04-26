@@ -1,5 +1,6 @@
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using UsbDotNet;
 using UsbDotNet.LibUsbNative;
 
@@ -18,16 +19,30 @@ public static class UsbDotNetServiceCollectionExtensions
     /// Loggers for <see cref="Usb"/> and its sub-components are resolved from the
     /// <see cref="ILoggerFactory"/> registered in the service collection.
     /// </summary>
-    public static IServiceCollection AddUsbDotNet(this IServiceCollection services)
+    /// <param name="services">The service collection.</param>
+    /// <param name="configure">
+    /// Optional configurator for <see cref="UsbDotNetOptions"/>. Equivalent to calling
+    /// <c>services.Configure&lt;UsbDotNetOptions&gt;(configure)</c>.
+    /// </param>
+    public static IServiceCollection AddUsbDotNet(
+        this IServiceCollection services,
+        Action<UsbDotNetOptions>? configure = null
+    )
     {
         ArgumentNullException.ThrowIfNull(services);
 
+        _ = services.AddOptions<UsbDotNetOptions>();
+        if (configure is not null)
+        {
+            _ = services.Configure(configure);
+        }
         services.TryAddSingleton<ILibUsb, LibUsb>();
         services.TryAddSingleton<IUsb>(sp =>
         {
             var loggerFactory = sp.GetRequiredService<ILoggerFactory>();
             var libUsb = sp.GetRequiredService<ILibUsb>();
-            return new Usb(libUsb, loggerFactory, loggerFactory.CreateLogger<Usb>());
+            var options = sp.GetRequiredService<IOptions<UsbDotNetOptions>>().Value;
+            return new Usb(libUsb, loggerFactory, loggerFactory.CreateLogger<Usb>(), options);
         });
         return services;
     }

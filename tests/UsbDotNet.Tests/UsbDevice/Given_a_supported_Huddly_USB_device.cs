@@ -26,11 +26,12 @@ public sealed class Given_a_supported_Huddly_USB_device : IDisposable
         _usb = new UsbDotNet.Usb(
             _libusb,
             _loggerFactory,
-            _loggerFactory.CreateLogger<UsbDotNet.Usb>()
+            _loggerFactory.CreateLogger<UsbDotNet.Usb>(),
+            new UsbDotNetOptions { NativeLibraryLogLevel = LogLevel.Information }
         );
         try
         {
-            _usb.Initialize(LogLevel.Information);
+            _usb.Initialize();
             _deviceSource = new TestDeviceSource(_logger, _usb);
             _deviceSource.SetRequiredVendorId(HuddlyVendorId);
             _deviceSource.SetRequiredInterfaceClass(
