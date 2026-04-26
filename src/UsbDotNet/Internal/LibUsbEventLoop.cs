@@ -13,7 +13,6 @@ namespace UsbDotNet.Internal;
 internal sealed class LibUsbEventLoop : IDisposable
 {
     private readonly object _lock = new();
-    private readonly ILoggerFactory _loggerFactory;
     private readonly ILogger<LibUsbEventLoop> _logger;
     private readonly ISafeContext _context;
     private readonly CancellationTokenSource _cts;
@@ -21,10 +20,9 @@ internal sealed class LibUsbEventLoop : IDisposable
     private Thread? _thread;
     private bool _disposed;
 
-    public LibUsbEventLoop(ILoggerFactory loggerFactory, ISafeContext context)
+    public LibUsbEventLoop(ILogger<LibUsbEventLoop> logger, ISafeContext context)
     {
-        _loggerFactory = loggerFactory;
-        _logger = _loggerFactory.CreateLogger<LibUsbEventLoop>();
+        _logger = logger;
         _context = context;
         _cts = new CancellationTokenSource();
         _completedPtr = Marshal.AllocHGlobal(sizeof(int));

@@ -1,5 +1,6 @@
 using System.Collections.Concurrent;
 using System.Diagnostics;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using UsbDotNet.Core;
@@ -40,8 +41,39 @@ public sealed class Usb : IUsb
     }
 
     /// <summary>
-    /// Creates the Usb wrapper.
-    /// NOTE: Call Initialize() before enumerating or opening devices.
+    /// Creates UsbDotNet with optional LibUsb instance and logging builder.
+    /// Consider using DI; registering via IServiceCollection.AddUsbDotNet() instead.
+    /// <para>NOTE: Call Initialize() before enumerating or opening devices.</para>
+    /// </summary>
+    /// <param name="libUsb">
+    /// Optional libusb instance. If null, a new default instance will be created.
+    /// </param>
+    /// <param name="configureLogging">
+    /// Optional logging builder; e.g. <c>builder =&gt; builder.AddConsole()</c>.
+    /// If null, logging is disabled.
+    /// </param>
+    public static Usb Create(
+        ILibUsb? libUsb = null,
+        Action<ILoggingBuilder>? configureLogging = null
+    )
+    {
+        var provider = new ServiceCollection()
+            .AddLogging(configureLogging ?? (_ => { }))
+            .BuildServiceProvider();
+        var loggerFactory = provider.GetRequiredService<ILoggerFactory>();
+        return new Usb(libUsb, loggerFactory, loggerFactory.CreateLogger<Usb>());
+    }
+
+    /// <summary>
+    /// Creates UsbDotNet with all logging disabled.
+    /// <para>NOTE: Call Initialize() before enumerating or opening devices.</para>
+    /// </summary>
+    public Usb()
+        : this(libUsb: null, NullLoggerFactory.Instance, NullLogger<Usb>.Instance) { }
+
+    /// <summary>
+    /// Creates UsbDotNet with optional LibUsb instance and logging.
+    /// <para>NOTE: Call Initialize() before enumerating or opening devices.</para>
     /// </summary>
     /// <param name="libUsb">
     /// Optional libusb instance. If null, a new default instance will be created.
@@ -49,7 +81,18 @@ public sealed class Usb : IUsb
     /// <param name="loggerFactory">
     /// Logger factory for libusb logging. If null, logging is disabled.
     /// </param>
+    [Obsolete(
+        "Register via IServiceCollection.AddUsbDotNet() or use Usb.Create(...) for non-DI "
+            + "scenarios. This constructor will be removed in a future version."
+    )]
     public Usb(ILibUsb? libUsb = default, ILoggerFactory? loggerFactory = null)
+        : this(
+            libUsb,
+            loggerFactory ?? NullLoggerFactory.Instance,
+            (loggerFactory ?? NullLoggerFactory.Instance).CreateLogger<Usb>()
+        ) { }
+
+    internal Usb(ILibUsb? libUsb, ILoggerFactory loggerFactory, ILogger<Usb> logger)
     {
         if (Interlocked.CompareExchange(ref _instances, 1, 0) != 0)
         {
@@ -60,8 +103,8 @@ public sealed class Usb : IUsb
         try
         {
             _libUsb = libUsb ?? new LibUsb();
-            _loggerFactory = loggerFactory ?? new NullLoggerFactory();
-            _logger = _loggerFactory.CreateLogger<Usb>();
+            _loggerFactory = loggerFactory;
+            _logger = logger;
             LibUsbLogHandler.SetLogger(_logger);
         }
         catch (Exception)
@@ -86,7 +129,10 @@ public sealed class Usb : IUsb
             _logger.LogInformation("LibUsb v{LibUsbVersion} initialized.", GetVersion());
 
             InitializeLibUsbLogHandler(_context, nativeLibraryLogLevel);
-            _eventLoop = new LibUsbEventLoop(_loggerFactory, _context);
+            _eventLoop = new LibUsbEventLoop(
+                _loggerFactory.CreateLogger<LibUsbEventLoop>(),
+                _context
+            );
             _eventLoop.Start();
         }
     }

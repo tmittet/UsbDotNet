@@ -19,7 +19,7 @@ public sealed class Given_any_USB_device : IDisposable
         _libusb = new LibUsb();
         _loggerFactory = new TestLoggerFactory(output);
         _logger = _loggerFactory.CreateLogger<Given_any_USB_device>();
-        _usb = new Usb(_libusb, _loggerFactory);
+        _usb = new Usb(_libusb, _loggerFactory, _loggerFactory.CreateLogger<Usb>());
         _usb.Initialize(LogLevel.Information);
         _deviceSource = new TestDeviceSource(_logger, _usb);
         _deviceSource.SetPreferredVendorId(0x2BD9);

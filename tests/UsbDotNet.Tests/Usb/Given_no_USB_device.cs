@@ -24,8 +24,17 @@ public sealed class Given_no_USB_device : IDisposable
     [Fact]
     public void Creating_two_active_instances_of_the_Usb_type_is_not_allowed()
     {
-        using var usb1 = new UsbDotNet.Usb(_libusb, _loggerFactory);
-        var act = () => new UsbDotNet.Usb(_libusb, _loggerFactory);
+        using var usb1 = new UsbDotNet.Usb(
+            _libusb,
+            _loggerFactory,
+            _loggerFactory.CreateLogger<UsbDotNet.Usb>()
+        );
+        var act = () =>
+            new UsbDotNet.Usb(
+                _libusb,
+                _loggerFactory,
+                _loggerFactory.CreateLogger<UsbDotNet.Usb>()
+            );
         act.Should()
             .Throw<InvalidOperationException>()
             .WithMessage("Only one instance of the Usb type allowed.");
@@ -34,15 +43,27 @@ public sealed class Given_no_USB_device : IDisposable
     [Fact]
     public void Creating_a_second_instance_of_the_Usb_type_is_allowed_after_disposal_of_first()
     {
-        var usb1 = new UsbDotNet.Usb(_libusb, _loggerFactory);
+        var usb1 = new UsbDotNet.Usb(
+            _libusb,
+            _loggerFactory,
+            _loggerFactory.CreateLogger<UsbDotNet.Usb>()
+        );
         usb1.Dispose();
-        using var usb2 = new UsbDotNet.Usb(_libusb, _loggerFactory);
+        using var usb2 = new UsbDotNet.Usb(
+            _libusb,
+            _loggerFactory,
+            _loggerFactory.CreateLogger<UsbDotNet.Usb>()
+        );
     }
 
     [Fact]
     public void Initialize_throws_when_called_a_second_time()
     {
-        using var usb = new UsbDotNet.Usb(_libusb, _loggerFactory);
+        using var usb = new UsbDotNet.Usb(
+            _libusb,
+            _loggerFactory,
+            _loggerFactory.CreateLogger<UsbDotNet.Usb>()
+        );
         usb.Initialize();
         var act = () => usb.Initialize();
         act.Should()
@@ -53,7 +74,11 @@ public sealed class Given_no_USB_device : IDisposable
     [Fact]
     public void GetDeviceList_throws_when_called_without_Initialize()
     {
-        using var usb = new UsbDotNet.Usb(_libusb, _loggerFactory);
+        using var usb = new UsbDotNet.Usb(
+            _libusb,
+            _loggerFactory,
+            _loggerFactory.CreateLogger<UsbDotNet.Usb>()
+        );
         var act = () => usb.GetDeviceList();
         act.Should().Throw<InvalidOperationException>();
     }
@@ -61,7 +86,11 @@ public sealed class Given_no_USB_device : IDisposable
     [Fact]
     public void GetDeviceList_throws_when_called_after_Dispose()
     {
-        using var usb = new UsbDotNet.Usb(_libusb, _loggerFactory);
+        using var usb = new UsbDotNet.Usb(
+            _libusb,
+            _loggerFactory,
+            _loggerFactory.CreateLogger<UsbDotNet.Usb>()
+        );
         usb.Initialize(LogLevel.Information);
         usb.Dispose();
         var act = () => usb.GetDeviceList();
@@ -76,7 +105,11 @@ public sealed class Given_no_USB_device : IDisposable
             "Hotplug only supported on Linux and macOS."
         );
 
-        using var usb = new UsbDotNet.Usb(_libusb, _loggerFactory);
+        using var usb = new UsbDotNet.Usb(
+            _libusb,
+            _loggerFactory,
+            _loggerFactory.CreateLogger<UsbDotNet.Usb>()
+        );
         var act = () => usb.RegisterHotplug(vendorId: 0x2BD9);
         act.Should().Throw<InvalidOperationException>();
     }
@@ -89,7 +122,11 @@ public sealed class Given_no_USB_device : IDisposable
             "Hotplug only supported on Linux and macOS."
         );
 
-        using var usb = new UsbDotNet.Usb(_libusb, _loggerFactory);
+        using var usb = new UsbDotNet.Usb(
+            _libusb,
+            _loggerFactory,
+            _loggerFactory.CreateLogger<UsbDotNet.Usb>()
+        );
         usb.Initialize(LogLevel.Information);
         var success = usb.RegisterHotplug(vendorId: 0x2BD9);
         success.Should().BeTrue();
@@ -102,7 +139,11 @@ public sealed class Given_no_USB_device : IDisposable
         {
             return;
         }
-        using var usb = new UsbDotNet.Usb(_libusb, _loggerFactory);
+        using var usb = new UsbDotNet.Usb(
+            _libusb,
+            _loggerFactory,
+            _loggerFactory.CreateLogger<UsbDotNet.Usb>()
+        );
         usb.Initialize(LogLevel.Information);
         var success = usb.RegisterHotplug(vendorId: 0x2BD9);
         success.Should().BeFalse();
