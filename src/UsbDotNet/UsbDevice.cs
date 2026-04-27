@@ -230,7 +230,12 @@ public sealed class UsbDevice : IUsbDevice
             // TODO: libusb_set_auto_detach_kernel_driver on Linux?
             var claimedInterface = Handle.ClaimInterface(descriptor.InterfaceNumber);
 
-            var usbInterface = new UsbInterface(_loggerFactory, this, descriptor, claimedInterface);
+            var usbInterface = new UsbInterface(
+                _loggerFactory.CreateLogger<UsbInterface>(),
+                this,
+                descriptor,
+                claimedInterface
+            );
             // No need to check if already added, checked in TryGetValue above
             _claimedInterfaces[descriptor.InterfaceNumber] = usbInterface;
             _logger.LogDebug("Interface {UsbInterface} claimed.", usbInterface);

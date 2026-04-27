@@ -96,6 +96,27 @@ jobs:
           --no-restore \
           --runtime ${{ matrix.config.runtime }}
 
+    - name: Build UsbDotNet.DeviceInteractionSample
+      shell: bash
+      run: |
+        dotnet build examples/UsbDotNet.DeviceInteractionSample/UsbDotNet.DeviceInteractionSample.csproj \
+          --no-restore \
+          --runtime ${{ matrix.config.runtime }}
+
+    - name: Build UsbDotNet.LibUsbNative.DeviceListToJsonSample
+      shell: bash
+      run: |
+        dotnet build examples/UsbDotNet.LibUsbNative.DeviceListToJsonSample/UsbDotNet.LibUsbNative.DeviceListToJsonSample.csproj \
+          --no-restore \
+          --runtime ${{ matrix.config.runtime }}
+
+    - name: Build UsbDotNet.LibUsbNative.DeviceListToStringSample
+      shell: bash
+      run: |
+        dotnet build examples/UsbDotNet.LibUsbNative.DeviceListToStringSample/UsbDotNet.LibUsbNative.DeviceListToStringSample.csproj \
+          --no-restore \
+          --runtime ${{ matrix.config.runtime }}
+
     - name: Build UsbDotNet.LibUsbNative.Tests
       shell: bash
       run: |

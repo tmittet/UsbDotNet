@@ -18,7 +18,6 @@ public sealed class UsbInterface : IUsbInterface
     private const int ReadBufferSize = 32 * 1024;
     private const int WriteBufferSize = 32 * 1024;
 
-    private readonly ILoggerFactory _loggerFactory;
     private readonly ILogger<UsbInterface> _logger;
     private readonly UsbDevice _device;
     private readonly IUsbInterfaceDescriptor _descriptor;
@@ -41,7 +40,7 @@ public sealed class UsbInterface : IUsbInterface
     /// <summary>
     /// A type representing a claimed USB interface.
     /// </summary>
-    /// <param name="loggerFactory">An optional logger factory.</param>
+    /// <param name="logger">Logger for this UsbInterface.</param>
     /// <param name="device">The parent USB device.</param>
     /// <param name="descriptor">The USB interface descriptor.</param>
     /// <param name="claimedInterface">A claimed USB device interface.</param>
@@ -54,7 +53,7 @@ public sealed class UsbInterface : IUsbInterface
     /// an attempt is made to pick the first available "output" endpoint for this interface.
     /// </param>
     public UsbInterface(
-        ILoggerFactory loggerFactory,
+        ILogger<UsbInterface> logger,
         UsbDevice device,
         IUsbInterfaceDescriptor descriptor,
         ISafeDeviceInterface claimedInterface,
@@ -62,8 +61,7 @@ public sealed class UsbInterface : IUsbInterface
         IUsbEndpointDescriptor? writeEndpoint = default
     )
     {
-        _loggerFactory = loggerFactory;
-        _logger = _loggerFactory.CreateLogger<UsbInterface>();
+        _logger = logger;
         _device = device;
         _descriptor = descriptor;
         _claimedInterface = claimedInterface;
