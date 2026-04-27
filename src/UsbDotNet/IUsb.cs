@@ -26,7 +26,7 @@ public interface IUsb : IDisposable
     /// <param name="nativeLibraryLogLevel">The desired log level for the libusb native library.</param>
     /// <exception cref="ObjectDisposedException">Thrown when the Usb type is disposed.</exception>
     [Obsolete(
-        "Configure NativeLibraryLogLevel via UsbDotNetOptions when constructing Usb, and call the"
+        "Configure NativeLibraryLogLevel via UsbDotNetOptions when constructing Usb, and call the "
             + "parameterless Initialize() instead. This overload will be removed in a future version."
     )]
     void Initialize(LogLevel nativeLibraryLogLevel);
