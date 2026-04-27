@@ -61,7 +61,11 @@ public sealed class Usb : IUsb
     /// <param name="options">
     /// Optional <see cref="UsbDotNetOptions"/>. If null, default options are used.
     /// </param>
-    public Usb(ILibUsb? libUsb, ILoggerFactory? loggerFactory, UsbDotNetOptions? options)
+    public Usb(
+        ILibUsb? libUsb = default,
+        ILoggerFactory? loggerFactory = default,
+        UsbDotNetOptions? options = default
+    )
     {
         if (Interlocked.CompareExchange(ref _instances, 1, 0) != 0)
         {
