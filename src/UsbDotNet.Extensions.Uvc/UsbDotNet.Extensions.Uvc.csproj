@@ -1,0 +1,13 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+    <PropertyGroup>
+        <RootNamespace>UsbDotNet.Extensions.Uvc</RootNamespace>
+        <PackageId>UsbDotNet.Extensions.Uvc</PackageId>
+        <Description>UsbDotNet UVC (USB Video Class) control extensions with cross-platform support and Windows DirectShow/Kernel Streaming integration</Description>
+    </PropertyGroup>
+    <ItemGroup>
+        <InternalsVisibleTo Include="UsbDotNet.Extensions.Tests" />
+    </ItemGroup>
+    <ItemGroup>
+        <ProjectReference Include="..\UsbDotNet\UsbDotNet.csproj" />
+    </ItemGroup>
+</Project>

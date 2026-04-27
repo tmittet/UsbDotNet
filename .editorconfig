@@ -197,6 +197,7 @@ prefer_readonly_struct = true:suggestion
 dotnet_code_quality_unused_parameters = all:suggestion
 dotnet_diagnostic.CA1028.severity = suggestion # Enum storage should be Int32
 dotnet_diagnostic.CA1031.severity = suggestion # Do not catch general exception types
+# TODO: Consider making CA1062 a warning
 dotnet_diagnostic.CA1062.severity = suggestion # Validate arguments of public methods
 dotnet_diagnostic.CA1711.severity = suggestion # Identifiers should not have incorrect suffix
 dotnet_diagnostic.CA1819.severity = suggestion # Properties should not return arrays

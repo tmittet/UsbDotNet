@@ -20,7 +20,6 @@ public sealed class UsbDevice : IUsbDevice
     private readonly Usb _usb;
     private readonly ISafeContext _context;
     private readonly UsbDeviceDescriptor _descriptor;
-    private readonly ILoggerFactory _loggerFactory;
     private readonly ILogger<UsbDevice> _logger;
     private readonly ConcurrentDictionary<byte, UsbInterface> _claimedInterfaces = new();
     private readonly ConcurrentDictionary<byte, string> _descriptorCache = new();
@@ -28,6 +27,9 @@ public sealed class UsbDevice : IUsbDevice
     private readonly RundownGuard _rundownGuard = new();
     private readonly object _interfaceLock = new();
     private readonly CancellationTokenSource _disposeCts = new();
+
+    /// <inheritdoc/>
+    public ILoggerFactory LoggerFactory { get; init; }
 
     internal ISafeDeviceHandle Handle { get; init; }
 
@@ -46,8 +48,8 @@ public sealed class UsbDevice : IUsbDevice
         IUsbConfigDescriptor configDescriptor
     )
     {
-        _loggerFactory = loggerFactory;
-        _logger = _loggerFactory.CreateLogger<UsbDevice>();
+        LoggerFactory = loggerFactory;
+        _logger = LoggerFactory.CreateLogger<UsbDevice>();
         _usb = usb;
         _context = context;
         Handle = handle;
@@ -218,6 +220,7 @@ public sealed class UsbDevice : IUsbDevice
     /// <inheritdoc/>
     public IUsbInterface ClaimInterface(IUsbInterfaceDescriptor descriptor)
     {
+        ArgumentNullException.ThrowIfNull(descriptor);
         using var token = _rundownGuard.AcquireExclusiveToken();
 
         lock (_interfaceLock)
@@ -231,7 +234,7 @@ public sealed class UsbDevice : IUsbDevice
             var claimedInterface = Handle.ClaimInterface(descriptor.InterfaceNumber);
 
             var usbInterface = new UsbInterface(
-                _loggerFactory.CreateLogger<UsbInterface>(),
+                LoggerFactory.CreateLogger<UsbInterface>(),
                 this,
                 descriptor,
                 claimedInterface

@@ -8,19 +8,17 @@ public sealed class TestDeviceSource(ILogger _logger, IUsb _usb)
 {
     private ushort _preferredVendorId;
     private ushort? _requiredVendorId;
+    private ushort[] _requiredProductIds = [];
     private UsbClass? _interfaceClass;
     private TestDeviceAccess _interfaceAccess = TestDeviceAccess.None;
     private byte? _interfaceSubClass;
 
-    public void SetPreferredVendorId(ushort vendorId)
-    {
-        _preferredVendorId = vendorId;
-    }
+    public void SetPreferredVendorId(ushort vendorId) => _preferredVendorId = vendorId;
 
-    public void SetRequiredVendorId(ushort vendorId)
-    {
-        _requiredVendorId = vendorId;
-    }
+    public void SetRequiredVendorId(ushort vendorId) => _requiredVendorId = vendorId;
+
+    public void SetRequiredProductId(params ushort[] productIds) =>
+        _requiredProductIds = productIds;
 
     public void SetRequiredInterfaceClass(UsbClass interfaceClass, TestDeviceAccess requiredAccess)
     {
@@ -55,7 +53,7 @@ public sealed class TestDeviceSource(ILogger _logger, IUsb _usb)
 
     public bool TryOpenUsbDevice([NotNullWhen(true)] out IUsbDevice? openDevice)
     {
-        var devices = _usb.GetDeviceList(_requiredVendorId)
+        var devices = _usb.GetDeviceList(_requiredVendorId, _requiredProductIds)
             .OrderBy(d => d.VendorId == _preferredVendorId ? 0 : 1);
 
         foreach (var deviceDescriptor in devices)

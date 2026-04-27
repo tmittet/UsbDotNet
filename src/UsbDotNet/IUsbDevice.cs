@@ -1,3 +1,4 @@
+using Microsoft.Extensions.Logging;
 using UsbDotNet.Core;
 using UsbDotNet.Descriptor;
 using UsbDotNet.Transfer;
@@ -10,6 +11,11 @@ namespace UsbDotNet;
 /// </summary>
 public interface IUsbDevice : IDisposable
 {
+    /// <summary>
+    /// The logger factory used by this device instance.
+    /// </summary>
+    ILoggerFactory LoggerFactory { get; }
+
     /// <summary>
     /// A device descriptor that includes device class, vendor ID, product ID, bus address and more.
     /// It is safe to read/inspect 'Descriptor' information after the UsbDevice has been disposed.
