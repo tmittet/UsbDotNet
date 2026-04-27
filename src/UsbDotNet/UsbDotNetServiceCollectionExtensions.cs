@@ -32,6 +32,8 @@ public static class UsbDotNetServiceCollectionExtensions
     {
         ArgumentNullException.ThrowIfNull(services);
 
+        // Ensure ILoggerFactory is resolvable on a bare ServiceCollection; no-op if already added.
+        _ = services.AddLogging();
         _ = services.AddOptions<UsbDotNetOptions>();
         if (configure is not null)
         {
