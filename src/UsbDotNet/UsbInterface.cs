@@ -52,7 +52,7 @@ public sealed class UsbInterface : IUsbInterface
     /// Optional write endpoint. When nothing is specified and a write operation is attempted,
     /// an attempt is made to pick the first available "output" endpoint for this interface.
     /// </param>
-    internal UsbInterface(
+    public UsbInterface(
         ILogger<UsbInterface> logger,
         UsbDevice device,
         IUsbInterfaceDescriptor descriptor,
