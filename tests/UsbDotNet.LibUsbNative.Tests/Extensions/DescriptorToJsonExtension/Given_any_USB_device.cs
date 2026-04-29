@@ -1,6 +1,5 @@
-﻿using System.Text.Json;
+using System.Text.Json;
 using UsbDotNet.LibUsbNative.Extensions;
-using UsbDotNet.LibUsbNative.Structs;
 
 namespace UsbDotNet.LibUsbNative.Tests.Extensions.DescriptorToJsonExtension;
 
@@ -26,7 +25,10 @@ public abstract class Given_any_USB_device(ITestOutputHelper output, ILibUsbApi 
             var json = device.GetActiveConfigDescriptor().ToJson();
             Output.WriteLine(json);
 
-            var deserialized = JsonSerializer.Deserialize<libusb_config_descriptor>(json)!;
+            var deserialized = JsonSerializer.Deserialize(
+                json,
+                LibUsbSerializationContext.Default.libusb_config_descriptor
+            )!;
             deserialized.ToJson().Should().Be(json);
         });
     }
@@ -43,7 +45,10 @@ public abstract class Given_any_USB_device(ITestOutputHelper output, ILibUsbApi 
             var json = device.GetDeviceDescriptor().ToJson();
             Output.WriteLine(json);
 
-            var deserialized = JsonSerializer.Deserialize<libusb_device_descriptor>(json)!;
+            var deserialized = JsonSerializer.Deserialize(
+                json,
+                LibUsbSerializationContext.Default.libusb_device_descriptor
+            )!;
             deserialized.ToJson().Should().Be(json);
         });
     }

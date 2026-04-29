@@ -12,8 +12,8 @@ using var deviceList = context.GetDeviceList();
 Console.WriteLine($"Found {deviceList.Count} USB devices:");
 Console.WriteLine(
     JsonSerializer.Serialize(
-        deviceList.Select(d => GetDeviceInfo(d, d.GetDeviceDescriptor())),
-        GetJsonSerializerOptions()
+        deviceList.Select(d => GetDeviceInfo(d, d.GetDeviceDescriptor())).ToArray(),
+        GetJsonSerializerOptions().GetTypeInfo(typeof(DeviceInfo[]))
     )
 );
 
