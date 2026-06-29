@@ -11,7 +11,7 @@ on:
         required: true
       libusb_ref:
         description: "git ref for libusb (tag/branch/commit)"
-        default: "v1.0.29"
+        default: "v1.0.30"
         type: string
         required: true
 
