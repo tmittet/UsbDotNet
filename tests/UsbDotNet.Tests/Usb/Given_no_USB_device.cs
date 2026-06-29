@@ -6,11 +6,13 @@ public sealed class Given_no_USB_device : IDisposable
 {
     private readonly ILibUsb _libusb;
     private readonly ILoggerFactory _loggerFactory;
+    private readonly ILogger _logger;
 
     public Given_no_USB_device(ITestOutputHelper output)
     {
         _libusb = new LibUsb();
         _loggerFactory = new TestLoggerFactory(output);
+        _logger = _loggerFactory.CreateLogger<Given_no_USB_device>();
     }
 
     private UsbDotNet.Usb CreateUsb(LogLevel nativeLogLevel = LogLevel.Information) =>
@@ -24,6 +26,7 @@ public sealed class Given_no_USB_device : IDisposable
     public void GetVersion_returns_a_valid_version_of_at_least_1_0_27()
     {
         var version = UsbDotNet.Usb.GetVersion();
+        _logger.LogInformation("LibUsb version: {Version}", version);
         // Log callback requires v1.0.27 or above
         version.Should().BeGreaterThanOrEqualTo(new Version(1, 0, 27));
     }
