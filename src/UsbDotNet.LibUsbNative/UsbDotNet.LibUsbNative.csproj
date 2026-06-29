@@ -68,8 +68,7 @@
     <PropertyGroup>
         <EffectiveRID Condition="'$(RuntimeIdentifier)' != ''">$(RuntimeIdentifier)</EffectiveRID>
         <EffectiveRID Condition="'$(RuntimeIdentifier)' == ''"
-            >$(NETCoreSdkRuntimeIdentifier)</EffectiveRID
-        >
+            >$(NETCoreSdkRuntimeIdentifier)</EffectiveRID>
         <!-- Linux -->
         <IsLinuxA64 Condition="'$(EffectiveRID)' == 'linux-arm64'">true</IsLinuxA64>
         <IsLinuxX64 Condition="'$(EffectiveRID)' == 'linux-x64'">true</IsLinuxX64>
@@ -79,21 +78,17 @@
         <!-- macOS - NOTE: Using fallback for arm64 and x64 when when RID isn't specified -->
         <IsOsxA64
             Condition="'$(EffectiveRID)' == 'osx-arm64' OR ('$(EffectiveRID)' == '' AND '$([System.Runtime.InteropServices.RuntimeInformation]::IsOSPlatform($([System.Runtime.InteropServices.OSPlatform]::OSX)))' AND '$([System.Runtime.InteropServices.RuntimeInformation]::OSArchitecture)' == 'Arm64')"
-            >true</IsOsxA64
-        >
+            >true</IsOsxA64>
         <IsOsxX64
             Condition="'$(EffectiveRID)' == 'osx-x64' OR ('$(EffectiveRID)' == '' AND '$([System.Runtime.InteropServices.RuntimeInformation]::IsOSPlatform($([System.Runtime.InteropServices.OSPlatform]::OSX)))' AND '$([System.Runtime.InteropServices.RuntimeInformation]::OSArchitecture)' == 'X64')"
-            >true</IsOsxX64
-        >
+            >true</IsOsxX64>
         <!-- Windows - NOTE: Using fallback for arm64 and x64 when RID isn't specified -->
         <IsWinA64
             Condition="'$(EffectiveRID)' == 'win-arm64' OR ('$(EffectiveRID)' == '' AND '$(OS)'=='Windows_NT' AND '$(Platform)' == 'arm64')"
-            >true</IsWinA64
-        >
+            >true</IsWinA64>
         <IsWinX64
             Condition="'$(EffectiveRID)' == 'win-x64' OR ('$(EffectiveRID)' == '' AND '$(OS)'=='Windows_NT' AND ('$(Platform)' == 'AnyCPU' OR '$(Platform)' == 'x64'))"
-            >true</IsWinX64
-        >
+            >true</IsWinX64>
         <IsWinX86 Condition="'$(EffectiveRID)' == 'win-x86'">true</IsWinX86>
     </PropertyGroup>
     <ItemGroup>

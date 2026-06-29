@@ -1,4 +1,4 @@
-﻿using UsbDotNet.LibUsbNative.Enums;
+using UsbDotNet.LibUsbNative.Enums;
 
 namespace UsbDotNet.LibUsbNative.SafeHandles;
 
