@@ -1,3 +1,4 @@
+using System.Diagnostics.CodeAnalysis;
 using System.Runtime.InteropServices;
 using System.Runtime.Versioning;
 using UsbDotNet.Descriptor;
@@ -80,6 +81,12 @@ internal sealed class SafeVideoDeviceHandle : SafeHandle
         byte interfaceNumber
     ) => Open(descriptor.VendorId, descriptor.ProductId, serialNumber, interfaceNumber);
 
+    [UnconditionalSuppressMessage(
+        "Trimming",
+        "IL2072:Activator.CreateInstance requires a parameterless constructor",
+        Justification = "The COM object is activated from a registered CLSID, not from a managed "
+            + "type the trimmer could remove, so the annotation requirement does not apply."
+    )]
     private static SafeVideoDeviceHandle Open(
         ushort vendorId,
         ushort productId,
