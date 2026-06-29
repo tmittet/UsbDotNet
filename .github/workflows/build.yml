@@ -96,6 +96,16 @@ jobs:
           --no-restore \
           --runtime ${{ matrix.config.runtime }}
 
+    - name: Build UsbDotNet.Extensions (all)
+      shell: bash
+      run: |
+        dotnet build src/UsbDotNet.Extensions/UsbDotNet.Extensions.csproj \
+          --no-restore \
+          --runtime ${{ matrix.config.runtime }}
+        dotnet build src/UsbDotNet.Extensions.Uvc/UsbDotNet.Extensions.Uvc.csproj \
+          --no-restore \
+          --runtime ${{ matrix.config.runtime }}
+
     - name: Build UsbDotNet.DeviceInteractionSample
       shell: bash
       run: |

@@ -1,12 +1,13 @@
-﻿using System.Runtime.InteropServices;
+using System.Runtime.InteropServices;
 using UsbDotNet.LibUsbNative.Enums;
 using UsbDotNet.LibUsbNative.Functions;
 using UsbDotNet.LibUsbNative.Structs;
 
 namespace UsbDotNet.LibUsbNative;
 
-// LibraryImportAttribute not available in .NET6, silence warning until removal of .NET6 support
-#pragma warning disable SYSLIB1054 // Use 'LibraryImportAttribute' instead of 'DllImportAttribute' to generate P/Invoke marshalling code at compile time
+// TODO: Research using DefaultDllImportSearchPaths attribute reduce risk of DLL preloading attacks
+// SYSLIB1054: LibraryImportAttribute not available in .NET6, silence until removal of .NET6 support
+#pragma warning disable CA5392, SYSLIB1054 // CA5392: Use DefaultDllImportSearchPaths attribute for P/Invokes
 
 /// <summary>Concrete ILibUsbApi using direct DllImports.</summary>
 public sealed class PInvokeLibUsbApi : ILibUsbApi
@@ -319,4 +320,4 @@ public sealed class PInvokeLibUsbApi : ILibUsbApi
     #endregion
 }
 
-#pragma warning restore SYSLIB1054 // Use 'LibraryImportAttribute' instead of 'DllImportAttribute' to generate P/Invoke marshalling code at compile time
+#pragma warning restore CA5392, SYSLIB1054 // CA5392: Use DefaultDllImportSearchPaths attribute for P/Invokes
