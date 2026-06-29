@@ -58,7 +58,7 @@ jobs:
           fi
 
       - name: Checkout (this repo)
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
 
       - name: Fetch libusb source
         shell: bash
@@ -70,7 +70,7 @@ jobs:
           echo "libusb ref:"; git rev-parse --short HEAD
 
       - name: Setup MSBuild
-        uses: microsoft/setup-msbuild@v2
+        uses: microsoft/setup-msbuild@v3
 
       - name: Print tool versions
         run: |
