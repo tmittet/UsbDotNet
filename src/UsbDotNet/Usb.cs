@@ -1,5 +1,6 @@
 using System.Collections.Concurrent;
 using System.Diagnostics;
+using System.Diagnostics.CodeAnalysis;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using UsbDotNet.Core;
@@ -7,6 +8,7 @@ using UsbDotNet.Descriptor;
 using UsbDotNet.Internal;
 using UsbDotNet.LibUsbNative;
 using UsbDotNet.LibUsbNative.Enums;
+using UsbDotNet.LibUsbNative.Extensions;
 using UsbDotNet.LibUsbNative.SafeHandles;
 
 namespace UsbDotNet;
@@ -209,7 +211,7 @@ public sealed class Usb : IUsb
         // TODO: Test on macOS and Linux; "most functions that take a device handle are not safe"
         try
         {
-            var descriptor = UsbDeviceEnum.GetDeviceDescriptor(device);
+            var descriptor = GetDeviceDescriptor(device);
             _logger.LogInformation(
                 "Hotplug '{EventType}'. Class: {DeviceClass}. Key: {DeviceKey}.",
                 eventType,
@@ -235,29 +237,152 @@ public sealed class Usb : IUsb
         lock (_lock)
         {
             CheckDisposed();
-            return UsbDeviceEnum.GetDeviceList(
-                _logger,
-                GetInitializedContextOrThrow(),
-                vendorId,
-                productIds
-            );
+            var context = GetInitializedContextOrThrow();
+            using var deviceList = context.GetDeviceList();
+            return
+            [
+                .. GetDeviceDescriptors(_logger, deviceList)
+                    .Select(d => d.Descriptor)
+                    .Where(d =>
+                        (vendorId is null || vendorId == d.VendorId)
+                        && (productIds is null || productIds.Contains(d.ProductId))
+                    )
+                    .Cast<IUsbDeviceDescriptor>(),
+            ];
         }
     }
 
+    /// <summary>
+    /// Get cached USB device descriptors for a given, already in memory, device descriptor list.
+    /// </summary>
+    /// <param name="logger">A logger.</param>
+    /// <param name="devices">Pointer to device list returned by libusb_get_device_list.</param>
+    /// <param name="findKey">Return first instance with this key.</param>
+    /// <exception cref="ObjectDisposedException">Thrown when device is disposed.</exception>
+    private static List<(ISafeDevice device, UsbDeviceDescriptor Descriptor)> GetDeviceDescriptors(
+        ILogger logger,
+        IReadOnlyList<ISafeDevice> devices,
+        string? findKey = null
+    )
+    {
+        var result = new List<(ISafeDevice device, UsbDeviceDescriptor Descriptor)>();
+        foreach (var device in devices)
+        {
+            try
+            {
+                var descriptor = GetDeviceDescriptor(device);
+                if (descriptor.BcdUsb == 0)
+                    continue;
+                if (findKey is null || descriptor.DeviceKey == findKey)
+                {
+                    result.Add((device, descriptor));
+                    if (findKey is not null)
+                        break;
+                }
+            }
+            // NOTE: Never throws; since libusb-1.0.16 libusb_get_device_descriptor always succeeds
+            catch (UsbException ex)
+            {
+                logger.LogWarning(ex, "Get device descriptor failed: {ErrorMessage}.", ex.Message);
+            }
+        }
+        return result;
+    }
+
+    /// <summary>
+    /// Get the cached USB device descriptor for a given, already in memory, device descriptor.
+    /// <para>
+    /// NOTE: since libusb-1.0.16, LIBUSBX_API_VERSION >= 0x01000102, this function always succeeds.
+    /// </para>
+    /// </summary>
+    /// <exception cref="ObjectDisposedException">Thrown when device is disposed.</exception>
+    private static UsbDeviceDescriptor GetDeviceDescriptor(ISafeDevice device) =>
+        new(
+            device.GetDeviceDescriptor(),
+            device.GetBusNumber(),
+            device.GetDeviceAddress(),
+            device.GetPortNumber()
+        );
+
     /// <inheritdoc/>
-    public string GetDeviceSerial(string deviceKey)
+    public string GetDeviceManufacturer(string deviceKey) =>
+        GetDeviceString(
+            deviceKey,
+            libusb_device_string_type.LIBUSB_DEVICE_STRING_MANUFACTURER,
+            device => device.GetManufacturer()
+        );
+
+    /// <inheritdoc/>
+    public string GetDeviceProduct(string deviceKey) =>
+        GetDeviceString(
+            deviceKey,
+            libusb_device_string_type.LIBUSB_DEVICE_STRING_PRODUCT,
+            device => device.GetProduct()
+        );
+
+    /// <inheritdoc/>
+    public string GetDeviceSerial(string deviceKey) =>
+        GetDeviceString(
+            deviceKey,
+            libusb_device_string_type.LIBUSB_DEVICE_STRING_SERIAL_NUMBER,
+            device => device.GetSerialNumber()
+        );
+
+    private string GetDeviceString(
+        string deviceKey,
+        libusb_device_string_type stringType,
+        Func<UsbDevice, string> readFromDevice
+    )
     {
         lock (_lock)
         {
             CheckDisposed();
-            if (_openDevices.TryGetValue(deviceKey, out var openDevice))
-            {
-                return openDevice.GetSerialNumber();
-            }
             var context = GetInitializedContextOrThrow();
+            // Attempt to read the value from the operating system
+            if (GetOsDeviceString(context, deviceKey, stringType, out var value))
+                return value;
+            // If the device is already open; read from the open device
+            if (_openDevices.TryGetValue(deviceKey, out var openDevice))
+                return readFromDevice(openDevice);
+            // Open the device to read the value, then close it
             using var device = OpenDeviceUnlocked(context, deviceKey);
-            return device.GetSerialNumber();
+            return readFromDevice(device);
         }
+    }
+
+    private bool GetOsDeviceString(
+        ISafeContext context,
+        string deviceKey,
+        libusb_device_string_type stringType,
+        [NotNullWhen(true)] out string? value
+    )
+    {
+        using var deviceList = context.GetDeviceList();
+        (var listDevice, _) = GetListDeviceUnlocked(deviceList, deviceKey);
+        if (listDevice.TryGetDeviceString(stringType, out value, out var error))
+        {
+            if (!string.IsNullOrEmpty(value))
+            {
+                return true;
+            }
+            _logger.LogDebug(
+                "The {StringType} value read from the operating system "
+                    + "for device '{DeviceKey}' is empty. Falling back to device read.",
+                stringType,
+                deviceKey
+            );
+        }
+        else
+        {
+            _logger.LogWarning(
+                "Failed to get {StringType} for device '{DeviceKey}' from the "
+                    + "operating system: {ErrorMessage}. Falling back to device read.",
+                stringType,
+                deviceKey,
+                error.Value.GetMessage()
+            );
+        }
+        return false;
     }
 
     /// <inheritdoc/>
@@ -278,7 +403,15 @@ public sealed class Usb : IUsb
     private UsbDevice OpenDeviceUnlocked(ISafeContext context, string deviceKey)
     {
         using var deviceList = context.GetDeviceList();
-        var device = OpenListDeviceUnlocked(context, deviceList, deviceKey);
+        var (safeDevice, descriptor) = GetListDeviceUnlocked(deviceList, deviceKey);
+        var device = new UsbDevice(
+            _loggerFactory,
+            this,
+            context,
+            safeDevice.Open(),
+            descriptor,
+            safeDevice.GetActiveConfigDescriptor().ToUsbConfigDescriptor()
+        );
         if (!_openDevices.TryAdd(deviceKey, device))
         {
             device.Dispose();
@@ -291,28 +424,18 @@ public sealed class Usb : IUsb
         return device;
     }
 
-    private UsbDevice OpenListDeviceUnlocked(
-        ISafeContext context,
+    private (ISafeDevice, UsbDeviceDescriptor) GetListDeviceUnlocked(
         ISafeDeviceList deviceList,
         string deviceKey
     )
     {
-        var (device, descriptor) = UsbDeviceEnum
-            .GetDeviceDescriptors(_logger, deviceList)
-            .FirstOrDefault(d => d.Descriptor.DeviceKey == deviceKey);
-        return device is null
+        var descriptor = GetDeviceDescriptors(_logger, deviceList, deviceKey).FirstOrDefault();
+        return descriptor.device is null
             ? throw new UsbException(
                 UsbResult.NotFound,
                 "Failed to get device from list; the device could not be found."
             )
-            : new UsbDevice(
-                _loggerFactory,
-                this,
-                context,
-                device.Open(),
-                descriptor,
-                device.GetActiveConfigDescriptor().ToUsbConfigDescriptor()
-            );
+            : descriptor;
     }
 
     /// <summary>

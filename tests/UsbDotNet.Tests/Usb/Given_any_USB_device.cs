@@ -116,6 +116,32 @@ public sealed class Given_any_USB_device : IDisposable
     }
 
     [SkippableFact]
+    public void GetDeviceManufacturer_returns_manufacturer_given_a_device_descriptor_when_device_is_not_open()
+    {
+        IUsbDeviceDescriptor deviceDescriptor;
+        using (var device = _deviceSource.OpenUsbDeviceOrSkip())
+        {
+            deviceDescriptor = device.Descriptor;
+        }
+        var manufacturer = _usb.GetDeviceManufacturer(deviceDescriptor);
+        manufacturer.Should().NotBeNullOrWhiteSpace();
+        manufacturer.Should().NotEndWith("\0", because: "null terminator should be trimmed");
+    }
+
+    [SkippableFact]
+    public void GetDeviceProduct_returns_product_name_given_a_device_descriptor_when_device_is_not_open()
+    {
+        IUsbDeviceDescriptor deviceDescriptor;
+        using (var device = _deviceSource.OpenUsbDeviceOrSkip())
+        {
+            deviceDescriptor = device.Descriptor;
+        }
+        var productName = _usb.GetDeviceProduct(deviceDescriptor);
+        productName.Should().NotBeNullOrWhiteSpace();
+        productName.Should().NotEndWith("\0", because: "null terminator should be trimmed");
+    }
+
+    [SkippableFact]
     public void GetDeviceSerial_returns_serial_given_a_device_descriptor_when_device_is_not_open()
     {
         IUsbDeviceDescriptor deviceDescriptor;
@@ -125,6 +151,7 @@ public sealed class Given_any_USB_device : IDisposable
         }
         var serial = _usb.GetDeviceSerial(deviceDescriptor);
         serial.Should().NotBeNullOrWhiteSpace();
+        serial.Should().NotEndWith("\0", because: "null terminator should be trimmed");
     }
 
     [SkippableFact]
@@ -137,7 +164,7 @@ public sealed class Given_any_USB_device : IDisposable
             openDevice.Descriptor.ProductId,
             openDevice.GetSerialNumber()
         );
-        // Get serial using the descriptor (not the open device)
+        // Get productName using the descriptor (not the open device)
         var serial = _usb.GetDeviceSerial(openDevice.Descriptor);
         serial.Should().NotBeNullOrWhiteSpace();
     }
@@ -149,7 +176,7 @@ public sealed class Given_any_USB_device : IDisposable
         var device = _deviceSource.OpenUsbDeviceOrSkip();
         // Dispose Usb to trigger auto disposal of devices
         _usb.Dispose();
-        // Attempt to get serial, the device should be auto disposed at this point
+        // Attempt to get productName, the device should be auto disposed at this point
         var getSerialAct = () => device.GetSerialNumber();
         getSerialAct.Should().Throw<ObjectDisposedException>();
         var disposeAct = () => device.Dispose();

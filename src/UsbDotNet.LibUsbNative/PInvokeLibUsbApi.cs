@@ -120,6 +120,14 @@ public sealed class PInvokeLibUsbApi : ILibUsbApi
     #region Strings
 
     [DllImport(Lib, CallingConvention = CallingConvention.Cdecl)]
+    private static extern libusb_error libusb_get_device_string(
+        IntPtr dev,
+        libusb_device_string_type string_type,
+        byte[] data,
+        int length
+    );
+
+    [DllImport(Lib, CallingConvention = CallingConvention.Cdecl)]
     private static extern libusb_error libusb_get_string_descriptor_ascii(
         IntPtr h,
         byte idx,
@@ -251,6 +259,14 @@ public sealed class PInvokeLibUsbApi : ILibUsbApi
 
     /// <inheritdoc/>
     byte ILibUsbApi.libusb_get_port_number(IntPtr dev) => libusb_get_port_number(dev);
+
+    /// <inheritdoc/>
+    libusb_error ILibUsbApi.libusb_get_device_string(
+        IntPtr dev,
+        libusb_device_string_type string_type,
+        byte[] data,
+        int length
+    ) => libusb_get_device_string(dev, string_type, data, length);
 
     /// <inheritdoc/>
     libusb_error ILibUsbApi.libusb_open(IntPtr dev, out IntPtr h) => libusb_open(dev, out h);

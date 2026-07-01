@@ -57,8 +57,24 @@ public interface IUsb : IDisposable
     );
 
     /// <summary>
-    /// Get the device serial number. To read the serial the device must be opened for a brief
-    /// moment; unless already open. If the device is open in another process the read will fail.
+    /// Get the device manufacturer from the string descriptors read and cached by the OS during
+    /// device enumeration. As a fallback; read the manufacturer directly from the device.
+    /// </summary>
+    /// <exception cref="UsbException">Thrown when the descriptor read operation fails.</exception>
+    /// <exception cref="ObjectDisposedException">Thrown when the UsbDevice is disposed.</exception>
+    string GetDeviceManufacturer(string deviceKey);
+
+    /// <summary>
+    /// Get the device product name from the string descriptors read and cached by the OS during
+    /// device enumeration. As a fallback; read the product name directly from the device.
+    /// </summary>
+    /// <exception cref="UsbException">Thrown when the descriptor read operation fails.</exception>
+    /// <exception cref="ObjectDisposedException">Thrown when the UsbDevice is disposed.</exception>
+    string GetDeviceProduct(string deviceKey);
+
+    /// <summary>
+    /// Get the device serial number from the string descriptors read and cached by the OS during
+    /// device enumeration. As a fallback; read the serial directly from the device.
     /// </summary>
     /// <exception cref="UsbException">
     /// UsbException.Code AccessDenied or IoError is typically an indication that the device

@@ -9,6 +9,8 @@ namespace UsbDotNet.LibUsbNative;
 /// </summary>
 public interface ILibUsbApi
 {
+    const uint LIBUSB_DEVICE_STRING_BYTES_MAX = 384;
+
     /// <summary>
     /// Initialize libusb. This function must be called before calling any other libusb function.
     /// If you do not provide an output location for a context pointer, a default context will be
@@ -161,6 +163,45 @@ public interface ILibUsbApi
     /// </para>
     /// </summary>
     byte libusb_get_port_number(IntPtr dev);
+
+    /// <summary>
+    /// Retrieve a device string without needing to open the device.
+    /// Available since libusb version v1.0.30
+    /// <para>
+    /// USB string descriptors cannot be longer than LIBUSB_DEVICE_STRING_BYTES_MAX.
+    /// </para>
+    /// <para>
+    /// This function works when the device is still closed since it relies on the operating system
+    /// to provide the string. The operating system normally reads and caches the common string
+    /// descriptors during USB enumeration.
+    /// </para>
+    /// <para>
+    /// Since the USB string descriptor could be processed by the OS, this function returns a UTF-8
+    /// encoded string.
+    /// </para>
+    /// <para>
+    /// The string will be returned untranslated or in the default OS language when supported by the
+    /// OS and USB device.
+    /// </para>
+    /// <para>
+    /// This function is commonly used to get the serial number to allow for device selection before
+    /// opening the selected device.
+    /// </para>
+    /// </summary>
+    /// <param name="dev">the target device</param>
+    /// <param name="string_type">the string type to retrieve</param>
+    /// <param name="data">the data buffer for the UTF-8 encoded string</param>
+    /// <param name="length">the size of the data buffer in bytes</param>
+    /// <returns>
+    /// returns a negative error code or the actual string length in bytes including the null terminator.
+    /// <para><see cref="libusb_get_string_descriptor_ascii"/></para>
+    /// </returns>
+    libusb_error libusb_get_device_string(
+        IntPtr dev,
+        libusb_device_string_type string_type,
+        byte[] data,
+        int length
+    );
 
     /// <summary>
     /// Open a device and obtain a device handle. Allows you to perform I/O on the device.

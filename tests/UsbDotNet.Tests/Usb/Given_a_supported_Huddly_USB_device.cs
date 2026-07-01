@@ -66,6 +66,32 @@ public sealed class Given_a_supported_Huddly_USB_device : IDisposable
     }
 
     [SkippableFact]
+    public void GetDeviceManufacturer_returns_manufacturer_given_a_Huddly_device_descriptor()
+    {
+        IUsbDeviceDescriptor deviceDescriptor;
+        using (var device = _deviceSource.OpenUsbDeviceOrSkip())
+        {
+            deviceDescriptor = device.Descriptor;
+        }
+        var manufacturer = _usb.GetDeviceManufacturer(deviceDescriptor);
+        manufacturer.Should().NotBeNullOrWhiteSpace();
+        manufacturer.Should().NotEndWith("\0", because: "null terminator should be trimmed");
+    }
+
+    [SkippableFact]
+    public void GetDeviceProduct_returns_product_name_given_a_Huddly_device_descriptor()
+    {
+        IUsbDeviceDescriptor deviceDescriptor;
+        using (var device = _deviceSource.OpenUsbDeviceOrSkip())
+        {
+            deviceDescriptor = device.Descriptor;
+        }
+        var productName = _usb.GetDeviceProduct(deviceDescriptor);
+        productName.Should().NotBeNullOrWhiteSpace();
+        productName.Should().NotEndWith("\0", because: "null terminator should be trimmed");
+    }
+
+    [SkippableFact]
     public void GetDeviceSerial_returns_serial_given_a_Huddly_device_descriptor()
     {
         IUsbDeviceDescriptor deviceDescriptor;
@@ -75,6 +101,7 @@ public sealed class Given_a_supported_Huddly_USB_device : IDisposable
         }
         var serial = _usb.GetDeviceSerial(deviceDescriptor);
         serial.Should().NotBeNullOrWhiteSpace();
+        serial.Should().NotEndWith("\0", because: "null terminator should be trimmed");
     }
 
     public void Dispose()
