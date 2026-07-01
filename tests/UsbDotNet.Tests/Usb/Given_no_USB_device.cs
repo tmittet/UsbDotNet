@@ -78,44 +78,21 @@ public sealed class Given_no_USB_device : IDisposable
         act.Should().Throw<ObjectDisposedException>();
     }
 
-    [SkippableFact]
-    public void RegisterHotplug_throws_when_called_without_Initialize_on_supported_platform()
+    [Fact]
+    public void RegisterHotplug_throws_when_called_without_Initialize()
     {
-        Skip.If(
-            !OperatingSystem.IsLinux() && !OperatingSystem.IsMacOS(),
-            "Hotplug only supported on Linux and macOS."
-        );
-
         using var usb = CreateUsb();
         var act = () => usb.RegisterHotplug(vendorId: 0x2BD9);
         act.Should().Throw<InvalidOperationException>();
     }
 
-    [SkippableFact]
-    public void RegisterHotplug_returns_true_when_called_after_Initialize_on_supported_platform()
+    [Fact]
+    public void RegisterHotplug_returns_true_when_called_after_Initialize()
     {
-        Skip.If(
-            !OperatingSystem.IsLinux() && !OperatingSystem.IsMacOS(),
-            "Hotplug only supported on Linux and macOS."
-        );
-
         using var usb = CreateUsb();
         usb.Initialize();
         var success = usb.RegisterHotplug(vendorId: 0x2BD9);
         success.Should().BeTrue();
-    }
-
-    [Fact]
-    public void RegisterHotplug_returns_false_when_called_after_Initialize_on_unsupported_platform()
-    {
-        if (!OperatingSystem.IsWindows())
-        {
-            return;
-        }
-        using var usb = CreateUsb();
-        usb.Initialize();
-        var success = usb.RegisterHotplug(vendorId: 0x2BD9);
-        success.Should().BeFalse();
     }
 
     public void Dispose()

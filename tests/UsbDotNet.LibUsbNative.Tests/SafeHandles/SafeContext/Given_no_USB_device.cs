@@ -97,15 +97,10 @@ public abstract class Given_no_USB_device(ITestOutputHelper output, ILibUsbApi a
         | libusb_hotplug_event.LIBUSB_HOTPLUG_EVENT_DEVICE_LEFT;
     private const libusb_hotplug_flag HpFlags = libusb_hotplug_flag.NONE;
 
-    [SkippableTheory]
+    [Theory]
     [InlineData(5)]
     public void RegisterHotplugCallback_can_have_many_active_callbacks(int callbackCount)
     {
-        Skip.If(
-            !OperatingSystem.IsLinux() && !OperatingSystem.IsMacOS(),
-            "Hotplug only supported on Linux and macOS."
-        );
-
         using var context = GetContext();
         var callbacks = Enumerable
             .Range(0, callbackCount)
@@ -127,14 +122,9 @@ public abstract class Given_no_USB_device(ITestOutputHelper output, ILibUsbApi a
         context.IsClosed.Should().BeTrue();
     }
 
-    [SkippableFact]
+    [Fact]
     public void Not_disposing_RegisterHotplugCallback_handle_blocks_SafeContext_handle_close()
     {
-        Skip.If(
-            !OperatingSystem.IsLinux() && !OperatingSystem.IsMacOS(),
-            "Hotplug only supported on Linux and macOS."
-        );
-
         using var context = GetContext();
         var cbHandle = context.RegisterHotplugCallback(
             HpEvents,
