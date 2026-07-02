@@ -111,7 +111,7 @@ internal sealed class SafeDevice : SafeHandle, ISafeDevice
         TryGetDeviceString(stringType, out var value, out var error)
             ? value
             : throw error.Value.ToLibUsbExceptionForApi(
-                nameof(_context.Api.libusb_get_string_descriptor_ascii)
+                nameof(_context.Api.libusb_get_device_string)
             );
 
     /// <inheritdoc/>
