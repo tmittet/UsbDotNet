@@ -421,7 +421,7 @@ internal sealed class FakeLibusbApi : ILibUsbApi
 
     // ------------- Strings -------------
     public libusb_error libusb_get_device_string(
-        nint dev,
+        IntPtr dev,
         libusb_device_string_type string_type,
         byte[] data,
         int length
