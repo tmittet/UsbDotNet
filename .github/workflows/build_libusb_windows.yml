@@ -11,8 +11,20 @@ on:
         required: true
       libusb_ref:
         description: "git ref for libusb (tag/branch/commit)"
-        default: "v1.0.29"
+        default: "v1.0.30"
         type: string
+        required: true
+      configuration:
+        description: "MSBuild config (Hotplug for support on Windows)"
+        default: "Release-Hotplug"
+        type: choice
+        options:
+          # NOTE: The 'Release-Hotplug' configuration (added in libusb 1.0.30) sets
+          # EnableWindowsHotplug=true, which defines LIBUSB_WINDOWS_HOTPLUG and compiles
+          # windows_hotplug.c. Without it, libusb_has_capability(LIBUSB_CAP_HAS_HOTPLUG)
+          # returns false on Windows and hotplug callbacks are never delivered.
+          - Release-Hotplug
+          - Release
         required: true
 
 permissions:
@@ -41,6 +53,7 @@ jobs:
     env:
       LIBUSB_REPO: ${{ github.event.inputs.libusb_repo }}
       LIBUSB_REF: ${{ github.event.inputs.libusb_ref }}
+      CONFIGURATION: ${{ github.event.inputs.configuration }}
       SRC_DIR:   ${{ github.workspace }}/libusb
       BUILD_DIR: ${{ github.workspace }}/build
 
@@ -58,7 +71,7 @@ jobs:
           fi
 
       - name: Checkout (this repo)
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
 
       - name: Fetch libusb source
         shell: bash
@@ -70,7 +83,7 @@ jobs:
           echo "libusb ref:"; git rev-parse --short HEAD
 
       - name: Setup MSBuild
-        uses: microsoft/setup-msbuild@v2
+        uses: microsoft/setup-msbuild@v3
 
       - name: Print tool versions
         run: |
@@ -84,12 +97,12 @@ jobs:
           msbuild libusb_dll.vcxproj
           -m
           -v:minimal
-          -p:PlatformToolset=v143,Platform=${{ matrix.platform }},Configuration=Release
+          -p:PlatformToolset=v143,Platform=${{ matrix.platform }},Configuration=${{ env.CONFIGURATION }}
 
       - name: Prepare artifact
         shell: bash
         run: |
-          src="$SRC_DIR/build/v143/${{ matrix.platform }}/Release/dll"
+          src="$SRC_DIR/build/v143/${{ matrix.platform }}/$CONFIGURATION/dll"
           hdr="$SRC_DIR/libusb/libusb.h"
           dest="$BUILD_DIR/windows-${{ matrix.arch }}"
           mkdir -p "$dest/lib" "$dest/include/libusb-1.0"

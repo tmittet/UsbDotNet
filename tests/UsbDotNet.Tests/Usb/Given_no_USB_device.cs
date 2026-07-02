@@ -6,11 +6,13 @@ public sealed class Given_no_USB_device : IDisposable
 {
     private readonly ILibUsb _libusb;
     private readonly ILoggerFactory _loggerFactory;
+    private readonly ILogger _logger;
 
     public Given_no_USB_device(ITestOutputHelper output)
     {
         _libusb = new LibUsb();
         _loggerFactory = new TestLoggerFactory(output);
+        _logger = _loggerFactory.CreateLogger<Given_no_USB_device>();
     }
 
     private UsbDotNet.Usb CreateUsb(LogLevel nativeLogLevel = LogLevel.Information) =>
@@ -24,6 +26,7 @@ public sealed class Given_no_USB_device : IDisposable
     public void GetVersion_returns_a_valid_version_of_at_least_1_0_27()
     {
         var version = UsbDotNet.Usb.GetVersion();
+        _logger.LogInformation("LibUsb version: {Version}", version);
         // Log callback requires v1.0.27 or above
         version.Should().BeGreaterThanOrEqualTo(new Version(1, 0, 27));
     }
@@ -75,44 +78,21 @@ public sealed class Given_no_USB_device : IDisposable
         act.Should().Throw<ObjectDisposedException>();
     }
 
-    [SkippableFact]
-    public void RegisterHotplug_throws_when_called_without_Initialize_on_supported_platform()
+    [Fact]
+    public void RegisterHotplug_throws_when_called_without_Initialize()
     {
-        Skip.If(
-            !OperatingSystem.IsLinux() && !OperatingSystem.IsMacOS(),
-            "Hotplug only supported on Linux and macOS."
-        );
-
         using var usb = CreateUsb();
         var act = () => usb.RegisterHotplug(vendorId: 0x2BD9);
         act.Should().Throw<InvalidOperationException>();
     }
 
-    [SkippableFact]
-    public void RegisterHotplug_returns_true_when_called_after_Initialize_on_supported_platform()
+    [Fact]
+    public void RegisterHotplug_returns_true_when_called_after_Initialize()
     {
-        Skip.If(
-            !OperatingSystem.IsLinux() && !OperatingSystem.IsMacOS(),
-            "Hotplug only supported on Linux and macOS."
-        );
-
         using var usb = CreateUsb();
         usb.Initialize();
         var success = usb.RegisterHotplug(vendorId: 0x2BD9);
         success.Should().BeTrue();
-    }
-
-    [Fact]
-    public void RegisterHotplug_returns_false_when_called_after_Initialize_on_unsupported_platform()
-    {
-        if (!OperatingSystem.IsWindows())
-        {
-            return;
-        }
-        using var usb = CreateUsb();
-        usb.Initialize();
-        var success = usb.RegisterHotplug(vendorId: 0x2BD9);
-        success.Should().BeFalse();
     }
 
     public void Dispose()

@@ -18,7 +18,7 @@ jobs:
     name: Validate Code Style
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v6
+    - uses: actions/checkout@v7
 
     - name: Setup .NET
       uses: actions/setup-dotnet@v5
@@ -60,7 +60,7 @@ jobs:
     runs-on: ${{ matrix.config.os }}
 
     steps:
-    - uses: actions/checkout@v6
+    - uses: actions/checkout@v7
       with:
         fetch-depth: 0
         fetch-tags: true
@@ -71,7 +71,7 @@ jobs:
         global-json-file: ./global.json
 
     - name: NuGet Cache
-      uses: actions/cache@v5
+      uses: actions/cache@v6
       with:
         path: ~/.nuget/packages
         key: ${{ runner.os }}-nuget-${{ hashFiles('**/*.csproj', '**/packages.lock.json') }}
@@ -255,7 +255,7 @@ jobs:
     if: github.event_name == 'release' && github.event.action == 'published'
 
     steps:
-    - uses: actions/checkout@v6
+    - uses: actions/checkout@v7
 
     - name: Setup .NET
       uses: actions/setup-dotnet@v5
@@ -263,7 +263,7 @@ jobs:
         global-json-file: ./global.json
 
     - name: Download UsbDotNet NuGet packages 📥
-      uses: actions/download-artifact@v7
+      uses: actions/download-artifact@v8
       with:
         name: usbdotnet-nuget-${{ github.run_id }}
         path: out/nuget
@@ -296,7 +296,7 @@ jobs:
     if: github.event_name == 'release' && github.event.action == 'published'
 
     steps:
-    - uses: actions/checkout@v6
+    - uses: actions/checkout@v7
 
     - name: Setup .NET
       uses: actions/setup-dotnet@v5
@@ -304,7 +304,7 @@ jobs:
         global-json-file: ./global.json
 
     - name: Download UsbDotNet NuGet packages 📥
-      uses: actions/download-artifact@v7
+      uses: actions/download-artifact@v8
       with:
         name: usbdotnet-nuget-${{ github.run_id }}
         path: out/nuget
