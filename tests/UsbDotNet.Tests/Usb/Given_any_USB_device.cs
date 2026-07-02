@@ -211,7 +211,7 @@ public sealed class Given_any_USB_device : IDisposable
             openDevice.Descriptor.ProductId,
             openDevice.GetSerialNumber()
         );
-        // Get productName using the descriptor (not the open device)
+        // Get serial using the descriptor (not the open device)
         var serial = _usb.GetDeviceSerial(openDevice.Descriptor);
         serial.Should().NotBeNullOrWhiteSpace();
     }
