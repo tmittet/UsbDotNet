@@ -61,7 +61,8 @@ public interface IUsb : IDisposable
     /// device enumeration. As a fallback; read the manufacturer directly from the device.
     /// </summary>
     /// <exception cref="UsbException">Thrown when the descriptor read operation fails.</exception>
-    /// <exception cref="ObjectDisposedException">Thrown when the UsbDevice is disposed.</exception>
+    /// <exception cref="InvalidOperationException">Thrown when the Usb type is not initialized.</exception>
+    /// <exception cref="ObjectDisposedException">Thrown when the Usb type is disposed.</exception>
     string GetDeviceManufacturer(string deviceKey);
 
     /// <summary>
@@ -69,7 +70,8 @@ public interface IUsb : IDisposable
     /// device enumeration. As a fallback; read the product name directly from the device.
     /// </summary>
     /// <exception cref="UsbException">Thrown when the descriptor read operation fails.</exception>
-    /// <exception cref="ObjectDisposedException">Thrown when the UsbDevice is disposed.</exception>
+    /// <exception cref="InvalidOperationException">Thrown when the Usb type is not initialized.</exception>
+    /// <exception cref="ObjectDisposedException">Thrown when the Usb type is disposed.</exception>
     string GetDeviceProduct(string deviceKey);
 
     /// <summary>
