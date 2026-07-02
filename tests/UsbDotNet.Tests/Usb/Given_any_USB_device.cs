@@ -223,7 +223,7 @@ public sealed class Given_any_USB_device : IDisposable
         var device = _deviceSource.OpenUsbDeviceOrSkip();
         // Dispose Usb to trigger auto disposal of devices
         _usb.Dispose();
-        // Attempt to get productName, the device should be auto disposed at this point
+        // Attempt to get serial, the device should be auto disposed at this point
         var getSerialAct = () => device.GetSerialNumber();
         getSerialAct.Should().Throw<ObjectDisposedException>();
         var disposeAct = () => device.Dispose();
