@@ -1,0 +1,16 @@
+{
+  "profiles": {
+    "Subscribe to events in 'Channels' mode": {
+      "commandName": "Project",
+      "commandLineArgs": "--mode channels"
+    },
+    "Subscribe to events in classic 'Events' mode": {
+      "commandName": "Project",
+      "commandLineArgs": "--mode events"
+    },
+    "Subscribe to events; filter on VID and PID": {
+      "commandName": "Project",
+      "commandLineArgs": "--mode channels --vid 0x2BD9 --pid 0x0021"
+    }
+  }
+}
