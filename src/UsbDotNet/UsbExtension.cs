@@ -29,8 +29,11 @@ public static class UsbExtension
     /// device enumeration. As a fallback; read the manufacturer directly from the device.
     /// </summary>
     /// <exception cref="UsbException">
-    /// UsbException.Code AccessDenied or IoError is typically an indication that the device
-    /// is inaccessible because it's open in another process or due to lacking permissions.
+    /// Thrown when the descriptor cannot be read. <see cref="UsbException.Code"/> indicates why:
+    /// <see cref="UsbResult.NotFound"/> when <paramref name="descriptor"/> is no longer present in
+    /// the current system device list (for example it has been unplugged); or
+    /// <see cref="UsbResult.AccessDenied"/> / <see cref="UsbResult.IoError"/>, typically because
+    /// the device is inaccessible due to being open in another process or lacking permissions.
     /// </exception>
     /// <exception cref="InvalidOperationException">
     /// Thrown when the Usb type is not initialized.
@@ -44,8 +47,11 @@ public static class UsbExtension
     /// device enumeration. As a fallback; read the product name directly from the device.
     /// </summary>
     /// <exception cref="UsbException">
-    /// UsbException.Code AccessDenied or IoError is typically an indication that the device
-    /// is inaccessible because it's open in another process or due to lacking permissions.
+    /// Thrown when the descriptor cannot be read. <see cref="UsbException.Code"/> indicates why:
+    /// <see cref="UsbResult.NotFound"/> when <paramref name="descriptor"/> is no longer present in
+    /// the current system device list (for example it has been unplugged); or
+    /// <see cref="UsbResult.AccessDenied"/> / <see cref="UsbResult.IoError"/>, typically because
+    /// the device is inaccessible due to being open in another process or lacking permissions.
     /// </exception>
     /// <exception cref="InvalidOperationException">
     /// Thrown when the Usb type is not initialized.
@@ -59,8 +65,11 @@ public static class UsbExtension
     /// device enumeration. As a fallback; read the serial directly from the device.
     /// </summary>
     /// <exception cref="UsbException">
-    /// UsbException.Code AccessDenied or IoError is typically an indication that the device
-    /// is inaccessible because it's open in another process or due to lacking permissions.
+    /// Thrown when the descriptor cannot be read. <see cref="UsbException.Code"/> indicates why:
+    /// <see cref="UsbResult.NotFound"/> when <paramref name="descriptor"/> is no longer present in
+    /// the current system device list (for example it has been unplugged); or
+    /// <see cref="UsbResult.AccessDenied"/> / <see cref="UsbResult.IoError"/>, typically because
+    /// the device is inaccessible due to being open in another process or lacking permissions.
     /// </exception>
     /// <exception cref="InvalidOperationException">
     /// Thrown when the Usb type is not initialized.
