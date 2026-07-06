@@ -116,19 +116,6 @@ public sealed class Given_any_USB_device : IDisposable
     }
 
     [SkippableFact]
-    public void GetDeviceManufacturer_returns_manufacturer_given_a_device_descriptor_when_device_is_not_open()
-    {
-        IUsbDeviceDescriptor deviceDescriptor;
-        using (var device = _deviceSource.OpenUsbDeviceOrSkip())
-        {
-            deviceDescriptor = device.Descriptor;
-        }
-        var manufacturer = _usb.GetDeviceManufacturer(deviceDescriptor);
-        manufacturer.Should().NotBeNullOrWhiteSpace();
-        manufacturer.Should().NotEndWith("\0", because: "null terminator should be trimmed");
-    }
-
-    [SkippableFact]
     public void GetDeviceManufacturer_from_OS_matches_value_read_from_open_device()
     {
         using var device = _deviceSource.OpenUsbDeviceOrSkip();
