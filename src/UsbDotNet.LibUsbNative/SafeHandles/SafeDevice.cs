@@ -1,4 +1,6 @@
+using System.Diagnostics.CodeAnalysis;
 using System.Runtime.InteropServices;
+using System.Text;
 using UsbDotNet.LibUsbNative.Enums;
 using UsbDotNet.LibUsbNative.Extensions;
 using UsbDotNet.LibUsbNative.Structs;
@@ -102,6 +104,43 @@ internal sealed class SafeDevice : SafeHandle, ISafeDevice
     {
         SafeHelper.ThrowIfClosed(this);
         return _context.Api.libusb_get_port_number(handle);
+    }
+
+    /// <inheritdoc/>
+    public string GetDeviceString(libusb_device_string_type stringType) =>
+        TryGetDeviceString(stringType, out var value, out var error)
+            ? value
+            : throw error.Value.ToLibUsbExceptionForApi(
+                nameof(_context.Api.libusb_get_device_string)
+            );
+
+    /// <inheritdoc/>
+    public bool TryGetDeviceString(
+        libusb_device_string_type stringType,
+        [NotNullWhen(true)] out string? descriptorValue,
+        [NotNullWhen(false)] out libusb_error? usbError
+    )
+    {
+        SafeHelper.ThrowIfClosed(this);
+
+        var buffer = new byte[ILibUsbApi.LIBUSB_DEVICE_STRING_BYTES_MAX];
+        var result = _context.Api.libusb_get_device_string(
+            handle,
+            stringType,
+            buffer,
+            buffer.Length
+        );
+
+        if (result >= 0)
+        {
+            descriptorValue = Encoding.UTF8.GetString(buffer, 0, (int)result).TrimEnd('\0');
+            usbError = null;
+            return true;
+        }
+
+        descriptorValue = null;
+        usbError = result;
+        return false;
     }
 
     /// <inheritdoc/>

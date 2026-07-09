@@ -116,6 +116,53 @@ public sealed class Given_any_USB_device : IDisposable
     }
 
     [SkippableFact]
+    public void GetDeviceManufacturer_from_OS_matches_value_read_from_open_device()
+    {
+        using var device = _deviceSource.OpenUsbDeviceOrSkip();
+        // Read the string descriptor directly from the open device
+        var fromDevice = device.GetManufacturer();
+        // Read the same value via the Usb type, which reads it from the operating system
+        var fromOs = _usb.GetDeviceManufacturer(device.Descriptor);
+
+        _logger.LogInformation(
+            "Manufacturer: OS='{FromOs}', Device='{FromDevice}'.",
+            fromOs,
+            fromDevice
+        );
+        fromOs.Should().Be(fromDevice);
+    }
+
+    [SkippableFact]
+    public void GetDeviceProduct_returns_product_name_given_a_device_descriptor_when_device_is_not_open()
+    {
+        IUsbDeviceDescriptor deviceDescriptor;
+        using (var device = _deviceSource.OpenUsbDeviceOrSkip())
+        {
+            deviceDescriptor = device.Descriptor;
+        }
+        var productName = _usb.GetDeviceProduct(deviceDescriptor);
+        productName.Should().NotBeNullOrWhiteSpace();
+        productName.Should().NotEndWith("\0", because: "null terminator should be trimmed");
+    }
+
+    [SkippableFact]
+    public void GetDeviceProduct_from_OS_matches_value_read_from_open_device()
+    {
+        using var device = _deviceSource.OpenUsbDeviceOrSkip();
+        // Read the string descriptor directly from the open device
+        var fromDevice = device.GetProduct();
+        // Read the same value via the Usb type, which reads it from the operating system
+        var fromOs = _usb.GetDeviceProduct(device.Descriptor);
+
+        _logger.LogInformation(
+            "Product: OS='{FromOs}', Device='{FromDevice}'.",
+            fromOs,
+            fromDevice
+        );
+        fromOs.Should().Be(fromDevice);
+    }
+
+    [SkippableFact]
     public void GetDeviceSerial_returns_serial_given_a_device_descriptor_when_device_is_not_open()
     {
         IUsbDeviceDescriptor deviceDescriptor;
@@ -125,6 +172,20 @@ public sealed class Given_any_USB_device : IDisposable
         }
         var serial = _usb.GetDeviceSerial(deviceDescriptor);
         serial.Should().NotBeNullOrWhiteSpace();
+        serial.Should().NotEndWith("\0", because: "null terminator should be trimmed");
+    }
+
+    [SkippableFact]
+    public void GetDeviceSerial_from_OS_matches_value_read_from_open_device()
+    {
+        using var device = _deviceSource.OpenUsbDeviceOrSkip();
+        // Read the string descriptor directly from the open device
+        var fromDevice = device.GetSerialNumber();
+        // Read the same value via the Usb type, which reads it from the operating system
+        var fromOs = _usb.GetDeviceSerial(device.Descriptor);
+
+        _logger.LogInformation("Serial: OS='{FromOs}', Device='{FromDevice}'.", fromOs, fromDevice);
+        fromOs.Should().Be(fromDevice);
     }
 
     [SkippableFact]

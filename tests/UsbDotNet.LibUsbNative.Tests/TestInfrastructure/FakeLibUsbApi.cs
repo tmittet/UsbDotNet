@@ -1,4 +1,4 @@
-﻿using System.Runtime.InteropServices;
+using System.Runtime.InteropServices;
 using System.Text;
 using UsbDotNet.LibUsbNative.Enums;
 using UsbDotNet.LibUsbNative.Functions;
@@ -420,6 +420,13 @@ internal sealed class FakeLibusbApi : ILibUsbApi
     }
 
     // ------------- Strings -------------
+    public libusb_error libusb_get_device_string(
+        IntPtr dev,
+        libusb_device_string_type string_type,
+        byte[] data,
+        int length
+    ) => libusb_error.LIBUSB_ERROR_NOT_FOUND;
+
     public libusb_error libusb_get_string_descriptor_ascii(
         IntPtr h,
         byte idx,

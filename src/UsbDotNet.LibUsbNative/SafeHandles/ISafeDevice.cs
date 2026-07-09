@@ -1,3 +1,5 @@
+using System.Diagnostics.CodeAnalysis;
+using UsbDotNet.LibUsbNative.Enums;
 using UsbDotNet.LibUsbNative.Structs;
 
 namespace UsbDotNet.LibUsbNative.SafeHandles;
@@ -48,6 +50,35 @@ public interface ISafeDevice : IDisposable
     /// </summary>
     /// <exception cref="ObjectDisposedException">Thrown when the ISafeDevice is disposed.</exception>
     byte GetPortNumber();
+
+    /// <summary>
+    /// Retrieve a device string without needing to open the device.
+    /// <para>
+    /// The string will be returned untranslated or in the default OS language when supported by the
+    /// OS and USB device.
+    /// </para>
+    /// </summary>
+    /// <returns>A UTF-8 encoded string.</returns>
+    /// <exception cref="ObjectDisposedException">Thrown when the SafeDeviceHandle is disposed.</exception>
+    /// <exception cref="LibUsbException">Thrown when the descriptor read operation fails.</exception>
+    string GetDeviceString(libusb_device_string_type stringType);
+
+    /// <summary>
+    /// Retrieve a device string without needing to open the device.
+    /// <para>
+    /// The string will be returned untranslated or in the default OS language when supported by the
+    /// OS and USB device.
+    /// </para>
+    /// </summary>
+    /// <returns>
+    /// True when the string read operation was successful; otherwise false with a libusb_error output.
+    /// </returns>
+    /// <exception cref="ObjectDisposedException">Thrown when the SafeDeviceHandle is disposed.</exception>
+    bool TryGetDeviceString(
+        libusb_device_string_type stringType,
+        [NotNullWhen(true)] out string? descriptorValue,
+        [NotNullWhen(false)] out libusb_error? usbError
+    );
 
     /// <summary>
     /// Gets a value indicating whether the underlying handle is closed or not.

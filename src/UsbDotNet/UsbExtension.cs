@@ -25,12 +25,51 @@ public static class UsbExtension
     ) => usb.GetDeviceList(vendorId, productId.Length == 0 ? null : productId.ToHashSet());
 
     /// <summary>
-    /// Get the device serial number. To read the serial the device must be opened for a brief
-    /// moment; unless already open. If the device is open in another process the read will fail.
+    /// Get the device manufacturer from the string descriptors read and cached by the OS during
+    /// device enumeration. As a fallback; read the manufacturer directly from the device.
     /// </summary>
     /// <exception cref="UsbException">
-    /// UsbException.Code AccessDenied or IoError is typically an indication that the device
-    /// is inaccessible because it's open in another process or due to lacking permissions.
+    /// Thrown when the descriptor cannot be read. <see cref="UsbException.Code"/> indicates why:
+    /// <see cref="UsbResult.NotFound"/> when <paramref name="descriptor"/> is no longer present in
+    /// the current system device list (for example it has been unplugged); or
+    /// <see cref="UsbResult.AccessDenied"/> / <see cref="UsbResult.IoError"/>, typically because
+    /// the device is inaccessible due to being open in another process or lacking permissions.
+    /// </exception>
+    /// <exception cref="InvalidOperationException">
+    /// Thrown when the Usb type is not initialized.
+    /// </exception>
+    /// <exception cref="ObjectDisposedException">Thrown when the Usb type is disposed.</exception>
+    public static string GetDeviceManufacturer(this IUsb usb, IUsbDeviceDescriptor descriptor) =>
+        usb.GetDeviceManufacturer(descriptor.DeviceKey);
+
+    /// <summary>
+    /// Get the device product name from the string descriptors read and cached by the OS during
+    /// device enumeration. As a fallback; read the product name directly from the device.
+    /// </summary>
+    /// <exception cref="UsbException">
+    /// Thrown when the descriptor cannot be read. <see cref="UsbException.Code"/> indicates why:
+    /// <see cref="UsbResult.NotFound"/> when <paramref name="descriptor"/> is no longer present in
+    /// the current system device list (for example it has been unplugged); or
+    /// <see cref="UsbResult.AccessDenied"/> / <see cref="UsbResult.IoError"/>, typically because
+    /// the device is inaccessible due to being open in another process or lacking permissions.
+    /// </exception>
+    /// <exception cref="InvalidOperationException">
+    /// Thrown when the Usb type is not initialized.
+    /// </exception>
+    /// <exception cref="ObjectDisposedException">Thrown when the Usb type is disposed.</exception>
+    public static string GetDeviceProduct(this IUsb usb, IUsbDeviceDescriptor descriptor) =>
+        usb.GetDeviceProduct(descriptor.DeviceKey);
+
+    /// <summary>
+    /// Get the device serial number from the string descriptors read and cached by the OS during
+    /// device enumeration. As a fallback; read the serial directly from the device.
+    /// </summary>
+    /// <exception cref="UsbException">
+    /// Thrown when the descriptor cannot be read. <see cref="UsbException.Code"/> indicates why:
+    /// <see cref="UsbResult.NotFound"/> when <paramref name="descriptor"/> is no longer present in
+    /// the current system device list (for example it has been unplugged); or
+    /// <see cref="UsbResult.AccessDenied"/> / <see cref="UsbResult.IoError"/>, typically because
+    /// the device is inaccessible due to being open in another process or lacking permissions.
     /// </exception>
     /// <exception cref="InvalidOperationException">
     /// Thrown when the Usb type is not initialized.
