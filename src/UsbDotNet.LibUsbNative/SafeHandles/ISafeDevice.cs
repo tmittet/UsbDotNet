@@ -70,7 +70,9 @@ public interface ISafeDevice : IDisposable
     /// OS and USB device.
     /// </para>
     /// </summary>
-    /// <returns>A UTF-8 encoded string.</returns>
+    /// <returns>
+    /// True when the string read operation was successful; otherwise false with a libusb_error output.
+    /// </returns>
     /// <exception cref="ObjectDisposedException">Thrown when the SafeDeviceHandle is disposed.</exception>
     bool TryGetDeviceString(
         libusb_device_string_type stringType,
