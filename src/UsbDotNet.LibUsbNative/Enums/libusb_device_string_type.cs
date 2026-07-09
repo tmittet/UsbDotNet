@@ -11,7 +11,7 @@ namespace UsbDotNet.LibUsbNative.Enums;
 #if NET8_0_OR_GREATER
 [JsonConverter(typeof(JsonStringEnumConverter<libusb_device_string_type>))]
 #endif
-public enum libusb_device_string_type : byte
+public enum libusb_device_string_type : int
 {
     /// <summary>The manufacturer string descriptor type.</summary>
     LIBUSB_DEVICE_STRING_MANUFACTURER = 0x00,
