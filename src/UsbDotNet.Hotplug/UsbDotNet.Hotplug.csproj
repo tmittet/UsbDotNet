@@ -1,0 +1,17 @@
+<Project Sdk="Microsoft.NET.Sdk">
+    <PropertyGroup>
+        <RootNamespace>UsbDotNet.Hotplug</RootNamespace>
+        <PackageId>UsbDotNet.Hotplug</PackageId>
+        <Description>Channel-based USB hotplug monitoring for UsbDotNet</Description>
+    </PropertyGroup>
+    <ItemGroup>
+        <InternalsVisibleTo Include="UsbDotNet.Hotplug.Tests" />
+    </ItemGroup>
+    <ItemGroup>
+        <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" />
+        <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" />
+    </ItemGroup>
+    <ItemGroup>
+        <ProjectReference Include="..\UsbDotNet\UsbDotNet.csproj" />
+    </ItemGroup>
+</Project>

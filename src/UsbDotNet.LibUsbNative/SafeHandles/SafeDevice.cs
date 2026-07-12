@@ -15,6 +15,9 @@ internal sealed class SafeDevice : SafeHandle, ISafeDevice
 
     public override bool IsInvalid => handle == IntPtr.Zero;
 
+    /// <inheritdoc/>
+    public UniqueId Id => new(handle);
+
     public SafeDevice(SafeContext context, nint devicePtr)
         : base(IntPtr.Zero, ownsHandle: true)
     {

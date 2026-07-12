@@ -10,12 +10,17 @@ using UsbDotNet.LibUsbNative;
 using UsbDotNet.LibUsbNative.Enums;
 using UsbDotNet.LibUsbNative.Extensions;
 using UsbDotNet.LibUsbNative.SafeHandles;
+using UsbDotNet.LibUsbNative.Structs;
 
 namespace UsbDotNet;
 
 /// <inheritdoc/>
-public sealed class Usb : IUsb
+public sealed partial class Usb : IUsb, IHotplugProvider
 {
+    private EventHandler<IUsbDeviceDescriptor>? _deviceArrived;
+    private EventHandler<IUsbDeviceDescriptor>? _deviceLeft;
+    private EventHandler? _hotplugProviderDisposed;
+
     private static int _instances;
 
     private readonly object _lock = new();
@@ -24,13 +29,98 @@ public sealed class Usb : IUsb
     private readonly ILogger<Usb> _logger;
     private readonly UsbDotNetOptions _options;
     private readonly ConcurrentDictionary<string, UsbDevice> _openDevices = new();
+
+    /// <summary>
+    /// Devices seen via hotplug DEVICE_ARRIVED, keyed by their libusb_device pointer. Each entry
+    /// keeps the ISafeDevice (and a libusb reference) taken on arrival, so that on DEVICE_LEFT we
+    /// can recover the full descriptor.
+    /// <para>
+    /// A DeviceKey needs VID/PID plus bus number/address. VID/PID alone cannot distinguish two
+    /// identical devices plugged in at the same time; the bus number/address makes the key unique.
+    /// </para>
+    /// <para>
+    /// On DEVICE_ARRIVED reading bus number/address is fine, On DEVICE_LEFT it is not. According to
+    /// the docs only libusb_get_device_descriptor(VID/PID) is safe to call on DEVICE_LEFT. See:
+    /// https://libusb.sourceforge.io/api-1.0/libusb_hotplug.html. The libusb_device pointer,
+    /// however, is stable: libusb passes the same device object to both the arrival and removal
+    /// callbacks (verified in v1.0.30 core.c/hotplug.c). So we use it as an opaque identifier
+    /// <see cref="SafeDevice.Id"/> and do a look up of the cached descriptor on DEVICE_LEFT.
+    /// </para>
+    /// </summary>
+    private readonly ConcurrentDictionary<
+        UniqueId,
+        (ISafeDevice Device, UsbDeviceDescriptor Descriptor)
+    > _hotplugDevices = new();
+
 #pragma warning disable CA2213 // Disposable fields should be disposed
     // CA2213 false positive
     private ISafeContext? _context;
 #pragma warning restore CA2213 // Disposable fields should be disposed
     private LibUsbEventLoop? _eventLoop;
     private ISafeCallbackHandle? _hotplugCallbackHandle;
-    private bool _disposed;
+    private int _eventLoopThreadId;
+    private DisposeState _disposeState;
+
+    /// <inheritdoc/>
+    bool IHotplugProvider.IsHotplugSupported =>
+        _libUsb.HasCapability(libusb_capability.LIBUSB_CAP_HAS_HOTPLUG);
+
+    /// <inheritdoc/>
+    event EventHandler<IUsbDeviceDescriptor>? IHotplugProvider.DeviceArrived
+    {
+        add
+        {
+            lock (_lock)
+            {
+                _deviceArrived += value;
+            }
+        }
+        remove
+        {
+            lock (_lock)
+            {
+                _deviceArrived -= value;
+            }
+        }
+    }
+
+    /// <inheritdoc/>
+    event EventHandler<IUsbDeviceDescriptor>? IHotplugProvider.DeviceLeft
+    {
+        add
+        {
+            lock (_lock)
+            {
+                _deviceLeft += value;
+            }
+        }
+        remove
+        {
+            lock (_lock)
+            {
+                _deviceLeft -= value;
+            }
+        }
+    }
+
+    /// <inheritdoc/>
+    event EventHandler? IHotplugProvider.Disposed
+    {
+        add
+        {
+            lock (_lock)
+            {
+                _hotplugProviderDisposed += value;
+            }
+        }
+        remove
+        {
+            lock (_lock)
+            {
+                _hotplugProviderDisposed -= value;
+            }
+        }
+    }
 
     /// <summary>
     /// Get the Usb library version.
@@ -110,6 +200,7 @@ public sealed class Usb : IUsb
                 _context
             );
             _eventLoop.Start();
+            _eventLoopThreadId = _eventLoop.ManagedThreadId!.Value;
         }
     }
 
@@ -153,22 +244,44 @@ public sealed class Usb : IUsb
     }
 
     /// <inheritdoc/>
+    [Obsolete(
+        "Use UsbDotNet.Hotplug package instead. This method will be removed in a future version."
+    )]
     public bool RegisterHotplug(
         UsbClass? deviceClass = default,
         ushort? vendorId = default,
         ushort? productId = default
+    ) =>
+        RegisterHotplugCore(deviceClass, vendorId, productId) switch
+        {
+            HotplugRegistrationResult.Success => true,
+            HotplugRegistrationResult.NotSupported => false,
+            HotplugRegistrationResult.AlreadyRegistered => true,
+        };
+
+    /// <inheritdoc/>
+    HotplugRegistrationResult IHotplugProvider.RegisterHotplug() =>
+        RegisterHotplugCore(deviceClass: null, vendorId: null, productId: null);
+
+    private HotplugRegistrationResult RegisterHotplugCore(
+        UsbClass? deviceClass,
+        ushort? vendorId,
+        ushort? productId
     )
     {
-        var supported = _libUsb.HasCapability(libusb_capability.LIBUSB_CAP_HAS_HOTPLUG);
-        if (!supported)
+        if (!_libUsb.HasCapability(libusb_capability.LIBUSB_CAP_HAS_HOTPLUG))
         {
             _logger.LogDebug("Hotplug not supported or unimplemented on this platform.");
-            return false;
+            return HotplugRegistrationResult.NotSupported;
         }
         lock (_lock)
         {
             CheckDisposed();
             var context = GetInitializedContextOrThrow();
+            if (_hotplugCallbackHandle is not null)
+            {
+                return HotplugRegistrationResult.AlreadyRegistered;
+            }
             // We do not follow the recommended libusb init pattern: hotplug first then event loop.
             // See: https://libusb.sourceforge.io/api-1.0/group__libusb__asyncio.html#eventthread
             // This should not have any adverse effects as long as we register callback with the
@@ -185,7 +298,7 @@ public sealed class Usb : IUsb
                 productId
             );
         }
-        return true;
+        return HotplugRegistrationResult.Success;
     }
 
     /// <summary>
@@ -208,24 +321,97 @@ public sealed class Usb : IUsb
         ArgumentNullException.ThrowIfNull(context);
         ArgumentNullException.ThrowIfNull(device);
 
-        // TODO: Test on macOS and Linux; "most functions that take a device handle are not safe"
+        if (eventType is libusb_hotplug_event.LIBUSB_HOTPLUG_EVENT_DEVICE_ARRIVED)
+        {
+            HandleDeviceArrived(device);
+        }
+        else
+        {
+            HandleDeviceLeft(device);
+        }
+        return libusb_hotplug_return.REARM;
+    }
+
+    private void HandleDeviceArrived(ISafeDevice device)
+    {
+        UsbDeviceDescriptor descriptor;
         try
         {
-            var descriptor = GetDeviceDescriptor(device);
-            _logger.LogInformation(
-                "Hotplug '{EventType}'. Class: {DeviceClass}. Key: {DeviceKey}.",
-                eventType,
-                descriptor.DeviceClass,
-                descriptor.DeviceKey
-            );
+            descriptor = GetDeviceDescriptor(device);
         }
         // NOTE: Never throws; since libusb-1.0.16 libusb_get_device_descriptor always succeeds
         catch (UsbException ex)
         {
             _logger.LogWarning("Hotplug event handling failed. {ErrorMessage}.", ex.Message);
+            device.Dispose();
+            return;
         }
-        device.Dispose();
-        return libusb_hotplug_return.REARM;
+        // Cache the arriving device, keeping the libusb reference held by this ISafeDevice,
+        // so the descriptor (including bus number/address) can be recovered on DEVICE_LEFT.
+        if (!_hotplugDevices.TryAdd(device.Id, (device, descriptor)))
+        {
+            // With LIBUSB_HOTPLUG_ENUMERATE libusb may notify the arrival of the same device
+            // twice: once from registration enumeration and once from the live event loop.
+            _logger.LogDebug(
+                "Duplicate hotplug arrival for device '{DeviceKey}' ignored.",
+                descriptor.DeviceKey
+            );
+            device.Dispose();
+            return;
+        }
+        EmitHotplugEvent(libusb_hotplug_event.LIBUSB_HOTPLUG_EVENT_DEVICE_ARRIVED, descriptor);
+    }
+
+    private void HandleDeviceLeft(ISafeDevice device)
+    {
+        try
+        {
+            if (_hotplugDevices.TryRemove(device.Id, out var cached))
+            {
+                cached.Device.Dispose(); // Release the reference taken on arrival.
+                EmitHotplugEvent(
+                    libusb_hotplug_event.LIBUSB_HOTPLUG_EVENT_DEVICE_LEFT,
+                    cached.Descriptor
+                );
+                return;
+            }
+            // A device we never cached (per docs: removal may be notified without a prior arrival).
+            // Should not happen; we register with libusb_hotplug_flag.LIBUSB_HOTPLUG_ENUMERATE.
+            try
+            {
+                var descriptor = device.GetDeviceDescriptor();
+                _logger.LogWarning(
+                    "Hotplug 'DEVICE_LEFT' for an untracked device ignored. "
+                        + "VID=0x{VendorId:X4}, PID=0x{ProductId:X4}.",
+                    descriptor.idVendor,
+                    descriptor.idProduct
+                );
+            }
+            // NOTE: Never throws; since libusb-1.0.16 libusb_get_device_descriptor always succeeds
+            catch (UsbException ex)
+            {
+                _logger.LogWarning("Hotplug event handling failed. {ErrorMessage}.", ex.Message);
+            }
+        }
+        finally
+        {
+            device.Dispose(); // Dispose the throwaway instance created for the callback
+        }
+    }
+
+    private void EmitHotplugEvent(libusb_hotplug_event eventType, UsbDeviceDescriptor descriptor)
+    {
+        _logger.LogInformation(
+            "Hotplug '{EventType}'. Class: {DeviceClass}. Key: {DeviceKey}.",
+            eventType,
+            descriptor.DeviceClass,
+            descriptor.DeviceKey
+        );
+        var handler =
+            eventType == libusb_hotplug_event.LIBUSB_HOTPLUG_EVENT_DEVICE_ARRIVED ? _deviceArrived
+            : eventType == libusb_hotplug_event.LIBUSB_HOTPLUG_EVENT_DEVICE_LEFT ? _deviceLeft
+            : null;
+        EventDispatch.RaiseSafely(handler, _logger, this, descriptor, descriptor.DeviceKey);
     }
 
     /// <inheritdoc/>
@@ -438,7 +624,11 @@ public sealed class Usb : IUsb
     {
         lock (_lock)
         {
-            CheckDisposed();
+            // Deliberately not CheckDisposed(): Dispose() closes remaining open devices.
+            if (_disposeState is DisposeState.Disposed)
+            {
+                throw new ObjectDisposedException(nameof(Usb));
+            }
             _ = GetInitializedContextOrThrow();
             if (!_openDevices.TryRemove(key, out _))
             {
@@ -450,12 +640,9 @@ public sealed class Usb : IUsb
         }
     }
 
-    /// <summary>
-    /// Throw ObjectDisposedException when the Usb type is disposed.
-    /// </summary>
     private void CheckDisposed()
     {
-        if (_disposed)
+        if (_disposeState is not DisposeState.Live)
         {
             throw new ObjectDisposedException(nameof(Usb));
         }
@@ -473,20 +660,51 @@ public sealed class Usb : IUsb
     /// </summary>
     public void Dispose()
     {
+        LibUsbEventLoop? eventLoop;
+        EventHandler? providerDisposed;
         lock (_lock)
         {
-            if (_disposed)
+            if (_disposeState is DisposeState.Disposed)
             {
                 return;
             }
+            if (_disposeState is DisposeState.Disposing)
+            {
+                // Allow the event-loop thread disposer to join this thread below; waiting here
+                // would deadlock when a hotplug subscriber calls Dispose during event dispatch.
+                if (Environment.CurrentManagedThreadId != _eventLoopThreadId)
+                {
+                    while (_disposeState is not DisposeState.Disposed)
+                    {
+                        _ = Monitor.Wait(_lock);
+                    }
+                }
+                return;
+            }
+            _disposeState = DisposeState.Disposing;
+            // Disabling hotplug here makes most sense, although done differently in sample code.
+            // NOTE: Callbacks for a context are automatically deregistered by libusb_exit()
+            _hotplugCallbackHandle?.Dispose();
+            eventLoop = _eventLoop;
+            _eventLoop = null;
+        }
+
+        // Stop the event loop outside _lock. Joining the event-loop thread while holding
+        // _lock deadlocks when that thread is dispatching a hotplug event to a subscriber.
+        eventLoop?.Dispose();
+
+        lock (_lock)
+        {
             if (_context is not null)
             {
-                // Disabling hotplug here makes most sense, although done differently in sample code.
-                // To ensure event loop exit, libusb_interrupt_event_handler is called on dispose.
-                // See: https://libusb.sourceforge.io/api-1.0/group__libusb__asyncio.html#eventthread
-                // NOTE: Callbacks for a context are automatically deregistered by libusb_exit()
-                _hotplugCallbackHandle?.Dispose();
-                _eventLoop?.Dispose();
+                // The callback is deregistered and the event loop stopped above, so no further
+                // hotplug callbacks can run. Release references held for devices that never received
+                // a DEVICE_LEFT (e.g. still connected at shutdown).
+                foreach (var (cachedDevice, _) in _hotplugDevices.Values)
+                {
+                    cachedDevice.Dispose();
+                }
+                _hotplugDevices.Clear();
                 // Close any devices, interfaces and transfers that remain open or are ongoing
                 foreach (var device in _openDevices)
                 {
@@ -513,7 +731,12 @@ public sealed class Usb : IUsb
             LibUsbLogHandler.ClearLogger();
             _logger.LogDebug("Usb type disposed.");
             _ = Interlocked.Exchange(ref _instances, 0);
-            _disposed = true;
+            _disposeState = DisposeState.Disposed;
+            // Wake up concurrent Dispose callers waiting for teardown to complete
+            Monitor.PulseAll(_lock);
+            providerDisposed = _hotplugProviderDisposed;
         }
+        // Notify hotplug consumers once
+        EventDispatch.RaiseSafely(providerDisposed, _logger, this);
     }
 }

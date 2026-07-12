@@ -5,8 +5,12 @@
         <Description>USB library for .NET</Description>
     </PropertyGroup>
     <ItemGroup>
-        <InternalsVisibleTo Include="UsbDotNet.Tests" />
+        <InternalsVisibleTo Include="UsbDotNet.Hotplug" />
         <InternalsVisibleTo Include="UsbDotNet.Extensions.Tests" />
+        <InternalsVisibleTo Include="UsbDotNet.Hotplug.Tests" />
+        <InternalsVisibleTo Include="UsbDotNet.Tests" />
+        <!-- Lets FakeItEasy (Castle DynamicProxy) fake internal interfaces such as IHotplugProvider -->
+        <InternalsVisibleTo Include="DynamicProxyGenAssembly2" />
     </ItemGroup>
     <ItemGroup>
         <PackageReference Include="Microsoft.Extensions.DependencyInjection" />

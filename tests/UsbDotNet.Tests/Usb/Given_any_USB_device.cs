@@ -1,5 +1,7 @@
+using System.Collections.Concurrent;
 using UsbDotNet.Core;
 using UsbDotNet.Descriptor;
+using UsbDotNet.Internal;
 using UsbDotNet.LibUsbNative;
 
 namespace UsbDotNet.Tests.Usb;
@@ -7,6 +9,8 @@ namespace UsbDotNet.Tests.Usb;
 [Trait("Category", "UsbDevice")]
 public sealed class Given_any_USB_device : IDisposable
 {
+    private static readonly TimeSpan EventTimeout = TimeSpan.FromSeconds(5);
+
     private readonly ILibUsb _libusb;
     private readonly ILoggerFactory _loggerFactory;
     private readonly ILogger<Given_any_USB_device> _logger;
@@ -221,6 +225,132 @@ public sealed class Given_any_USB_device : IDisposable
         // Calling dispose again in release only logs warning
         disposeAct.Should().NotThrow();
 #endif
+    }
+
+    [SkippableFact]
+    public void DeviceArrived_is_raised_with_a_descriptor_for_each_connected_device()
+    {
+        // Snapshot the currently connected devices; enumeration replays these as DeviceArrived.
+        var expectedKeys = _usb.GetDeviceList().Select(d => d.DeviceKey).ToHashSet();
+        Skip.If(
+            expectedKeys.Count == 0,
+            "No USB device available to emit a hotplug arrived event."
+        );
+
+        var provider = (IHotplugProvider)_usb;
+        var arrived = new ConcurrentQueue<IUsbDeviceDescriptor>();
+        using var reachedExpected = new ManualResetEventSlim(false);
+        provider.DeviceArrived += (_, descriptor) =>
+        {
+            arrived.Enqueue(descriptor);
+            // Events arrive on the libusb event loop thread; signal once we've seen them all.
+            if (arrived.Select(k => k.DeviceKey).Distinct().Count() >= expectedKeys.Count)
+                reachedExpected.Set();
+        };
+
+        // Registration with LIBUSB_HOTPLUG_ENUMERATE replays the connected devices as
+        // DeviceArrived events, delivered on the libusb event loop thread.
+        Skip.IfNot(
+            provider.RegisterHotplug() == HotplugRegistrationResult.Success,
+            "Hotplug is not supported on this platform."
+        );
+        reachedExpected.Wait(EventTimeout);
+
+        arrived.Should().NotBeEmpty(because: "enumeration should replay connected devices");
+        arrived
+            .Should()
+            .OnlyContain(
+                d => d != null && !string.IsNullOrWhiteSpace(d.DeviceKey),
+                because: "every emitted event should carry a populated device descriptor"
+            );
+        arrived
+            .Select(d => d.DeviceKey)
+            .Should()
+            .Contain(
+                expectedKeys,
+                because: "emitted descriptors should correspond to real connected devices"
+            );
+
+        foreach (var descriptor in arrived)
+        {
+            _logger.LogInformation(
+                "DeviceArrived: Class={DeviceClass}, VID=0x{VID:X4}, PID=0x{PID:X4}, Key={Key}.",
+                descriptor.DeviceClass,
+                descriptor.VendorId,
+                descriptor.ProductId,
+                descriptor.DeviceKey
+            );
+        }
+    }
+
+    [SkippableFact]
+    public void DeviceArrived_descriptor_matches_the_enumerated_device_descriptor()
+    {
+        var expected = _usb.GetDeviceList().FirstOrDefault();
+        Skip.If(expected is null, "No USB device available to emit a hotplug arrived event.");
+
+        var provider = (IHotplugProvider)_usb;
+        var arrived = new ConcurrentDictionary<string, IUsbDeviceDescriptor>();
+        using var matched = new ManualResetEventSlim(false);
+        provider.DeviceArrived += (_, descriptor) =>
+        {
+            arrived[descriptor.DeviceKey] = descriptor;
+            if (arrived.ContainsKey(expected!.DeviceKey))
+                matched.Set();
+        };
+
+        Skip.IfNot(
+            provider.RegisterHotplug() == HotplugRegistrationResult.Success,
+            "Hotplug is not supported on this platform."
+        );
+        matched.Wait(EventTimeout);
+
+        arrived
+            .Should()
+            .ContainKey(
+                expected!.DeviceKey,
+                because: "the enumerated device should be replayed as a DeviceArrived event"
+            );
+        var emitted = arrived[expected!.DeviceKey];
+        emitted.VendorId.Should().Be(expected.VendorId);
+        emitted.ProductId.Should().Be(expected.ProductId);
+        emitted.BusNumber.Should().Be(expected.BusNumber);
+        emitted.BusAddress.Should().Be(expected.BusAddress);
+        emitted.DeviceClass.Should().Be(expected.DeviceClass);
+    }
+
+    [Fact]
+    public void RegisterHotplug_without_subscribers_does_not_throw()
+    {
+        // With enumeration enabled the callback runs for connected devices; with no subscribers
+        // the raise path must be a safe no-op rather than throwing on a null handler.
+        var provider = (IHotplugProvider)_usb;
+        var act = () => provider.RegisterHotplug();
+        act.Should().NotThrow();
+    }
+
+    [SkippableFact]
+    public void A_throwing_DeviceArrived_handler_does_not_prevent_delivery_to_other_handlers()
+    {
+        Skip.If(
+            _usb.GetDeviceList().Count == 0,
+            "No USB device available to emit a hotplug arrived event."
+        );
+
+        var provider = (IHotplugProvider)_usb;
+        using var secondHandlerReceived = new ManualResetEventSlim(false);
+        provider.DeviceArrived += (_, _) => throw new InvalidOperationException("Handler failure.");
+        provider.DeviceArrived += (_, _) => secondHandlerReceived.Set();
+
+        Skip.IfNot(
+            provider.RegisterHotplug() == HotplugRegistrationResult.Success,
+            "Hotplug is not supported on this platform."
+        );
+
+        secondHandlerReceived
+            .Wait(EventTimeout)
+            .Should()
+            .BeTrue(because: "a throwing handler must not stop delivery to later handlers");
     }
 
     public void Dispose()

@@ -1,3 +1,4 @@
+using UsbDotNet.Internal;
 using UsbDotNet.LibUsbNative;
 
 namespace UsbDotNet.Tests.Usb;
@@ -82,17 +83,32 @@ public sealed class Given_no_USB_device : IDisposable
     public void RegisterHotplug_throws_when_called_without_Initialize()
     {
         using var usb = CreateUsb();
-        var act = () => usb.RegisterHotplug(vendorId: 0x2BD9);
+        var provider = (IHotplugProvider)usb;
+        var act = () => provider.RegisterHotplug();
         act.Should().Throw<InvalidOperationException>();
     }
 
     [Fact]
-    public void RegisterHotplug_returns_true_when_called_after_Initialize()
+    public void RegisterHotplug_returns_Success_when_called_after_Initialize()
     {
         using var usb = CreateUsb();
         usb.Initialize();
-        var success = usb.RegisterHotplug(vendorId: 0x2BD9);
-        success.Should().BeTrue();
+        var provider = (IHotplugProvider)usb;
+        provider.RegisterHotplug().Should().Be(HotplugRegistrationResult.Success);
+    }
+
+    [SkippableFact]
+    public void RegisterHotplug_returns_AlreadyRegistered_when_called_a_second_time()
+    {
+        using var usb = CreateUsb();
+        usb.Initialize();
+        var provider = (IHotplugProvider)usb;
+        Skip.IfNot(
+            provider.RegisterHotplug() == HotplugRegistrationResult.Success,
+            "Hotplug is not supported on this platform."
+        );
+
+        provider.RegisterHotplug().Should().Be(HotplugRegistrationResult.AlreadyRegistered);
     }
 
     public void Dispose()

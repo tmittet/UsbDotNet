@@ -1,4 +1,3 @@
-﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 18
 VisualStudioVersion = 18.1.11312.151
@@ -67,6 +66,10 @@ EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "UsbDotNet.DeviceInteractionSample", "examples\UsbDotNet.DeviceInteractionSample\UsbDotNet.DeviceInteractionSample.csproj", "{8F20BCB3-D0FC-C544-E8CB-774875158BA8}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "UsbDotNet.Extensions.Uvc", "src\UsbDotNet.Extensions.Uvc\UsbDotNet.Extensions.Uvc.csproj", "{A3E71B9F-42D8-5C06-B1E3-7F9A28D04C5E}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "UsbDotNet.Hotplug", "src\UsbDotNet.Hotplug\UsbDotNet.Hotplug.csproj", "{76103138-9226-41A7-A187-46B099A252B0}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "UsbDotNet.Hotplug.Tests", "tests\UsbDotNet.Hotplug.Tests\UsbDotNet.Hotplug.Tests.csproj", "{01712856-85FE-4159-9934-C78F9FEA2726}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -222,11 +225,36 @@ Global
 		{A3E71B9F-42D8-5C06-B1E3-7F9A28D04C5E}.Release|arm64.Build.0 = Release|arm64
 		{A3E71B9F-42D8-5C06-B1E3-7F9A28D04C5E}.Release|x64.ActiveCfg = Release|x64
 		{A3E71B9F-42D8-5C06-B1E3-7F9A28D04C5E}.Release|x64.Build.0 = Release|x64
+		{76103138-9226-41A7-A187-46B099A252B0}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{76103138-9226-41A7-A187-46B099A252B0}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{76103138-9226-41A7-A187-46B099A252B0}.Debug|arm64.ActiveCfg = Debug|arm64
+		{76103138-9226-41A7-A187-46B099A252B0}.Debug|arm64.Build.0 = Debug|arm64
+		{76103138-9226-41A7-A187-46B099A252B0}.Debug|x64.ActiveCfg = Debug|x64
+		{76103138-9226-41A7-A187-46B099A252B0}.Debug|x64.Build.0 = Debug|x64
+		{76103138-9226-41A7-A187-46B099A252B0}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{76103138-9226-41A7-A187-46B099A252B0}.Release|Any CPU.Build.0 = Release|Any CPU
+		{76103138-9226-41A7-A187-46B099A252B0}.Release|arm64.ActiveCfg = Release|arm64
+		{76103138-9226-41A7-A187-46B099A252B0}.Release|arm64.Build.0 = Release|arm64
+		{76103138-9226-41A7-A187-46B099A252B0}.Release|x64.ActiveCfg = Release|x64
+		{76103138-9226-41A7-A187-46B099A252B0}.Release|x64.Build.0 = Release|x64
+		{01712856-85FE-4159-9934-C78F9FEA2726}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{01712856-85FE-4159-9934-C78F9FEA2726}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{01712856-85FE-4159-9934-C78F9FEA2726}.Debug|arm64.ActiveCfg = Debug|arm64
+		{01712856-85FE-4159-9934-C78F9FEA2726}.Debug|arm64.Build.0 = Debug|arm64
+		{01712856-85FE-4159-9934-C78F9FEA2726}.Debug|x64.ActiveCfg = Debug|x64
+		{01712856-85FE-4159-9934-C78F9FEA2726}.Debug|x64.Build.0 = Debug|x64
+		{01712856-85FE-4159-9934-C78F9FEA2726}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{01712856-85FE-4159-9934-C78F9FEA2726}.Release|Any CPU.Build.0 = Release|Any CPU
+		{01712856-85FE-4159-9934-C78F9FEA2726}.Release|arm64.ActiveCfg = Release|arm64
+		{01712856-85FE-4159-9934-C78F9FEA2726}.Release|arm64.Build.0 = Release|arm64
+		{01712856-85FE-4159-9934-C78F9FEA2726}.Release|x64.ActiveCfg = Release|x64
+		{01712856-85FE-4159-9934-C78F9FEA2726}.Release|x64.Build.0 = Release|x64
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
 	EndGlobalSection
 	GlobalSection(NestedProjects) = preSolution
+		{01712856-85FE-4159-9934-C78F9FEA2726} = {D5E2E026-05AB-49B8-A8DB-5DFEF339FDE4}
 		{561B847C-1A7E-43CF-CCB5-2867863219F9} = {D5E2E026-05AB-49B8-A8DB-5DFEF339FDE4}
 		{9D23C15C-5ADC-4D24-9206-198A26113684} = {02EA681E-C7D8-13C7-8484-4AC65E1B71E8}
 		{9D9E1D3F-971F-4AD3-98E5-529A025D6332} = {02EA681E-C7D8-13C7-8484-4AC65E1B71E8}

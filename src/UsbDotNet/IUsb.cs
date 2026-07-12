@@ -36,6 +36,9 @@ public interface IUsb : IDisposable
     /// https://libusb.sourceforge.io/api-1.0/libusb_hotplug.html
     /// </summary>
     /// <exception cref="ObjectDisposedException">Thrown when the Usb type is disposed.</exception>
+    [Obsolete(
+        "Use UsbDotNet.Hotplug package instead. This method will be removed in a future version."
+    )]
     bool RegisterHotplug(
         UsbClass? deviceClass = null,
         ushort? vendorId = null,
