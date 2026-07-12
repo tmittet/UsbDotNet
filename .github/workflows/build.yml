@@ -202,13 +202,13 @@ jobs:
         IS_PRERELEASE: ${{ github.event.release.prerelease }}
       run: |
         set -euo pipefail
-        version="${RELEASE_TAG#v}"
-        semver_regex='^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z][0-9A-Za-z.-]*)?$'
-        if ! [[ $version =~ $semver_regex ]]; then
+        tag_regex='^v([0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z][0-9A-Za-z.-]*)?)$'
+        if ! [[ $RELEASE_TAG =~ $tag_regex ]]; then
           echo "::error::Tag '${RELEASE_TAG}' is not a valid vMAJOR.MINOR.PATCH[-SUFFIX] version"
           exit 1
         fi
-        suffix="${BASH_REMATCH[1]:-}"
+        version="${BASH_REMATCH[1]}"
+        suffix="${BASH_REMATCH[2]:-}"
         # The GitHub pre-release checkbox and the tag pre-release suffix must agree
         if [[ "$IS_PRERELEASE" == "true" && -z "$suffix" ]]; then
           echo "::error::Release is marked pre-release, but tag '${RELEASE_TAG}' has no pre-release suffix (e.g. v1.4.0-beta.1)"
@@ -218,11 +218,13 @@ jobs:
           echo "::error::Tag '${RELEASE_TAG}' has a pre-release suffix, but the release is not marked as pre-release"
           exit 1
         fi
-        # Stable releases must be made from main; pre-releases may use a feature branch
-        if [[ "$IS_PRERELEASE" != "true" ]] \
-          && ! git merge-base --is-ancestor "$GITHUB_SHA" origin/main; then
-          echo "::error::Stable releases must be made from the main branch; tag '${RELEASE_TAG}' points to a commit that is not on main"
-          exit 1
+        # Stable releases must be made from main; pre-releases may use a feature branch.
+        if [[ "$IS_PRERELEASE" != "true" ]]; then
+          git fetch --no-tags origin +refs/heads/main:refs/remotes/origin/main
+          if ! git merge-base --is-ancestor "$GITHUB_SHA" refs/remotes/origin/main; then
+            echo "::error::Stable releases must be made from the main branch; tag '${RELEASE_TAG}' points to a commit that is not on main"
+            exit 1
+          fi
         fi
         echo "Version: ${version}"
         echo "version=${version}" >> "$GITHUB_OUTPUT"
