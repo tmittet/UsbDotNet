@@ -46,15 +46,11 @@ public interface IUsb : IDisposable
     /// Returns a list of device descriptors for connected USB devices.
     /// It does not involve any requests being sent to the devices.
     /// </summary>
-    /// <param name="vendorId">Optional vendor ID filter.</param>
-    /// <param name="productIds">Optional product ID filter.</param>
+    /// <param name="filter">Optional device filter; when null, every device is returned.</param>
     /// <exception cref="UsbException">Thrown when the get device list operation fails.</exception>
     /// <exception cref="ObjectDisposedException">Thrown when the Usb type is disposed.</exception>
     /// <exception cref="InvalidOperationException">Thrown when the Usb type is not initialized.</exception>
-    IReadOnlyCollection<IUsbDeviceDescriptor> GetDeviceList(
-        ushort? vendorId = default,
-        HashSet<ushort>? productIds = default
-    );
+    IReadOnlyCollection<IUsbDeviceDescriptor> GetDeviceList(UsbDeviceFilter? filter = null);
 
     /// <summary>
     /// Get the device manufacturer from the string descriptors read and cached by the OS during

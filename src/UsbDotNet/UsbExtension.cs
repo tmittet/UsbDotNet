@@ -25,6 +25,26 @@ public static class UsbExtension
     ) => usb.GetDeviceList(vendorId, productId.Length == 0 ? null : productId.ToHashSet());
 
     /// <summary>
+    /// Returns a list of device descriptors for connected USB devices.
+    /// It does not involve any requests being sent to the devices.
+    /// <para>
+    /// Backwards-compatible overload matching the former <see cref="IUsb.GetDeviceList"/>
+    /// signature; prefer <see cref="IUsb.GetDeviceList"/> with a <see cref="UsbDeviceFilter"/>.
+    /// </para>
+    /// </summary>
+    /// <param name="usb">Usb type instance.</param>
+    /// <param name="vendorId">Optional vendor ID filter.</param>
+    /// <param name="productIds">Optional product ID filter.</param>
+    /// <exception cref="UsbException">Thrown when the get device list operation fails.</exception>
+    /// <exception cref="ObjectDisposedException">Thrown when the Usb type is disposed.</exception>
+    /// <exception cref="InvalidOperationException">Thrown when the Usb type is not initialized.</exception>
+    public static IReadOnlyCollection<IUsbDeviceDescriptor> GetDeviceList(
+        this IUsb usb,
+        ushort? vendorId = default,
+        IReadOnlyCollection<ushort>? productIds = default
+    ) => usb.GetDeviceList(new UsbDeviceFilter(vendorId, productIds));
+
+    /// <summary>
     /// Get the device manufacturer from the string descriptors read and cached by the OS during
     /// device enumeration. As a fallback; read the manufacturer directly from the device.
     /// </summary>
