@@ -229,11 +229,9 @@ public sealed class Usb : IUsb
     }
 
     /// <inheritdoc/>
-    public IReadOnlyCollection<IUsbDeviceDescriptor> GetDeviceList(
-        ushort? vendorId = default,
-        HashSet<ushort>? productIds = default
-    )
+    public IReadOnlyCollection<IUsbDeviceDescriptor> GetDeviceList(UsbDeviceFilter? filter = null)
     {
+        filter ??= UsbDeviceFilter.Any;
         lock (_lock)
         {
             CheckDisposed();
@@ -243,10 +241,7 @@ public sealed class Usb : IUsb
             [
                 .. GetDeviceDescriptors(_logger, deviceList)
                     .Select(d => d.Descriptor)
-                    .Where(d =>
-                        (vendorId is null || vendorId == d.VendorId)
-                        && (productIds is null || productIds.Contains(d.ProductId))
-                    )
+                    .Where(d => filter.Matches(d))
                     .Cast<IUsbDeviceDescriptor>(),
             ];
         }
@@ -271,8 +266,6 @@ public sealed class Usb : IUsb
             try
             {
                 var descriptor = GetDeviceDescriptor(device);
-                if (descriptor.BcdUsb == 0)
-                    continue;
                 if (findKey is null || descriptor.DeviceKey == findKey)
                 {
                     result.Add((device, descriptor));
