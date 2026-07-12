@@ -81,6 +81,22 @@ public interface ISafeDevice : IDisposable
     );
 
     /// <summary>
+    /// Identifier for the underlying device, stable for the lifetime of the physical device
+    /// instance. libusb reuses it across hotplug arrival and removal, so it can be used to
+    /// correlate the two events.
+    /// <para>
+    /// Stability is established by the libusb source (not stated in its API docs): in core.c,
+    /// usbi_connect_device and usbi_disconnect_device pass the same libusb_device to
+    /// usbi_hotplug_notification, which stores the pointer verbatim on the queued message
+    /// (hotplug.c, msg->device = dev) that usbi_hotplug_process later hands to callbacks; the
+    /// DEVICE_LEFT message holds a device reference that is dropped only after the callbacks have
+    /// run. See https://github.com/libusb/libusb/blob/v1.0.30/libusb/core.c and
+    /// https://github.com/libusb/libusb/blob/v1.0.30/libusb/hotplug.c
+    /// </para>
+    /// </summary>
+    UniqueId Id { get; }
+
+    /// <summary>
     /// Gets a value indicating whether the underlying handle is closed or not.
     /// NOTE: Even though the safe type is disposed, the handle may remain open.
     /// </summary>

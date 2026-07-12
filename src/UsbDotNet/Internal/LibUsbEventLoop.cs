@@ -20,6 +20,9 @@ internal sealed class LibUsbEventLoop : IDisposable
     private Thread? _thread;
     private bool _disposed;
 
+    /// <summary>Managed thread id of the event-loop thread; null when not started.</summary>
+    public int? ManagedThreadId => _thread?.ManagedThreadId;
+
     public LibUsbEventLoop(ILogger<LibUsbEventLoop> logger, ISafeContext context)
     {
         _logger = logger;
