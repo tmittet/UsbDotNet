@@ -197,25 +197,35 @@ jobs:
       if: matrix.config.runtime == 'linux-x64' && github.event_name == 'release'
       id: get-version
       shell: bash
+      env:
+        RELEASE_TAG: ${{ github.event.release.tag_name }}
+        IS_PRERELEASE: ${{ github.event.release.prerelease }}
       run: |
         set -euo pipefail
-        latest_tag=$(git tag -l 'v*' | sort -V | tail -n 1)
-        # Get release version, or the latest tag version when run is not a release
-        version=$(
-          if [ -z "${RELEASE_REF_NAME:-}" ]; then
-            echo "${latest_tag:1}"
-          else
-            echo "${RELEASE_REF_NAME:1}"
-          fi
-        )
+        version="${RELEASE_TAG#v}"
+        semver_regex='^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z][0-9A-Za-z.-]*)?$'
+        if ! [[ $version =~ $semver_regex ]]; then
+          echo "::error::Tag '${RELEASE_TAG}' is not a valid vMAJOR.MINOR.PATCH[-SUFFIX] version"
+          exit 1
+        fi
+        suffix="${BASH_REMATCH[1]:-}"
+        # The GitHub pre-release checkbox and the tag pre-release suffix must agree
+        if [[ "$IS_PRERELEASE" == "true" && -z "$suffix" ]]; then
+          echo "::error::Release is marked pre-release, but tag '${RELEASE_TAG}' has no pre-release suffix (e.g. v1.4.0-beta.1)"
+          exit 1
+        fi
+        if [[ "$IS_PRERELEASE" != "true" && -n "$suffix" ]]; then
+          echo "::error::Tag '${RELEASE_TAG}' has a pre-release suffix, but the release is not marked as pre-release"
+          exit 1
+        fi
+        # Stable releases must be made from main; pre-releases may use a feature branch
+        if [[ "$IS_PRERELEASE" != "true" ]] \
+          && ! git merge-base --is-ancestor "$GITHUB_SHA" origin/main; then
+          echo "::error::Stable releases must be made from the main branch; tag '${RELEASE_TAG}' points to a commit that is not on main"
+          exit 1
+        fi
+        echo "Version: ${version}"
         echo "version=${version}" >> "$GITHUB_OUTPUT"
-        # Use first major.minor.patch for file version i.e. '1.2.3-something' -> '1.2.3'
-        file_version_regex="([0-9]+\.[0-9]+\.[0-9]+).*"
-        [[ $version =~ $file_version_regex ]]
-        file_version="${BASH_REMATCH[1]}"
-        # Echo and store version
-        echo "Version: ${file_version}"
-        echo "version=${file_version}" >> "$GITHUB_OUTPUT"
 
     - name: Pack NuGet packages 📦
       if: matrix.config.runtime == 'linux-x64' && github.event_name == 'release'
