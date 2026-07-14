@@ -105,12 +105,15 @@ public sealed class UsbHotplugMonitor : IUsbHotplugMonitor
             // Replay currently connected, matching devices as Connected events (per-subscriber
             // enumeration). Empty for the very first subscriber; libusb enumeration then populates
             // _connected and reaches this subscriber via the live dispatch path.
-            foreach (var descriptor in _connected.Values)
+            var matchingDevices = _connected.Values.Where(d => filter.Matches(d)).ToList();
+            _logger.LogDebug(
+                "New subscriber with {Filter} registered; replaying {Connected} devices.",
+                filter,
+                matchingDevices.Count
+            );
+            foreach (var descriptor in matchingDevices)
             {
-                if (filter.Matches(descriptor))
-                {
-                    subscription.Write(UsbHotplugEventType.Connected, descriptor);
-                }
+                subscription.Write(UsbHotplugEventType.Connected, descriptor);
             }
             _subscriptions.Add(subscription);
             return subscription;
