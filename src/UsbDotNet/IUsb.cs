@@ -53,7 +53,7 @@ public interface IUsb : IDisposable
     /// <exception cref="UsbException">Thrown when the get device list operation fails.</exception>
     /// <exception cref="ObjectDisposedException">Thrown when the Usb type is disposed.</exception>
     /// <exception cref="InvalidOperationException">Thrown when the Usb type is not initialized.</exception>
-    IReadOnlyCollection<IUsbDeviceDescriptor> GetDeviceList(UsbDeviceFilter? filter = null);
+    IReadOnlyCollection<IUsbDeviceDescriptor> GetDeviceList(IUsbDeviceFilter? filter = null);
 
     /// <summary>
     /// Get the device manufacturer from the string descriptors read and cached by the OS during

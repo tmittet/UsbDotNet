@@ -65,7 +65,7 @@ public sealed class UsbHotplugMonitor : IUsbHotplugMonitor
     }
 
     /// <inheritdoc/>
-    public IUsbHotplugSubscription Subscribe(UsbDeviceFilter? filter = null)
+    public IUsbHotplugSubscription Subscribe(IUsbDeviceFilter? filter = null)
     {
         filter ??= UsbDeviceFilter.Any;
         lock (_lock)
@@ -240,11 +240,11 @@ public sealed class UsbHotplugMonitor : IUsbHotplugMonitor
         private readonly Channel<UsbHotplugEvent> _channel;
         private int _disposed;
 
-        public UsbDeviceFilter Filter { get; }
+        public IUsbDeviceFilter Filter { get; }
 
         public ChannelReader<UsbHotplugEvent> Reader => _channel.Reader;
 
-        public Subscription(UsbHotplugMonitor monitor, UsbDeviceFilter filter)
+        public Subscription(UsbHotplugMonitor monitor, IUsbDeviceFilter filter)
         {
             _monitor = monitor;
             Filter = filter;

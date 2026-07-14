@@ -27,10 +27,6 @@ public static class UsbExtension
     /// <summary>
     /// Returns a list of device descriptors for connected USB devices.
     /// It does not involve any requests being sent to the devices.
-    /// <para>
-    /// Backwards-compatible overload matching the former <see cref="IUsb.GetDeviceList"/>
-    /// signature; prefer <see cref="IUsb.GetDeviceList"/> with a <see cref="UsbDeviceFilter"/>.
-    /// </para>
     /// </summary>
     /// <param name="usb">Usb type instance.</param>
     /// <param name="vendorId">Optional vendor ID filter.</param>

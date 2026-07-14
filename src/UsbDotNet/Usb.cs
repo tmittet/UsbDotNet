@@ -415,7 +415,7 @@ public sealed partial class Usb : IUsb, IHotplugProvider
     }
 
     /// <inheritdoc/>
-    public IReadOnlyCollection<IUsbDeviceDescriptor> GetDeviceList(UsbDeviceFilter? filter = null)
+    public IReadOnlyCollection<IUsbDeviceDescriptor> GetDeviceList(IUsbDeviceFilter? filter = null)
     {
         filter ??= UsbDeviceFilter.Any;
         lock (_lock)
