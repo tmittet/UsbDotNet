@@ -39,7 +39,10 @@ internal sealed class DeviceHotplugWorker(
     }
 
     /// <summary>Default approach: read events straight from the subscription channel.</summary>
-    private async Task RunWithChannelsAsync(UsbDeviceFilter filter, CancellationToken stoppingToken)
+    private async Task RunWithChannelsAsync(
+        IUsbDeviceFilter filter,
+        CancellationToken stoppingToken
+    )
     {
         using var subscription = monitor.Subscribe(filter);
         try
@@ -58,7 +61,7 @@ internal sealed class DeviceHotplugWorker(
     }
 
     /// <summary>Alternative approach: classic events via the notifier adapter.</summary>
-    private async Task RunWithEventsAsync(UsbDeviceFilter filter, CancellationToken stoppingToken)
+    private async Task RunWithEventsAsync(IUsbDeviceFilter filter, CancellationToken stoppingToken)
     {
         using var notifier = new UsbHotplugEventNotifier(monitor, filter, loggerFactory);
         // Attach handlers before Start() so the initial snapshot of connected devices is delivered.

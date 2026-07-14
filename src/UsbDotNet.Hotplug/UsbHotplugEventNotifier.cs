@@ -45,7 +45,7 @@ public sealed class UsbHotplugEventNotifier : IDisposable
     /// <param name="loggerFactory">Optional logger factory. If null, logging is disabled.</param>
     public UsbHotplugEventNotifier(
         IUsbHotplugMonitor monitor,
-        UsbDeviceFilter? filter = null,
+        IUsbDeviceFilter? filter = null,
         ILoggerFactory? loggerFactory = null
     )
     {

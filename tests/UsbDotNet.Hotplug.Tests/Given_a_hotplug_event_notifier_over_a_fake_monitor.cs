@@ -107,7 +107,7 @@ public sealed class Given_a_hotplug_event_notifier_over_a_fake_monitor
     private static IUsbHotplugMonitor CreateFakeMonitor(Channel<UsbHotplugEvent> channel)
     {
         var monitor = A.Fake<IUsbHotplugMonitor>();
-        A.CallTo(() => monitor.Subscribe(A<UsbDeviceFilter?>._))
+        A.CallTo(() => monitor.Subscribe(A<IUsbDeviceFilter?>._))
             .ReturnsLazily(() => CreateFakeSubscription(channel));
         A.CallTo(() => monitor.Dispose()).Invokes(() => channel.Writer.TryComplete());
         return monitor;

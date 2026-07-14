@@ -16,12 +16,12 @@ namespace UsbDotNet;
 public sealed record UsbDeviceFilter(
     IReadOnlyCollection<ushort>? VendorIds = null,
     IReadOnlyCollection<ushort>? ProductIds = null
-)
+) : IUsbDeviceFilter
 {
     /// <summary>A filter that matches every device (with a valid descriptor).</summary>
     public static UsbDeviceFilter Any { get; } = new();
 
-    /// <summary>Returns whether the given descriptor satisfies this filter.</summary>
+    /// <inheritdoc/>
     public bool Matches(IUsbDeviceDescriptor descriptor)
     {
         ArgumentNullException.ThrowIfNull(descriptor);
