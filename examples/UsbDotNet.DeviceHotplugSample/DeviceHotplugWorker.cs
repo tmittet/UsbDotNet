@@ -27,7 +27,7 @@ internal sealed class DeviceHotplugWorker(
 
         var settings = options.Value;
         var filter = new UsbDeviceFilter(
-            VendorId: settings.VendorId,
+            VendorIds: settings.VendorId is { } vendorId ? [vendorId] : null,
             ProductIds: settings.ProductId is { } productId ? [productId] : null
         );
 

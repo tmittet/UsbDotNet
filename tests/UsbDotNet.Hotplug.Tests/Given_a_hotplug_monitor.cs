@@ -121,7 +121,7 @@ public sealed class Given_a_hotplug_monitor : IDisposable
         var vendorId = devices.First().VendorId;
         var expectedMatchCount = devices.Count(d => d.VendorId == vendorId);
 
-        using var subscription = _monitor.Subscribe(new UsbDeviceFilter(VendorId: vendorId));
+        using var subscription = _monitor.Subscribe(new UsbDeviceFilter(VendorIds: [vendorId]));
         var events = await ReadAtLeastAsync(subscription.Reader, expectedMatchCount, EventTimeout);
 
         events.Should().HaveCountGreaterThanOrEqualTo(1);
