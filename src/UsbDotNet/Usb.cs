@@ -401,7 +401,7 @@ public sealed partial class Usb : IUsb, IHotplugProvider
 
     private void EmitHotplugEvent(libusb_hotplug_event eventType, UsbDeviceDescriptor descriptor)
     {
-        _logger.LogInformation(
+        _logger.LogDebug(
             "Hotplug '{EventType}'. Class: {DeviceClass}. Key: {DeviceKey}.",
             eventType,
             descriptor.DeviceClass,
