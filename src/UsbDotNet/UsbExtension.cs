@@ -42,7 +42,12 @@ public static class UsbExtension
         this IUsb usb,
         ushort? vendorId = default,
         IReadOnlyCollection<ushort>? productIds = default
-    ) => usb.GetDeviceList(new UsbDeviceFilter(vendorId, productIds));
+    ) =>
+        usb.GetDeviceList(
+            vendorId is null
+                ? new UsbDeviceFilter(ProductIds: productIds)
+                : new UsbDeviceFilter([vendorId.Value], productIds)
+        );
 
     /// <summary>
     /// Get the device manufacturer from the string descriptors read and cached by the OS during
