@@ -147,6 +147,54 @@ public sealed class Given_a_fake_hotplug_device_lifecycle : IDisposable
         await dispose.WaitAsync(timeout);
     }
 
+    [Fact]
+    public void Dispose_called_from_a_DeviceArrived_handler_on_the_event_loop_thread_throws_instead_of_deadlocking()
+    {
+        var timeout = TimeSpan.FromSeconds(5);
+        var provider = (IHotplugProvider)_usb;
+        using var handlerReturned = new ManualResetEventSlim(false);
+        Exception? caught = null;
+
+        provider.DeviceArrived += (_, _) =>
+        {
+            // This handler runs synchronously on the event-loop thread (see
+            // RunOnNextHandleEventsCompleted below). Usb.Dispose() would try to join that same
+            // thread; instead of hanging in a self-join, it must fail fast.
+            try
+            {
+                _usb.Dispose();
+            }
+            catch (Exception ex)
+            {
+                caught = ex;
+            }
+            finally
+            {
+                handlerReturned.Set();
+            }
+        };
+        provider.RegisterHotplug().Should().Be(HotplugRegistrationResult.Success);
+
+        // Have the real event-loop thread invoke the hotplug callback itself, from inside
+        // libusb_handle_events_completed, exactly as real libusb dispatches a pending event.
+        _api.RunOnNextHandleEventsCompleted(() =>
+            _api.LastCallback!.Invoke(
+                IntPtr.Zero,
+                DevicePtr,
+                libusb_hotplug_event.LIBUSB_HOTPLUG_EVENT_DEVICE_ARRIVED,
+                IntPtr.Zero
+            )
+        );
+
+        handlerReturned
+            .Wait(timeout)
+            .Should()
+            .BeTrue(
+                because: "Dispose called from the event-loop thread must not self-join and hang"
+            );
+        caught.Should().BeOfType<InvalidOperationException>();
+    }
+
     private void Raise(libusb_hotplug_event eventType)
     {
         _api.LastCallback.Should().NotBeNull();

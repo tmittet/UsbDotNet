@@ -14,6 +14,8 @@ namespace UsbDotNet.Tests.Fakes;
 /// </summary>
 internal sealed class FakeHotplugLibUsbApi : IDisposable
 {
+    private Action? _onNextHandleEventsCompleted;
+
     public ILibUsbApi Api { get; }
 
     // Mutable topology: a test can change these between arrival and removal to prove the value
@@ -34,6 +36,15 @@ internal sealed class FakeHotplugLibUsbApi : IDisposable
 
     /// <summary>The last hotplug callback registered; null once deregistered.</summary>
     public libusb_hotplug_callback_fn? LastCallback { get; private set; }
+
+    /// <summary>
+    /// Runs <paramref name="action"/> once, on the real event-loop thread, from inside the next
+    /// call to libusb_handle_events_completed, exactly as real libusb dispatches a pending
+    /// hotplug event. Lets a test simulate <see cref="LastCallback"/> being invoked from the
+    /// event-loop thread itself instead of from the calling (test) thread.
+    /// </summary>
+    public void RunOnNextHandleEventsCompleted(Action action) =>
+        _onNextHandleEventsCompleted = action;
 
     public FakeHotplugLibUsbApi(ushort vendorId, ushort productId)
     {
@@ -63,6 +74,7 @@ internal sealed class FakeHotplugLibUsbApi : IDisposable
         A.CallTo(() => api.libusb_handle_events_completed(A<IntPtr>._, A<IntPtr>._))
             .ReturnsLazily(() =>
             {
+                Interlocked.Exchange(ref _onNextHandleEventsCompleted, null)?.Invoke();
                 if (BlockEventLoop)
                 {
                     EventLoopEntered.Set();

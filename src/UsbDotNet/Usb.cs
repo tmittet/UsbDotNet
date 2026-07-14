@@ -681,6 +681,20 @@ public sealed partial class Usb : IUsb, IHotplugProvider
                 }
                 return;
             }
+            if (Environment.CurrentManagedThreadId == _eventLoopThreadId)
+            {
+                // Thrown if called synchronously from one of the the internal hotplug
+                // IHotplugProvider.DeviceArrived or IHotplugProvider.DeviceLeft handlers. The
+                // handlers run on the libusb event-loop thread, and disposing joins that thread.
+#pragma warning disable CA1065 // Do not raise exceptions in unexpected locations
+                const string errorMessage =
+                    "Dispose() was invoked from within a hotplug event handler. This is unsafe: "
+                    + "hotplug callbacks execute on the libusb event-loop thread, and Dispose() "
+                    + "attempts to join that same thread during teardown, causing a deadlock.";
+                _logger.LogError(errorMessage);
+                throw new InvalidOperationException(errorMessage);
+#pragma warning restore CA1065
+            }
             _disposeState = DisposeState.Disposing;
             // Disabling hotplug here makes most sense, although done differently in sample code.
             // NOTE: Callbacks for a context are automatically deregistered by libusb_exit()
