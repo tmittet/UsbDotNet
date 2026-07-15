@@ -106,10 +106,24 @@ jobs:
           --no-restore \
           --runtime ${{ matrix.config.runtime }}
 
+    - name: Build UsbDotNet.Hotplug
+      shell: bash
+      run: |
+        dotnet build src/UsbDotNet.Hotplug/UsbDotNet.Hotplug.csproj \
+          --no-restore \
+          --runtime ${{ matrix.config.runtime }}
+
     - name: Build UsbDotNet.DeviceInteractionSample
       shell: bash
       run: |
         dotnet build examples/UsbDotNet.DeviceInteractionSample/UsbDotNet.DeviceInteractionSample.csproj \
+          --no-restore \
+          --runtime ${{ matrix.config.runtime }}
+
+    - name: Build UsbDotNet.DeviceHotplugSample
+      shell: bash
+      run: |
+        dotnet build examples/UsbDotNet.DeviceHotplugSample/UsbDotNet.DeviceHotplugSample.csproj \
           --no-restore \
           --runtime ${{ matrix.config.runtime }}
 
@@ -148,6 +162,13 @@ jobs:
           --no-restore \
           --runtime ${{ matrix.config.runtime }}
 
+    - name: Build UsbDotNet.Hotplug.Tests
+      shell: bash
+      run: |
+        dotnet build tests/UsbDotNet.Hotplug.Tests/UsbDotNet.Hotplug.Tests.csproj \
+          --no-restore \
+          --runtime ${{ matrix.config.runtime }}
+
     - name: Install libusb 1.0 dev (for linux)
       # libusb is not packaged for linux and must be present before running tests
       if: startsWith(matrix.config.runtime, 'linux-')
@@ -177,6 +198,15 @@ jobs:
       shell: bash
       run: |
         dotnet test tests/UsbDotNet.Extensions.Tests/UsbDotNet.Extensions.Tests.csproj \
+          --no-build \
+          --runtime ${{ matrix.config.runtime }} \
+          --logger "junit;LogFilePath=TestResults/results.xml" \
+          --verbosity normal
+
+    - name: Run UsbDotNet.Hotplug.Tests
+      shell: bash
+      run: |
+        dotnet test tests/UsbDotNet.Hotplug.Tests/UsbDotNet.Hotplug.Tests.csproj \
           --no-build \
           --runtime ${{ matrix.config.runtime }} \
           --logger "junit;LogFilePath=TestResults/results.xml" \
