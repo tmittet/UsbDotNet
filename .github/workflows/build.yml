@@ -43,13 +43,13 @@ jobs:
         # Visit github-hosted-runners page for reference:
         # https://docs.github.com/en/actions/reference/runners/github-hosted-runners
         config:
-          - os: ubuntu-24.04-arm
+          - os: ubuntu-26.04-arm
             runtime: linux-arm64
           - os: ubuntu-latest
             runtime: linux-x64
-          - os: macos-latest
+          - os: macos-26
             runtime: osx-arm64
-          - os: macos-15-intel
+          - os: macos-26-intel
             runtime: osx-x64
           - os: windows-11-arm
             runtime: win-arm64
