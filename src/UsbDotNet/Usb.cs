@@ -15,7 +15,7 @@ using UsbDotNet.LibUsbNative.Structs;
 namespace UsbDotNet;
 
 /// <inheritdoc/>
-public sealed partial class Usb : IUsb, IHotplugProvider
+public sealed class Usb : IUsb, IHotplugProvider
 {
     private EventHandler<IUsbDeviceDescriptor>? _deviceArrived;
     private EventHandler<IUsbDeviceDescriptor>? _deviceLeft;

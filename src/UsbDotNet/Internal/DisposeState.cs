@@ -1,11 +1,8 @@
-namespace UsbDotNet;
+namespace UsbDotNet.Internal;
 
-public sealed partial class Usb
+internal enum DisposeState
 {
-    private enum DisposeState
-    {
-        Live,
-        Disposing,
-        Disposed,
-    }
+    Live,
+    Disposing,
+    Disposed,
 }
