@@ -58,6 +58,7 @@ public sealed class Usb : IUsb, IHotplugProvider
 #pragma warning restore CA2213 // Disposable fields should be disposed
     private LibUsbEventLoop? _eventLoop;
     private ISafeCallbackHandle? _hotplugCallbackHandle;
+    private readonly RundownGuard _hotplugCallbackRundown = new();
     private int _eventLoopThreadId;
     private DisposeState _disposeState;
 
@@ -321,15 +322,24 @@ public sealed class Usb : IUsb, IHotplugProvider
         ArgumentNullException.ThrowIfNull(context);
         ArgumentNullException.ThrowIfNull(device);
 
-        if (eventType is libusb_hotplug_event.LIBUSB_HOTPLUG_EVENT_DEVICE_ARRIVED)
+        try
         {
-            HandleDeviceArrived(device);
+            using var token = _hotplugCallbackRundown.AcquireSharedToken();
+            if (eventType is libusb_hotplug_event.LIBUSB_HOTPLUG_EVENT_DEVICE_ARRIVED)
+            {
+                HandleDeviceArrived(device);
+            }
+            else
+            {
+                HandleDeviceLeft(device);
+            }
+            return libusb_hotplug_return.REARM;
         }
-        else
+        catch (ObjectDisposedException)
         {
-            HandleDeviceLeft(device);
+            device.Dispose();
+            return libusb_hotplug_return.DEREGISTER;
         }
-        return libusb_hotplug_return.REARM;
     }
 
     private void HandleDeviceArrived(ISafeDevice device)
@@ -660,8 +670,13 @@ public sealed class Usb : IUsb, IHotplugProvider
     /// </summary>
     public void Dispose()
     {
+        UsbDevice[] openDevices;
+        ISafeCallbackHandle? hotplugCallbackHandle;
         LibUsbEventLoop? eventLoop;
-        EventHandler? providerDisposed;
+        ISafeContext? context;
+        EventHandler? providerDisposed = null;
+
+        // 1. Mark Usb as Disposing
         lock (_lock)
         {
             if (_disposeState is DisposeState.Disposed)
@@ -670,8 +685,6 @@ public sealed class Usb : IUsb, IHotplugProvider
             }
             if (_disposeState is DisposeState.Disposing)
             {
-                // Allow the event-loop thread disposer to join this thread below; waiting here
-                // would deadlock when a hotplug subscriber calls Dispose during event dispatch.
                 if (Environment.CurrentManagedThreadId != _eventLoopThreadId)
                 {
                     while (_disposeState is not DisposeState.Disposed)
@@ -681,76 +694,80 @@ public sealed class Usb : IUsb, IHotplugProvider
                 }
                 return;
             }
+
             if (Environment.CurrentManagedThreadId == _eventLoopThreadId)
             {
                 // Thrown if called synchronously from one of the the internal hotplug
                 // IHotplugProvider.DeviceArrived or IHotplugProvider.DeviceLeft handlers. The
                 // handlers run on the libusb event-loop thread, and disposing joins that thread.
-#pragma warning disable CA1065 // Do not raise exceptions in unexpected locations
                 const string errorMessage =
                     "Dispose() was invoked from within a hotplug event handler. This is unsafe: "
                     + "hotplug callbacks execute on the libusb event-loop thread, and Dispose() "
                     + "attempts to join that same thread during teardown, causing a deadlock.";
                 _logger.LogError(errorMessage);
+#pragma warning disable CA1065 // Do not raise exceptions in unexpected locations
                 throw new InvalidOperationException(errorMessage);
 #pragma warning restore CA1065
             }
             _disposeState = DisposeState.Disposing;
-            // Disabling hotplug here makes most sense, although done differently in sample code.
-            // NOTE: Callbacks for a context are automatically deregistered by libusb_exit()
-            _hotplugCallbackHandle?.Dispose();
+
+            hotplugCallbackHandle = _hotplugCallbackHandle;
+            _hotplugCallbackHandle = null;
+            openDevices = [.. _openDevices.Values];
             eventLoop = _eventLoop;
-            _eventLoop = null;
+            context = _context;
         }
-
-        // Stop the event loop outside _lock. Joining the event-loop thread while holding
-        // _lock deadlocks when that thread is dispatching a hotplug event to a subscriber.
-        eventLoop?.Dispose();
-
-        lock (_lock)
+        try
         {
-            if (_context is not null)
+            // 2. Deregister hotplug callback
+            hotplugCallbackHandle?.Dispose();
+            // 3. Wait for any currently executing hotplug callback to finish
+            _hotplugCallbackRundown.Dispose();
+            // 4. Dispose devices and cancel transfers
+            foreach (var device in openDevices)
             {
-                // The callback is deregistered and the event loop stopped above, so no further
-                // hotplug callbacks can run. Release references held for devices that never received
-                // a DEVICE_LEFT (e.g. still connected at shutdown).
-                foreach (var (cachedDevice, _) in _hotplugDevices.Values)
+                _logger.LogDebug(
+                    "Auto disposing device '{DeviceKey}' on Usb type dispose.",
+                    device.Descriptor.DeviceKey
+                );
+                device.Dispose();
+            }
+            // 5. Stop and join libusb event loop
+            eventLoop?.Dispose();
+            // 6. Release cached hotplug device references
+            foreach (var entry in _hotplugDevices.ToArray())
+            {
+                if (_hotplugDevices.TryRemove(entry.Key, out var cached))
                 {
-                    cachedDevice.Dispose();
-                }
-                _hotplugDevices.Clear();
-                // Close any devices, interfaces and transfers that remain open or are ongoing
-                foreach (var device in _openDevices)
-                {
-                    _logger.LogDebug(
-                        "Auto disposing device '{DeviceKey}' on Usb type dispose.",
-                        device.Key
-                    );
-                    // Device dispose calls Usb.CloseDevice, which removes it from the
-                    // _openDevices dictionary. This works without deadlock or race conditions since
-                    // the C# Monitor lock is re-entrant and the ConcurrentDictionary is designed to
-                    // allow modification during iteration.
-                    device.Value.Dispose();
-                }
-
-                _context.Dispose();
-                Debug.Assert(_context.IsClosed, "SafeContext not closed after dispose.");
-                if (!_context.IsClosed)
-                {
-                    _logger.LogWarning(
-                        "Failed to clean up all LibUsb resources. SafeContext not closed after dispose."
-                    );
+                    cached.Device.Dispose();
                 }
             }
-            LibUsbLogHandler.ClearLogger();
-            _logger.LogDebug("Usb type disposed.");
-            _ = Interlocked.Exchange(ref _instances, 0);
-            _disposeState = DisposeState.Disposed;
-            // Wake up concurrent Dispose callers waiting for teardown to complete
-            Monitor.PulseAll(_lock);
-            providerDisposed = _hotplugProviderDisposed;
+            // 7. Dispose SafeContext (libusb_exit)
+            if (context is not null)
+            {
+                context.Dispose();
+                Debug.Assert(context.IsClosed, "SafeContext was not closed after Usb.Dispose().");
+                if (!context.IsClosed)
+                {
+                    _logger.LogWarning("SafeContext remained referenced after Usb.Dispose().");
+                }
+            }
         }
-        // Notify hotplug consumers once
-        EventDispatch.RaiseSafely(providerDisposed, _logger, this);
+        finally
+        {
+            lock (_lock)
+            {
+                _eventLoop = null;
+                _eventLoopThreadId = 0;
+                _context = null;
+
+                LibUsbLogHandler.ClearLogger();
+                _ = Interlocked.Exchange(ref _instances, 0);
+                _disposeState = DisposeState.Disposed;
+                Monitor.PulseAll(_lock);
+                providerDisposed = _hotplugProviderDisposed;
+            }
+            EventDispatch.RaiseSafely(providerDisposed, _logger, this);
+        }
     }
 }
