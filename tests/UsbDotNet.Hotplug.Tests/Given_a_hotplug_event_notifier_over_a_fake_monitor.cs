@@ -1,5 +1,4 @@
-using System.Collections.Concurrent;
-using System.Threading.Channels;
+using System.Runtime.CompilerServices;
 using FakeItEasy;
 using UsbDotNet.Descriptor;
 
@@ -10,114 +9,171 @@ public sealed class Given_a_hotplug_event_notifier_over_a_fake_monitor
     private static readonly TimeSpan Timeout = TimeSpan.FromSeconds(5);
 
     [Fact]
-    public void Dispose_from_within_a_handler_does_not_deadlock()
+    public async Task DeviceConnected_is_raised_for_each_connected_event()
     {
-        var channel = Channel.CreateUnbounded<UsbHotplugEvent>();
-        using var monitor = CreateFakeMonitor(channel);
-        // Also disposed from within the handler below; Dispose is idempotent so the scope-exit
-        // Dispose here (which satisfies CA2000) is harmless.
-        using var notifier = new UsbHotplugEventNotifier(monitor);
+        using var monitor = CreateFakeMonitor(Connected("device-a"), Connected("device-b"));
+        var notifier = new UsbHotplugEventNotifier(monitor);
+        var seen = new List<string>();
+        notifier.DeviceConnected += (_, e) => seen.Add(e.Descriptor.DeviceKey);
 
-        using var disposeReturned = new ManualResetEventSlim(false);
-        notifier.DeviceConnected += (_, _) =>
-        {
-            // Disposing from inside a handler runs on the pump thread; a naive synchronous wait on
-            // the pump would deadlock the thread against itself. This must return promptly instead.
-            notifier.Dispose();
-            disposeReturned.Set();
-        };
-        notifier.Start();
+        await notifier.RunAsync(CancellationToken.None);
 
-        channel
-            .Writer.TryWrite(
-                new UsbHotplugEvent(
-                    UsbHotplugEventType.Connected,
-                    new UsbDeviceDescriptor { DeviceKey = "fake-device" }
-                )
-            )
-            .Should()
-            .BeTrue();
-
-        disposeReturned
-            .Wait(Timeout)
-            .Should()
-            .BeTrue(because: "Dispose called from within a handler must not deadlock");
+        seen.Should().Equal("device-a", "device-b");
     }
 
     [Fact]
-    public void Start_after_Dispose_throws_ObjectDisposedException()
+    public async Task Each_event_type_reaches_only_its_own_handler()
     {
-        var channel = Channel.CreateUnbounded<UsbHotplugEvent>();
-        using var monitor = CreateFakeMonitor(channel);
-        using var notifier = new UsbHotplugEventNotifier(monitor);
+        using var monitor = CreateFakeMonitor(Connected("arrived"), Disconnected("left"));
+        var notifier = new UsbHotplugEventNotifier(monitor);
+        var connected = new List<string>();
+        var disconnected = new List<string>();
+        notifier.DeviceConnected += (_, e) => connected.Add(e.Descriptor.DeviceKey);
+        notifier.DeviceDisconnected += (_, e) => disconnected.Add(e.Descriptor.DeviceKey);
 
-        notifier.Dispose();
+        await notifier.RunAsync(CancellationToken.None);
 
-        FluentActions.Invoking(notifier.Start).Should().Throw<ObjectDisposedException>();
+        connected.Should().Equal("arrived");
+        disconnected.Should().Equal("left");
     }
 
     [Fact]
-    public async Task Concurrent_Start_and_Dispose_never_fault_the_pump_task()
+    public async Task A_handler_attached_after_RunAsync_starts_misses_the_initial_burst()
     {
-        // Regression for a Start/Dispose race: Dispose could observe _pump == null and dispose
-        // the CTS while Start was between its disposed check and the pump creation, so the pump
-        // lambda later read Token from a disposed CTS and faulted unobserved on a thread-pool
-        // thread. The interleaving cannot be forced deterministically from the outside, so race
-        // the two calls repeatedly and fail if any abandoned task faulted.
-        var unobserved = new ConcurrentQueue<Exception>();
-        EventHandler<UnobservedTaskExceptionEventArgs> onUnobserved = (_, e) =>
-        {
-            unobserved.Enqueue(e.Exception);
-            e.SetObserved();
-        };
-        TaskScheduler.UnobservedTaskException += onUnobserved;
-        try
-        {
-            for (var i = 0; i < 500; i++)
-            {
-                var channel = Channel.CreateUnbounded<UsbHotplugEvent>();
-                using var monitor = CreateFakeMonitor(channel);
-                using var notifier = new UsbHotplugEventNotifier(monitor);
-                var start = Task.Run(() =>
-                {
-                    try
-                    {
-                        notifier.Start();
-                    }
-                    catch (ObjectDisposedException)
-                    {
-                        // Valid outcome: Dispose won the race.
-                    }
-                });
-                var dispose = Task.Run(notifier.Dispose);
-                await Task.WhenAll(start, dispose);
-            }
-            // Faulted-and-abandoned tasks only surface through finalization.
-            GC.Collect();
-            GC.WaitForPendingFinalizers();
-            GC.Collect();
-            unobserved.Should().BeEmpty();
-        }
-        finally
-        {
-            TaskScheduler.UnobservedTaskException -= onUnobserved;
-        }
+        using var monitor = CreateFakeMonitor(Connected("device-a"));
+        var notifier = new UsbHotplugEventNotifier(monitor);
+
+        // RunAsync runs synchronously up to its first incomplete await, and an already-buffered
+        // snapshot is delivered inside that window — so by the time the call returns its Task the
+        // burst is gone. This is what makes "attach handlers, then RunAsync" the contract; the
+        // point of the new design is that there is nothing to call before attaching, so the
+        // ordering is hard to get wrong rather than merely documented.
+        var run = notifier.RunAsync(CancellationToken.None);
+        var late = new List<string>();
+        notifier.DeviceConnected += (_, e) => late.Add(e.Descriptor.DeviceKey);
+        await run;
+
+        late.Should().BeEmpty(because: "the burst was delivered before the handler was attached");
     }
 
-    private static IUsbHotplugMonitor CreateFakeMonitor(Channel<UsbHotplugEvent> channel)
+    [Fact]
+    public async Task A_throwing_handler_does_not_stop_the_others()
+    {
+        using var monitor = CreateFakeMonitor(Connected("device-a"));
+        var notifier = new UsbHotplugEventNotifier(monitor);
+        var reachedSecondHandler = false;
+        notifier.DeviceConnected += (_, _) => throw new InvalidOperationException("boom");
+        notifier.DeviceConnected += (_, _) => reachedSecondHandler = true;
+
+        // Must not fault: each handler is invoked individually and a thrower is logged, because
+        // isolation between handlers is most of the reason to expose an event at all.
+        await notifier.RunAsync(CancellationToken.None);
+
+        reachedSecondHandler
+            .Should()
+            .BeTrue(because: "one throwing handler must not deny the event to the others");
+    }
+
+    [Fact]
+    public async Task Running_the_same_notifier_twice_throws()
+    {
+        using var monitor = CreateFakeMonitor(Connected("device-a"));
+        var notifier = new UsbHotplugEventNotifier(monitor);
+
+        await notifier.RunAsync(CancellationToken.None);
+
+        // The stream itself is legitimately reusable, but a second run over the same handlers would
+        // raise every event twice, which is a bug rather than a feature.
+        var second = async () => await notifier.RunAsync(CancellationToken.None);
+        (await second.Should().ThrowAsync<InvalidOperationException>()).WithMessage(
+            "*already been run*"
+        );
+        A.CallTo(() => monitor.Subscribe(A<IUsbDeviceFilter?>._, A<CancellationToken>._))
+            .MustHaveHappenedOnceExactly();
+    }
+
+    [Fact]
+    public async Task Cancelling_the_token_ends_RunAsync()
+    {
+        using var monitor = A.Fake<IUsbHotplugMonitor>();
+        A.CallTo(() => monitor.Subscribe(A<IUsbDeviceFilter?>._, A<CancellationToken>._))
+            .ReturnsLazily((IUsbDeviceFilter? _, CancellationToken token) => NeverEnding(token));
+        using var cts = new CancellationTokenSource();
+        var notifier = new UsbHotplugEventNotifier(monitor);
+
+        var run = notifier.RunAsync(cts.Token);
+        await cts.CancelAsync();
+
+        // Bounded rather than a bare await: if the token is not forwarded to the monitor the run
+        // never ends, and a hung test run is a far worse failure than a TimeoutException.
+        var awaiting = async () => await run.WaitAsync(Timeout, CancellationToken.None);
+        (await awaiting.Should().ThrowAsync<OperationCanceledException>())
+            .Which.CancellationToken.Should()
+            .Be(cts.Token, because: "the consumer's own cancellation is identified by its token");
+    }
+
+    [Fact]
+    public async Task RunAsync_forwards_the_filter_and_the_token_to_the_monitor()
+    {
+        var filter = new UsbDeviceFilter(VendorIds: [0x1234]);
+        using var monitor = CreateFakeMonitor();
+        using var cts = new CancellationTokenSource(Timeout);
+        var notifier = new UsbHotplugEventNotifier(monitor, filter);
+
+        await notifier.RunAsync(cts.Token);
+
+        A.CallTo(() => monitor.Subscribe(filter, cts.Token)).MustHaveHappenedOnceExactly();
+    }
+
+    private static IUsbHotplugMonitor CreateFakeMonitor(params UsbHotplugEvent[] events)
     {
         var monitor = A.Fake<IUsbHotplugMonitor>();
-        A.CallTo(() => monitor.Subscribe(A<IUsbDeviceFilter?>._))
-            .ReturnsLazily(() => CreateFakeSubscription(channel));
-        A.CallTo(() => monitor.Dispose()).Invokes(() => channel.Writer.TryComplete());
+        A.CallTo(() => monitor.Subscribe(A<IUsbDeviceFilter?>._, A<CancellationToken>._))
+            .ReturnsLazily(
+                (IUsbDeviceFilter? _, CancellationToken token) => StreamOf(events, token)
+            );
         return monitor;
     }
 
-    private static IUsbHotplugSubscription CreateFakeSubscription(Channel<UsbHotplugEvent> channel)
+    /// <summary>
+    /// A finite stream. A real subscription never ends on its own, but ending after the burst lets
+    /// the mapping tests await <c>RunAsync</c> without cancellation ceremony.
+    /// </summary>
+    private static async IAsyncEnumerable<UsbHotplugEvent> StreamOf(
+        UsbHotplugEvent[] events,
+        [EnumeratorCancellation] CancellationToken cancellationToken
+    )
     {
-        var subscription = A.Fake<IUsbHotplugSubscription>();
-        A.CallTo(() => subscription.Reader).Returns(channel.Reader);
-        A.CallTo(() => subscription.Dispose()).Invokes(() => channel.Writer.TryComplete());
-        return subscription;
+        // Completes synchronously, so the burst below is still delivered inside RunAsync's
+        // synchronous window; present only because an async iterator needs an await.
+        await Task.CompletedTask;
+        foreach (var e in events)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            yield return e;
+        }
     }
+
+    /// <summary>A stream that only ever ends by cancellation, like a real live subscription.</summary>
+    private static async IAsyncEnumerable<UsbHotplugEvent> NeverEnding(
+        [EnumeratorCancellation] CancellationToken cancellationToken
+    )
+    {
+        await Task.Delay(System.Threading.Timeout.Infinite, cancellationToken);
+        yield break;
+    }
+
+    private static UsbHotplugEvent Connected(string key) =>
+        new(UsbHotplugEventType.Connected, Device(key));
+
+    private static UsbHotplugEvent Disconnected(string key) =>
+        new(UsbHotplugEventType.Disconnected, Device(key));
+
+    private static UsbDeviceDescriptor Device(string key) =>
+        new()
+        {
+            DeviceKey = key,
+            BcdUsb = 0x0200,
+            VendorId = 0x1234,
+        };
 }
