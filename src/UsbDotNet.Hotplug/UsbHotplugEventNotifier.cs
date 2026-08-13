@@ -6,21 +6,22 @@ namespace UsbDotNet.Hotplug;
 
 /// <summary>
 /// Adapts the channel-based <see cref="IUsbHotplugMonitor"/> subscription to classic .NET events.
-/// It subscribes with the given filter and, once <see cref="Start"/> is called, pumps the channel
-/// on a background task, raising <see cref="DeviceConnected"/> and <see cref="DeviceDisconnected"/>
+/// <see cref="Start"/> subscribes with the given filter and pumps the subscription channel on a
+/// background task, raising <see cref="DeviceConnected"/> and <see cref="DeviceDisconnected"/>
 /// events.
 /// <para>
-/// Usage: construct, attach handlers, then call <see cref="Start"/>. The subscription (including
-/// the initial snapshot of already connected devices) is captured at construction and buffered, so
-/// no events are lost between construction and <see cref="Start"/>.
+/// Usage: construct, attach handlers, then call <see cref="Start"/>. The subscription is created
+/// in <see cref="Start"/> and the initial snapshot of connected devices delivered to the handler.
 /// </para>
 /// </summary>
 public sealed class UsbHotplugEventNotifier : IDisposable
 {
     private readonly object _lock = new();
-    private readonly IUsbHotplugSubscription _subscription;
+    private readonly IUsbHotplugMonitor _monitor;
+    private readonly IUsbDeviceFilter? _filter;
     private readonly CancellationTokenSource _cts = new();
     private readonly ILogger<UsbHotplugEventNotifier> _logger;
+    private IUsbHotplugSubscription? _subscription;
     private Task? _pump;
     private bool _started;
     private bool _disposed;
@@ -37,8 +38,8 @@ public sealed class UsbHotplugEventNotifier : IDisposable
     public event EventHandler<UsbHotplugEventArgs>? DeviceDisconnected;
 
     /// <summary>
-    /// Subscribes to <paramref name="monitor"/> with the given filter.
-    /// Call <see cref="Start"/> after attaching handlers to begin raising events.
+    /// Creates a notifier over <paramref name="monitor"/>. No subscription is created yet;
+    /// call <see cref="Start"/> after attaching handlers to subscribe and begin raising events.
     /// </summary>
     /// <param name="monitor">The monitor to subscribe to.</param>
     /// <param name="filter">The filter to apply, or null for all devices.</param>
@@ -50,20 +51,23 @@ public sealed class UsbHotplugEventNotifier : IDisposable
     )
     {
         ArgumentNullException.ThrowIfNull(monitor);
+        _monitor = monitor;
+        _filter = filter;
         _logger = loggerFactory is null
             ? NullLogger<UsbHotplugEventNotifier>.Instance
             : loggerFactory.CreateLogger<UsbHotplugEventNotifier>();
-        // Subscribe now so the initial snapshot of connected devices is captured; events buffer in
-        // the channel until Start() drains them to the (by then attached) handlers.
-        _subscription = monitor.Subscribe(filter);
     }
 
     /// <summary>
-    /// Begins raising events on a background task. Attach <see cref="DeviceConnected"/> and
-    /// <see cref="DeviceDisconnected"/> handlers before calling this so the initial snapshot of
-    /// connected devices is delivered to them.
+    /// Subscribes to the monitor and begins raising events on a background task. Attach
+    /// <see cref="DeviceConnected"/> and <see cref="DeviceDisconnected"/> handlers before
+    /// calling this so the initial snapshot of connected devices is delivered.
     /// </summary>
     /// <exception cref="ObjectDisposedException">Thrown when the notifier is disposed.</exception>
+    /// <exception cref="InvalidOperationException">
+    /// Thrown when the monitor cannot create a subscription; see
+    /// <see cref="IUsbHotplugMonitor.Subscribe"/>. The notifier remains unstarted.
+    /// </exception>
     public void Start()
     {
         lock (_lock)
@@ -76,20 +80,25 @@ public sealed class UsbHotplugEventNotifier : IDisposable
             {
                 return;
             }
+            // Subscribe before setting _started so a throwing Subscribe leaves the notifier
+            // unstarted. The monitor replays already connected devices into the subscription
+            // channel at subscribe time; the pump below delivers them to the attached handlers.
+            var subscription = _monitor.Subscribe(_filter);
+            _subscription = subscription;
             _started = true;
             // Read the token under _lock, and before scheduling: a concurrent Dispose cannot
             // dispose _cts between the disposed check above and this read, and the deferred
             // pump task never touches _cts itself.
             var token = _cts.Token;
-            _pump = Task.Run(() => PumpAsync(token));
+            _pump = Task.Run(() => PumpAsync(subscription, token));
         }
     }
 
-    private async Task PumpAsync(CancellationToken token)
+    private async Task PumpAsync(IUsbHotplugSubscription subscription, CancellationToken token)
     {
         try
         {
-            await foreach (var e in _subscription.Reader.ReadAllAsync(token).ConfigureAwait(false))
+            await foreach (var e in subscription.Reader.ReadAllAsync(token).ConfigureAwait(false))
             {
                 var handler =
                     e.Type == UsbHotplugEventType.Connected ? DeviceConnected : DeviceDisconnected;
@@ -122,10 +131,11 @@ public sealed class UsbHotplugEventNotifier : IDisposable
         }
     }
 
-    /// <summary>Stops pumping events and disposes the underlying subscription.</summary>
+    /// <summary>Stops pumping events and disposes the underlying subscription, if any.</summary>
     public void Dispose()
     {
         Task? pump;
+        IUsbHotplugSubscription? subscription;
         lock (_lock)
         {
             if (_disposed)
@@ -134,10 +144,11 @@ public sealed class UsbHotplugEventNotifier : IDisposable
             }
             _disposed = true;
             pump = _pump;
+            subscription = _subscription;
         }
         // Cancel and wait outside _lock; only state transitions are serialized by it.
         _cts.Cancel();
-        _subscription.Dispose();
+        subscription?.Dispose();
         if (pump is null)
         {
             // Start can no longer create a pump (_disposed is set), so _cts is safe to dispose.
