@@ -1,3 +1,4 @@
+using System.Runtime.CompilerServices;
 using System.Threading.Channels;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -17,6 +18,8 @@ public sealed class UsbHotplugMonitor : IUsbHotplugMonitor, IHotplugListener
         "The underlying IUsb instance is disposed; hotplug monitoring has stopped. "
         + "Create a new IUsb instance and a new monitor to resume monitoring.";
 
+    private const string MonitorDisposedMessage = "The UsbHotplugMonitor was disposed.";
+
     /// <summary>
     /// Guards registration and deregistration (see EnsureRegistered and Dispose). A separate lock
     /// because the provider dispatches into Dispatch (which takes _lock) both synchronously during
@@ -26,7 +29,7 @@ public sealed class UsbHotplugMonitor : IUsbHotplugMonitor, IHotplugListener
     private readonly object _registerLock = new();
 
     /// <summary>
-    /// Serializes _subscriptions, the _connected devices snapshot, the _disposed/_providerDisposed
+    /// Serializes _subscribers, the _connected devices snapshot, the _disposed/_providerDisposed
     /// lifecycle flags, and most importantly: every Dispatch from the provider.
     /// </summary>
     private readonly object _lock = new();
@@ -35,22 +38,27 @@ public sealed class UsbHotplugMonitor : IUsbHotplugMonitor, IHotplugListener
     private readonly ILogger<UsbHotplugMonitor> _logger;
 
     // Devices currently connected, keyed by DeviceKey. Mutated only under _lock, from the
-    // hotplug events (libusb event loop thread) and read when replaying to late subscribers.
+    // hotplug events (libusb event loop thread) and read when a subscription starts.
     // Deliberately distinct from the provider's pointer-keyed device cache: this one is
-    // maintained under _lock atomically with the subscription channel writes, so a late
-    // subscriber's replay is exactly consistent with the live stream (no duplicated and no
-    // missed events). Snapshotting the provider's cache instead would race the in-flight
-    // dispatch that runs after the cache is updated.
+    // maintained under _lock atomically with joining the fan-out, so a starting subscription's
+    // snapshot is exactly consistent with the live stream (no duplicated and no missed events).
+    // Snapshotting the provider's cache instead would race the in-flight dispatch that runs after
+    // the cache is updated.
     private readonly Dictionary<string, IUsbDeviceDescriptor> _connected = [];
-    private readonly List<Subscription> _subscriptions = [];
+
+    // Live subscriptions
+    private readonly Dictionary<Channel<UsbHotplugEvent>, IUsbDeviceFilter> _subscribers = [];
 
     private bool _registered;
-    private bool _providerDisposed;
-    private bool _disposed;
+
+    // Volatile because a consumer reads these without _lock before yielding each event
+    private volatile bool _providerDisposed;
+    private volatile bool _disposed;
 
     /// <summary>
-    /// True when hotplug is supported on this platform. <see cref="Subscribe(IUsbDeviceFilter?)"/>
-    /// throws <see cref="NotSupportedException"/> if hotplug is not supported.
+    /// True when hotplug is supported on this platform. Enumerating
+    /// <see cref="Subscribe(IUsbDeviceFilter?, CancellationToken)"/> throws
+    /// <see cref="NotSupportedException"/> if hotplug is not supported.
     /// </summary>
     public bool IsHotplugSupported { get; }
 
@@ -77,6 +85,30 @@ public sealed class UsbHotplugMonitor : IUsbHotplugMonitor, IHotplugListener
         return new UsbHotplugMonitor(usbWithProvider.HotplugProvider, loggerFactory);
     }
 
+    /// <summary>Live subscriptions.</summary>
+    internal int SubscriptionCount
+    {
+        get
+        {
+            lock (_lock)
+            {
+                return _subscribers.Count;
+            }
+        }
+   }
+
+    /// <summary>Tracked connected devices.</summary>
+    internal int ConnectedCount
+    {
+        get
+        {
+            lock (_lock)
+            {
+                return _connected.Count;
+            }
+        }
+    }
+
     internal UsbHotplugMonitor(IHotplugProvider provider, ILoggerFactory? loggerFactory = null)
     {
         _provider = provider ?? throw new ArgumentNullException(nameof(provider));
@@ -87,34 +119,81 @@ public sealed class UsbHotplugMonitor : IUsbHotplugMonitor, IHotplugListener
     }
 
     /// <inheritdoc/>
-    public IUsbHotplugSubscription Subscribe(IUsbDeviceFilter? filter = null)
+    /// <remarks>
+    /// An iterator which yields hotplug events for:
+    /// 1. Devices already connected when the subscription start
+    /// 2. New events as they arrive from libusb
+    /// 
+    /// Doesn't run until the consumer's first read. 
+    /// </remarks>
+    public async IAsyncEnumerable<UsbHotplugEvent> Subscribe(
+        IUsbDeviceFilter? filter = null,
+        [EnumeratorCancellation] CancellationToken cancellationToken = default
+    )
     {
+        // Before registering: an already-cancelled consumer should not cause a native registration
+        // that nothing will ever read.
+        cancellationToken.ThrowIfCancellationRequested();
         filter ??= UsbDeviceFilter.Any;
         EnsureRegistered();
+
+        // Unbounded and never dropping while live: hotplug is low-volume, and dropping a connect
+        // or disconnect would corrupt a consumer's view of device state. SingleWriter is false
+        // because live events are written from the event loop thread while a concurrently starting
+        // subscription can be writing from its own thread.
+        var channel = Channel.CreateUnbounded<UsbHotplugEvent>(
+            new UnboundedChannelOptions { SingleReader = true, SingleWriter = false }
+        );
+        List<IUsbDeviceDescriptor> alreadyConnected;
         lock (_lock)
         {
             ThrowIfDisposed();
             ThrowIfProviderDisposed();
 
-            var subscription = new Subscription(this, filter);
-            // Replay currently connected, matching devices as Connected events (per-subscriber
-            // enumeration), then add the subscription — atomically under one _lock acquisition:
-            // events dispatched before this point are reflected in _connected, events after
-            // reach the subscription via Dispatch, so the replay is exactly consistent with the
-            // live stream. For the very first subscriber _connected was populated by the
-            // synchronous LIBUSB_HOTPLUG_ENUMERATE replay inside EnsureRegistered.
-            var matchingDevices = _connected.Values.Where(d => filter.Matches(d)).ToList();
-            _logger.LogDebug(
-                "New subscriber with {Filter} registered; replaying {Connected} devices.",
-                filter,
-                matchingDevices.Count
-            );
-            foreach (var descriptor in matchingDevices)
+            // Snapshot the matching already connected devices.
+            // These are yielded from the snapshot below
+            alreadyConnected = _connected.Values.Where(d => filter.Matches(d)).ToList();
+            _subscribers.Add(channel, filter);
+        }
+
+        _logger.LogDebug(
+            "New subscriber with {Filter} registered; replaying {Connected} devices.",
+            filter,
+            alreadyConnected.Count
+        );
+        try
+        {
+            // first yield the already connected devices
+            foreach (var descriptor in alreadyConnected)
             {
-                subscription.Write(UsbHotplugEventType.Connected, descriptor);
+                ThrowIfTerminated();
+                cancellationToken.ThrowIfCancellationRequested();
+                yield return new UsbHotplugEvent(UsbHotplugEventType.Connected, descriptor);
             }
-            _subscriptions.Add(subscription);
-            return subscription;
+
+            // now yield the live events from libusb
+            //
+            // A completed writer hands its exception to WaitToReadAsync, so monitor and
+            // provider teardown wake the consumer here. That is not sufficient on its own
+            // as WaitToReadAsync reports a non-empty queue as readable regardless of the
+            // writer being completed, which is what ThrowIfTerminated covers.
+            while (await channel.Reader.WaitToReadAsync(cancellationToken).ConfigureAwait(false))
+            {
+                while (channel.Reader.TryRead(out var e))
+                {
+                    ThrowIfTerminated();
+                    cancellationToken.ThrowIfCancellationRequested();
+                    yield return e;
+                }
+            }
+        }
+        finally
+        {
+            lock (_lock)
+            {
+                _ = _subscribers.Remove(channel);
+            }
+            _logger.LogDebug("Subscriber with {Filter} unsubscribed.", filter);
         }
     }
 
@@ -202,11 +281,11 @@ public sealed class UsbHotplugMonitor : IUsbHotplugMonitor, IHotplugListener
             {
                 _ = _connected.Remove(descriptor.DeviceKey);
             }
-            foreach (var subscription in _subscriptions)
+            foreach (var (channel, subscriberFilter) in _subscribers)
             {
-                if (subscription.Filter.Matches(descriptor))
+                if (subscriberFilter.Matches(descriptor))
                 {
-                    subscription.Write(type, descriptor);
+                    _ = channel.Writer.TryWrite(new UsbHotplugEvent(type, descriptor));
                 }
             }
         }
@@ -214,14 +293,15 @@ public sealed class UsbHotplugMonitor : IUsbHotplugMonitor, IHotplugListener
 
     /// <summary>
     /// The underlying IUsb has completed its teardown: no further hotplug events can arrive and
-    /// the tracked snapshot no longer reflects reality. Drop the snapshot, abort all subscription
-    /// channels (undelivered events are dropped and blocked readers wake to a cancellation, since
-    /// events describing devices the disposed IUsb can no longer reach make no sense to deliver),
-    /// and let Subscribe reject new subscribers instead of replaying stale devices.
+    /// the tracked snapshot no longer reflects reality. Drop the snapshot, terminate all live
+    /// subscriptions (undelivered events are dropped and each consumer's await foreach throws an
+    /// <see cref="OperationCanceledException"/>, since events describing devices the disposed IUsb
+    /// can no longer reach make no sense to deliver), and let a starting subscription throw
+    /// instead of replaying stale devices.
     /// </summary>
     void IHotplugListener.OnProviderDisposed()
     {
-        List<Subscription> subscriptions;
+        List<Channel<UsbHotplugEvent>> channels;
         lock (_lock)
         {
             if (_disposed || _providerDisposed)
@@ -229,41 +309,59 @@ public sealed class UsbHotplugMonitor : IUsbHotplugMonitor, IHotplugListener
                 return;
             }
             _providerDisposed = true;
-            subscriptions = [.. _subscriptions];
-            _subscriptions.Clear();
+            channels = [.. _subscribers.Keys];
+            _subscribers.Clear();
             _connected.Clear();
         }
         _logger.LogInformation(
             "The underlying IUsb instance was disposed; hotplug monitoring stopped and all "
                 + "subscriptions were canceled."
         );
-        foreach (var subscription in subscriptions)
+        Terminate(channels, ProviderDisposedMessage);
+    }
+
+    /// <summary>
+    /// Wakes every consumer of <paramref name="channels"/> with a cancellation. Completing a writer
+    /// with an <see cref="OperationCanceledException"/> hands that exact instance to a consumer
+    /// parked in WaitToReadAsync and to every later read, so the wake-up is immediate. 
+    /// </summary>
+    private static void Terminate(List<Channel<UsbHotplugEvent>> channels, string reason)
+    {
+        foreach (var channel in channels)
         {
-            subscription.Abort(new OperationCanceledException(ProviderDisposedMessage));
+            _ = channel.Writer.TryComplete(new OperationCanceledException(reason));
         }
     }
 
-    private void Unsubscribe(Subscription subscription)
+    /// <summary>
+    /// Throws when the monitor or the underlying IUsb was disposed
+    /// </summary>
+    private void ThrowIfTerminated()
     {
-        lock (_lock)
+        // Provider first: it is the more specific reason, and Dispose can still run afterwards and
+        // set its own flag on top.
+        if (_providerDisposed)
         {
-            _ = _subscriptions.Remove(subscription);
+            throw new OperationCanceledException(ProviderDisposedMessage);
         }
-        subscription.Complete();
+        if (_disposed)
+        {
+            throw new OperationCanceledException(MonitorDisposedMessage);
+        }
     }
 
     /// <summary>
     /// Releases the hotplug registration this monitor owns (allowing a new monitor over the same
-    /// <see cref="IUsb"/> instance) and aborts all subscription channels: undelivered events are
-    /// dropped and pending and future reads are canceled with
-    /// <see cref="OperationCanceledException"/> rather than observing a clean end-of-stream.
+    /// <see cref="IUsb"/> instance) and terminates all live subscriptions: undelivered events are
+    /// dropped and each consumer's await foreach throws an
+    /// <see cref="OperationCanceledException"/> rather than ending quietly.
     /// Does not dispose the <see cref="IUsb"/> instance.
     /// </summary>
     public void Dispose()
     {
-        List<Subscription> subscriptions;
+        List<Channel<UsbHotplugEvent>> channels;
         // _registerLock serializes this with an in-flight EnsureRegistered, so a registration
-        // completed by a racing Subscribe is always observed and released here.
+        // completed by a racing subscription is always observed and released here.
         lock (_registerLock)
         {
             lock (_lock)
@@ -273,8 +371,8 @@ public sealed class UsbHotplugMonitor : IUsbHotplugMonitor, IHotplugListener
                     return;
                 }
                 _disposed = true;
-                subscriptions = [.. _subscriptions];
-                _subscriptions.Clear();
+                channels = [.. _subscribers.Keys];
+                _subscribers.Clear();
                 _connected.Clear();
             }
             // Deregister outside _lock: DeregisterHotplug waits for any in-flight listener
@@ -285,16 +383,10 @@ public sealed class UsbHotplugMonitor : IUsbHotplugMonitor, IHotplugListener
                 _provider.DeregisterHotplug(this);
             }
         }
-        foreach (var subscription in subscriptions)
-        {
-            // Abort rather than complete: blocked readers wake immediately, future reads throw,
-            // and undelivered events are dropped, so consumers can tell monitor disposal apart
-            // from a clean end-of-stream and never act on a device the monitor no longer tracks.
-            // A fresh exception per subscription since each reader rethrows it independently.
-            subscription.Abort(
-                new OperationCanceledException("The UsbHotplugMonitor was disposed.")
-            );
-        }
+        // Terminate rather than end quietly: parked consumers wake immediately, later reads throw,
+        // and undelivered events are refused, so consumers can tell monitor disposal apart from
+        // their own stop and never act on a device the monitor no longer tracks.
+        Terminate(channels, MonitorDisposedMessage);
     }
 
     private void ThrowIfDisposed()
@@ -310,64 +402,6 @@ public sealed class UsbHotplugMonitor : IUsbHotplugMonitor, IHotplugListener
         if (_providerDisposed)
         {
             throw new InvalidOperationException(ProviderDisposedMessage);
-        }
-    }
-
-    private sealed class Subscription : IUsbHotplugSubscription
-    {
-        private readonly UsbHotplugMonitor _monitor;
-        private readonly Channel<UsbHotplugEvent> _channel;
-        private int _disposed;
-
-        public IUsbDeviceFilter Filter { get; }
-
-        public ChannelReader<UsbHotplugEvent> Reader => _channel.Reader;
-
-        public Subscription(UsbHotplugMonitor monitor, IUsbDeviceFilter filter)
-        {
-            _monitor = monitor;
-            Filter = filter;
-            // Unbounded and never dropping while live: hotplug is low-volume, and dropping a
-            // connect or disconnect would corrupt a consumer's view of device state. Multiple
-            // writer threads (event loop thread for live events, subscribing thread for the
-            // initial replay). SingleReader is false because Abort drains the buffer from the
-            // disposing thread, potentially concurrent with a consumer read.
-            // AllowSynchronousContinuations must stay at its default (false): with it enabled a
-            // blocked reader's continuation could run on the writing thread, i.e. consumer code
-            // inside a hotplug dispatch, breaking the no-user-code-in-dispatch rule that
-            // Usb.Dispose depends on (see the note at the top of Usb.Dispose).
-            _channel = Channel.CreateUnbounded<UsbHotplugEvent>(
-                new UnboundedChannelOptions { SingleReader = false, SingleWriter = false }
-            );
-        }
-
-        // Called while the monitor holds _lock, so writes to a live subscription are serialized.
-        public void Write(UsbHotplugEventType type, IUsbDeviceDescriptor descriptor) =>
-            _channel.Writer.TryWrite(new UsbHotplugEvent(type, descriptor));
-
-        public void Complete() => _channel.Writer.TryComplete();
-
-        /// <summary>
-        /// Cancels the subscription: pending and future reads observe <paramref name="error"/>,
-        /// and buffered events are dropped — they describe devices the disposed monitor or IUsb
-        /// can no longer reach. TryComplete stops new writes, so the drain terminates and the
-        /// error surfaces to the consumer immediately instead of after stale events. A consumer
-        /// read racing the drain may still win one already-buffered event, which is
-        /// indistinguishable from having read it just before the dispose.
-        /// </summary>
-        public void Abort(OperationCanceledException error)
-        {
-            _ = _channel.Writer.TryComplete(error);
-            while (_channel.Reader.TryRead(out _)) { }
-        }
-
-        public void Dispose()
-        {
-            if (Interlocked.Exchange(ref _disposed, 1) != 0)
-            {
-                return;
-            }
-            _monitor.Unsubscribe(this);
         }
     }
 }

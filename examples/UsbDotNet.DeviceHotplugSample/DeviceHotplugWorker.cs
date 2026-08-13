@@ -11,8 +11,8 @@ namespace UsbDotNet.DeviceHotplugSample;
 /// <summary>
 /// Prints a JSON line to stdout each time a device is connected or disconnected, until the host is
 /// stopped (Ctrl+C). Devices already connected at startup are printed as "connected". Demonstrates
-/// both ways to consume <see cref="IUsbHotplugMonitor"/>: reading a subscription channel (default)
-/// and the classic <see cref="UsbHotplugEventNotifier"/> events adapter.
+/// both ways to consume <see cref="IUsbHotplugMonitor"/>: enumerating the subscription directly
+/// (default) and the <see cref="UsbHotplugEventNotifier"/> events adapter.
 /// </summary>
 internal sealed class DeviceHotplugWorker(
     IUsb usb,
@@ -21,7 +21,7 @@ internal sealed class DeviceHotplugWorker(
     IOptions<DeviceHotplugOptions> options
 ) : BackgroundService
 {
-    protected override Task ExecuteAsync(CancellationToken stoppingToken)
+    protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         usb.Initialize();
 
@@ -31,51 +31,50 @@ internal sealed class DeviceHotplugWorker(
             ProductIds: settings.ProductId is { } productId ? [productId] : null
         );
 
-        return settings.Mode switch
-        {
-            HotplugMode.Channels => RunWithChannelsAsync(filter, stoppingToken),
-            HotplugMode.Events => RunWithEventsAsync(filter, stoppingToken),
-        };
-    }
-
-    /// <summary>Default approach: read events straight from the subscription channel.</summary>
-    private async Task RunWithChannelsAsync(
-        IUsbDeviceFilter filter,
-        CancellationToken stoppingToken
-    )
-    {
-        using var subscription = monitor.Subscribe(filter);
+        // The error handling is shared on purpose: both modes are the same subscription underneath,
+        // so they end in exactly the same ways and neither needs a catch of its own.
         try
         {
-            await foreach (
-                var e in subscription.Reader.ReadAllAsync(stoppingToken).ConfigureAwait(false)
-            )
-            {
-                PrintDevice(StateOf(e.Type), e.Descriptor);
-            }
+            await (
+                settings.Mode switch
+                {
+                    HotplugMode.Stream => RunWithStreamAsync(filter, stoppingToken),
+                    HotplugMode.Events => RunWithEventsAsync(filter, stoppingToken),
+                }
+            );
+        }
+        catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
+        {
+            // Expected on graceful shutdown: our own token ended the subscription.
         }
         catch (OperationCanceledException)
         {
-            // Expected on graceful shutdown.
+            // The monitor or the underlying IUsb was disposed under us, so undelivered events were
+            // dropped and monitoring cannot resume. The absent token is what tells this apart from
+            // our own shutdown above. 
+        }
+    }
+
+    /// <summary>Default approach: enumerate the subscription.</summary>
+    private async Task RunWithStreamAsync(IUsbDeviceFilter filter, CancellationToken stoppingToken)
+    {
+        // The subscription starts on the first read: devices already connected then are yielded as
+        // Connected events up front, and live events follow without a gap.
+        await foreach (var e in monitor.Subscribe(filter, stoppingToken))
+        {
+            PrintDevice(StateOf(e.Type), e.Descriptor);
         }
     }
 
     /// <summary>Alternative approach: classic events via the notifier adapter.</summary>
-    private async Task RunWithEventsAsync(IUsbDeviceFilter filter, CancellationToken stoppingToken)
+    private Task RunWithEventsAsync(IUsbDeviceFilter filter, CancellationToken stoppingToken)
     {
-        using var notifier = new UsbHotplugEventNotifier(monitor, filter, loggerFactory);
-        // Attach handlers before Start() so the initial snapshot of connected devices is delivered.
+        var notifier = new UsbHotplugEventNotifier(monitor, filter, loggerFactory);
+        // Attach the handlers before RunAsync: it is what subscribes, and the already-connected
+        // devices are delivered inside its synchronous prologue.
         notifier.DeviceConnected += (_, e) => PrintDevice("connected", e.Descriptor);
         notifier.DeviceDisconnected += (_, e) => PrintDevice("disconnected", e.Descriptor);
-        notifier.Start();
-        try
-        {
-            await Task.Delay(Timeout.Infinite, stoppingToken).ConfigureAwait(false);
-        }
-        catch (OperationCanceledException)
-        {
-            // Expected on graceful shutdown.
-        }
+        return notifier.RunAsync(stoppingToken);
     }
 
     private static string StateOf(UsbHotplugEventType type) =>
@@ -95,8 +94,8 @@ internal sealed class DeviceHotplugWorker(
             d.BusNumber,
             d.BusAddress
         );
-        // In channels mode this runs on the reader task; in events mode on the notifier's pump
-        // thread. Console.WriteLine is thread-safe either way.
+        // In stream mode this runs on the reader's task; in events mode on whatever thread the
+        // notifier's loop resumed on. Console.WriteLine is thread-safe either way.
         Console.WriteLine(JsonSerializer.Serialize(info, JsonContext.Default.DeviceInfo));
     }
 }
