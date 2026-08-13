@@ -94,9 +94,7 @@ public sealed class UsbHotplugMonitor : IUsbHotplugMonitor
                 }
                 if (!IsHotplugSupported)
                 {
-                    _logger.LogWarning(
-                        "Hotplug is not supported on this platform; no events will be emitted."
-                    );
+                    throw new NotSupportedException("Hotplug is not supported on this platform.");
                 }
                 _started = true;
             }
