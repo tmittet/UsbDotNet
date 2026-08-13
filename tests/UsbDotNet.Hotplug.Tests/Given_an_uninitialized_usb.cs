@@ -21,21 +21,23 @@ public sealed class Given_an_uninitialized_usb : IDisposable
     }
 
     [SkippableFact]
-    public void Subscribe_throws_when_usb_is_not_initialized()
+    public async Task Subscribe_throws_when_usb_is_not_initialized()
     {
         using var monitor = new UsbHotplugMonitor(_usb.HotplugProvider, _loggerFactory);
+        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
 
         Exception? caught = null;
-        IUsbHotplugSubscription? subscription = null;
         try
         {
-            subscription = monitor.Subscribe();
+            // Registration happens on the first read, not on the Subscribe call, so the
+            // initialization check lands there.
+            await using var events = monitor.Subscribe().GetAsyncEnumerator(cts.Token);
+            _ = await events.MoveNextAsync();
         }
         catch (InvalidOperationException ex)
         {
             caught = ex;
         }
-        subscription?.Dispose();
 
         // On platforms without hotplug support the monitor never registers (and never reaches the
         // initialization check), so there is nothing to assert.

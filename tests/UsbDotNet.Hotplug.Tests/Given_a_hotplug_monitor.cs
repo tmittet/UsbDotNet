@@ -1,4 +1,3 @@
-using System.Threading.Channels;
 using UsbDotNet.LibUsbNative;
 
 namespace UsbDotNet.Hotplug.Tests;
@@ -36,29 +35,45 @@ public sealed class Given_a_hotplug_monitor : IDisposable
         }
     }
 
-    /// <summary>Reads until at least <paramref name="minCount"/> events are seen or the timeout elapses.</summary>
+    /// <summary>
+    /// Reads until at least <paramref name="minCount"/> events are seen, or the enumerator's own
+    /// token (the caller's timeout) elapses. Leaves the enumerator open, so the subscription stays
+    /// live for tests that need a second subscriber to join while this one is still reading.
+    /// </summary>
     private static async Task<List<UsbHotplugEvent>> ReadAtLeastAsync(
-        ChannelReader<UsbHotplugEvent> reader,
-        int minCount,
-        TimeSpan timeout
+        IAsyncEnumerator<UsbHotplugEvent> events,
+        int minCount
     )
     {
-        var events = new List<UsbHotplugEvent>();
-        using var cts = new CancellationTokenSource(timeout);
+        var collected = new List<UsbHotplugEvent>();
         try
         {
-            await foreach (var e in reader.ReadAllAsync(cts.Token).ConfigureAwait(false))
+            while (collected.Count < minCount && await events.MoveNextAsync())
             {
-                events.Add(e);
-                if (events.Count >= minCount)
-                    break;
+                collected.Add(events.Current);
             }
         }
         catch (OperationCanceledException)
         {
-            // Timed out; return whatever was collected.
+            // Timed out, or the monitor was torn down; return whatever was collected.
         }
-        return events;
+        return collected;
+    }
+
+    /// <summary>
+    /// Reads until at least <paramref name="minCount"/> events are seen or the timeout elapses,
+    /// then ends the subscription. Use the enumerator overload when the subscription has to
+    /// outlive the read.
+    /// </summary>
+    private static async Task<List<UsbHotplugEvent>> ReadAtLeastAsync(
+        IAsyncEnumerable<UsbHotplugEvent> stream,
+        int minCount,
+        TimeSpan timeout
+    )
+    {
+        using var cts = new CancellationTokenSource(timeout);
+        await using var events = stream.GetAsyncEnumerator(cts.Token);
+        return await ReadAtLeastAsync(events, minCount);
     }
 
     [SkippableFact]
@@ -67,8 +82,7 @@ public sealed class Given_a_hotplug_monitor : IDisposable
         var expectedKeys = _usb.GetDeviceList().Select(d => d.DeviceKey).ToHashSet();
         Skip.If(expectedKeys.Count == 0, "No USB device available.");
 
-        using var subscription = _monitor.Subscribe();
-        var events = await ReadAtLeastAsync(subscription.Reader, expectedKeys.Count, EventTimeout);
+        var events = await ReadAtLeastAsync(_monitor.Subscribe(), expectedKeys.Count, EventTimeout);
 
         events.Should().NotBeEmpty(because: "enumeration should replay connected devices");
         events
@@ -91,15 +105,21 @@ public sealed class Given_a_hotplug_monitor : IDisposable
     {
         var expectedKeys = _usb.GetDeviceList().Select(d => d.DeviceKey).ToHashSet();
         Skip.If(expectedKeys.Count == 0, "No USB device available.");
+        using var cts = new CancellationTokenSource(EventTimeout);
 
         // First subscriber triggers native registration and libusb enumeration, populating the
-        // monitor's tracked device set.
-        using var first = _monitor.Subscribe();
-        _ = await ReadAtLeastAsync(first.Reader, expectedKeys.Count, EventTimeout);
+        // monitor's tracked device set. Its enumerator is held open deliberately: reading through
+        // the stream overload would leave the loop and unsubscribe, so this would silently stop
+        // covering a late subscriber joining while another subscription is still live.
+        await using var first = _monitor.Subscribe().GetAsyncEnumerator(cts.Token);
+        _ = await ReadAtLeastAsync(first, expectedKeys.Count);
 
         // A late subscriber must receive the current devices from the internal tracked set.
-        using var late = _monitor.Subscribe();
-        var snapshot = await ReadAtLeastAsync(late.Reader, expectedKeys.Count, EventTimeout);
+        var snapshot = await ReadAtLeastAsync(
+            _monitor.Subscribe(),
+            expectedKeys.Count,
+            EventTimeout
+        );
 
         snapshot.Should().OnlyContain(e => e.Type == UsbHotplugEventType.Connected);
         snapshot
@@ -120,8 +140,11 @@ public sealed class Given_a_hotplug_monitor : IDisposable
         var vendorId = devices.First().VendorId;
         var expectedMatchCount = devices.Count(d => d.VendorId == vendorId);
 
-        using var subscription = _monitor.Subscribe(new UsbDeviceFilter(VendorIds: [vendorId]));
-        var events = await ReadAtLeastAsync(subscription.Reader, expectedMatchCount, EventTimeout);
+        var events = await ReadAtLeastAsync(
+            _monitor.Subscribe(new UsbDeviceFilter(VendorIds: [vendorId])),
+            expectedMatchCount,
+            EventTimeout
+        );
 
         events.Should().HaveCountGreaterThanOrEqualTo(1);
         events
@@ -132,75 +155,84 @@ public sealed class Given_a_hotplug_monitor : IDisposable
             );
     }
 
-    /// <summary>Drains the reader to completion, or throws if it does not complete within the timeout.</summary>
-    private static async Task DrainToCompletionAsync(
-        ChannelReader<UsbHotplugEvent> reader,
-        TimeSpan timeout
-    )
+    [SkippableFact]
+    public async Task Disposing_the_monitor_cancels_all_consumers()
     {
-        using var cts = new CancellationTokenSource(timeout);
-        // Once the writer is completed, ReadAllAsync yields any buffered events then ends. If the
-        // channel is never completed this cancels and throws, failing the test.
-        await foreach (var _ in reader.ReadAllAsync(cts.Token).ConfigureAwait(false)) { }
-    }
-
-    [Fact]
-    public async Task Disposing_a_subscription_completes_its_reader()
-    {
-        var subscription = _monitor.Subscribe();
-        subscription.Dispose();
-
-        // A completed channel drains (possibly buffered enumeration events) then ends the loop.
-        await DrainToCompletionAsync(subscription.Reader, EventTimeout);
-        subscription.Reader.Completion.IsCompletedSuccessfully.Should().BeTrue();
-    }
-
-    [Fact]
-    public async Task Disposing_the_monitor_cancels_all_subscription_readers()
-    {
-        var first = _monitor.Subscribe();
-        var second = _monitor.Subscribe();
+        var expectedKeys = _usb.GetDeviceList().Select(d => d.DeviceKey).ToHashSet();
+        // A device is needed to prime the two streams deterministically: Subscribe is an iterator
+        // method, so a subscription only exists once its first read has run the body, and with no
+        // devices that first read parks instead of completing. The parked case is covered
+        // hardware-free in the fake-provider suite.
+        Skip.If(expectedKeys.Count == 0, "No USB device available.");
+        using var cts = new CancellationTokenSource(EventTimeout);
+        await using var first = _monitor.Subscribe().GetAsyncEnumerator(cts.Token);
+        await using var second = _monitor.Subscribe().GetAsyncEnumerator(cts.Token);
+        (await first.MoveNextAsync()).Should().BeTrue();
+        (await second.MoveNextAsync()).Should().BeTrue();
 
         _monitor.Dispose();
 
-        // Undelivered events (the initial replay) are dropped and the abort surfaces as an
-        // OperationCanceledException instead of a clean end-of-stream. The monitor's exception
-        // carries no token, which distinguishes the abort from the drain helper's own timeout.
-        var drainFirst = () => DrainToCompletionAsync(first.Reader, EventTimeout);
-        var drainSecond = () => DrainToCompletionAsync(second.Reader, EventTimeout);
-        (await drainFirst.Should().ThrowAsync<OperationCanceledException>())
+        // The rest of the replay is still buffered, so this exercises the refuse-to-yield-a-stale
+        // event path: teardown surfaces as an OperationCanceledException rather than the loop
+        // simply ending, and the exception carries no token, which distinguishes it from this
+        // test's own timeout.
+        var readFirst = async () => await first.MoveNextAsync();
+        var readSecond = async () => await second.MoveNextAsync();
+        (await readFirst.Should().ThrowAsync<OperationCanceledException>())
             .Which.CancellationToken.Should()
             .Be(CancellationToken.None);
-        (await drainSecond.Should().ThrowAsync<OperationCanceledException>())
+        (await readSecond.Should().ThrowAsync<OperationCanceledException>())
             .Which.CancellationToken.Should()
             .Be(CancellationToken.None);
-        first.Reader.Completion.IsCanceled.Should().BeTrue();
-        second.Reader.Completion.IsCanceled.Should().BeTrue();
     }
 
     [Fact]
-    public void Subscribe_after_dispose_throws_ObjectDisposedException()
+    public async Task Subscribing_after_dispose_throws_ObjectDisposedException()
     {
+        using var cts = new CancellationTokenSource(EventTimeout);
         _monitor.Dispose();
-        var act = () => _monitor.Subscribe();
-        act.Should().Throw<ObjectDisposedException>();
+
+        // The throw lands on the first read, not on the Subscribe call: Subscribe is an iterator
+        // method and runs no part of its body until then.
+        await using var events = _monitor.Subscribe().GetAsyncEnumerator(cts.Token);
+        var read = async () => await events.MoveNextAsync();
+        await read.Should().ThrowAsync<ObjectDisposedException>();
     }
 
     [SkippableFact]
-    public void A_second_monitor_over_the_same_usb_throws_on_subscribe()
+    public async Task A_second_monitor_over_the_same_usb_throws_on_subscribe()
     {
-        // The first monitor registers hotplug on its first subscription.
-        using var first = _monitor.Subscribe();
+        // Checked before subscribing: skipping with a read in flight would leave the enumerator
+        // disposed mid-read, which is undefined.
         Skip.If(
             !_monitor.IsHotplugSupported,
             "Hotplug not supported on this platform; nothing gets registered."
         );
+        using var cts = new CancellationTokenSource(EventTimeout);
+        // The first monitor registers hotplug on the first read of its first subscription, so the
+        // stream has to be started for there to be a registration the second monitor collides with.
+        await using var first = _monitor.Subscribe().GetAsyncEnumerator(cts.Token);
+        var parked = first.MoveNextAsync();
 
         using var secondMonitor = new UsbHotplugMonitor(_usb.HotplugProvider, _loggerFactory);
-        var act = () => secondMonitor.Subscribe();
-        act.Should()
-            .Throw<InvalidOperationException>()
-            .WithMessage("*only one UsbHotplugMonitor may be active per IUsb*");
+        await using var second = secondMonitor.Subscribe().GetAsyncEnumerator(cts.Token);
+        var read = async () => await second.MoveNextAsync();
+        (await read.Should().ThrowAsync<InvalidOperationException>()).WithMessage(
+            "*only one UsbHotplugMonitor may be active per IUsb*"
+        );
+
+        // Release the first stream before its enumerator is disposed. With devices attached its
+        // read has already completed with a replayed event; with none it is still parked and
+        // Dispose is what wakes it.
+        _monitor.Dispose();
+        try
+        {
+            _ = await parked;
+        }
+        catch (OperationCanceledException)
+        {
+            // Expected when the read was still parked.
+        }
     }
 
     [SkippableFact]
@@ -208,22 +240,26 @@ public sealed class Given_a_hotplug_monitor : IDisposable
     {
         var expectedKeys = _usb.GetDeviceList().Select(d => d.DeviceKey).ToHashSet();
         Skip.If(expectedKeys.Count == 0, "No USB device available.");
-        using var first = _monitor.Subscribe();
+        using var cts = new CancellationTokenSource(EventTimeout);
+        await using var first = _monitor.Subscribe().GetAsyncEnumerator(cts.Token);
         Skip.If(
             !_monitor.IsHotplugSupported,
             "Hotplug not supported on this platform; nothing gets registered."
         );
-        _ = await ReadAtLeastAsync(first.Reader, expectedKeys.Count, EventTimeout);
+        _ = await ReadAtLeastAsync(first, expectedKeys.Count);
 
         // Disposing the monitor releases its hotplug registration on the IUsb.
         _monitor.Dispose();
 
         using var secondMonitor = new UsbHotplugMonitor(_usb.HotplugProvider, _loggerFactory);
-        using var subscription = secondMonitor.Subscribe();
 
         // The new registration re-enumerates with a cleared device cache, so the connected
         // devices are replayed rather than suppressed as duplicate arrivals.
-        var events = await ReadAtLeastAsync(subscription.Reader, expectedKeys.Count, EventTimeout);
+        var events = await ReadAtLeastAsync(
+            secondMonitor.Subscribe(),
+            expectedKeys.Count,
+            EventTimeout
+        );
         events.Should().OnlyContain(e => e.Type == UsbHotplugEventType.Connected);
         events
             .Select(e => e.Descriptor.DeviceKey)

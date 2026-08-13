@@ -2,7 +2,7 @@
     <PropertyGroup>
         <RootNamespace>UsbDotNet.Hotplug</RootNamespace>
         <PackageId>UsbDotNet.Hotplug</PackageId>
-        <Description>Channel-based USB hotplug monitoring for UsbDotNet</Description>
+        <Description>Async-streaming USB hotplug monitoring for UsbDotNet</Description>
     </PropertyGroup>
     <ItemGroup>
         <InternalsVisibleTo Include="UsbDotNet.Hotplug.Tests" />
