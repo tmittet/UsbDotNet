@@ -321,7 +321,6 @@ public sealed class Usb : IUsb, IHotplugProvider
     {
         ArgumentNullException.ThrowIfNull(context);
         ArgumentNullException.ThrowIfNull(device);
-
         try
         {
             using var token = _hotplugCallbackRundown.AcquireSharedToken();
@@ -335,6 +334,9 @@ public sealed class Usb : IUsb, IHotplugProvider
             }
             return libusb_hotplug_return.REARM;
         }
+        // ObjectDisposedException is thrown when the hotplug rundown guard dispose has started,
+        // which means the Usb instance is being disposed. In this case we silently dispose the
+        // newly arrived device and deregister the callback.
         catch (ObjectDisposedException)
         {
             device.Dispose();
