@@ -17,9 +17,9 @@ namespace UsbDotNet;
 /// <inheritdoc/>
 public sealed class Usb : IUsb, IHotplugProvider
 {
-    private EventHandler<IUsbDeviceDescriptor>? _deviceArrived;
-    private EventHandler<IUsbDeviceDescriptor>? _deviceLeft;
-    private EventHandler? _hotplugProviderDisposed;
+    private Action<IUsbDeviceDescriptor>? _deviceArrived;
+    private Action<IUsbDeviceDescriptor>? _deviceLeft;
+    private Action? _providerDisposed;
 
     private static int _instances;
 
@@ -67,59 +67,44 @@ public sealed class Usb : IUsb, IHotplugProvider
         _libUsb.HasCapability(libusb_capability.LIBUSB_CAP_HAS_HOTPLUG);
 
     /// <inheritdoc/>
-    event EventHandler<IUsbDeviceDescriptor>? IHotplugProvider.DeviceArrived
+    Action<IUsbDeviceDescriptor>? IHotplugProvider.DeviceArrived
     {
-        add
-        {
-            lock (_lock)
-            {
-                _deviceArrived += value;
-            }
-        }
-        remove
-        {
-            lock (_lock)
-            {
-                _deviceArrived -= value;
-            }
-        }
+        get => _deviceArrived;
+        set =>
+            SetHotplugCallback(ref _deviceArrived, value, nameof(IHotplugProvider.DeviceArrived));
     }
 
     /// <inheritdoc/>
-    event EventHandler<IUsbDeviceDescriptor>? IHotplugProvider.DeviceLeft
+    Action<IUsbDeviceDescriptor>? IHotplugProvider.DeviceLeft
     {
-        add
-        {
-            lock (_lock)
-            {
-                _deviceLeft += value;
-            }
-        }
-        remove
-        {
-            lock (_lock)
-            {
-                _deviceLeft -= value;
-            }
-        }
+        get => _deviceLeft;
+        set => SetHotplugCallback(ref _deviceLeft, value, nameof(IHotplugProvider.DeviceLeft));
     }
 
     /// <inheritdoc/>
-    event EventHandler? IHotplugProvider.Disposed
+    Action? IHotplugProvider.Disposed
     {
-        add
+        get => _providerDisposed;
+        set => SetHotplugCallback(ref _providerDisposed, value, nameof(IHotplugProvider.Disposed));
+    }
+
+    /// <summary>
+    /// Single-owner callback slot: replacing a callback throws. A second consumer cannot silently
+    /// steal hotplug events from the current owner. Assigning null (detach) is always allowed.
+    /// </summary>
+    private void SetHotplugCallback<T>(ref T? callback, T? value, string callbackName)
+        where T : Delegate
+    {
+        lock (_lock)
         {
-            lock (_lock)
+            if (callback is not null && value is not null)
             {
-                _hotplugProviderDisposed += value;
+                throw new InvalidOperationException(
+                    $"{callbackName} is already attached. Only one consumer may own the hotplug "
+                        + "callbacks of a Usb instance; detach the existing callback first."
+                );
             }
-        }
-        remove
-        {
-            lock (_lock)
-            {
-                _hotplugProviderDisposed -= value;
-            }
+            callback = value;
         }
     }
 
@@ -419,11 +404,11 @@ public sealed class Usb : IUsb, IHotplugProvider
             descriptor.DeviceClass,
             descriptor.DeviceKey
         );
-        var handler =
+        var callback =
             eventType == libusb_hotplug_event.LIBUSB_HOTPLUG_EVENT_DEVICE_ARRIVED ? _deviceArrived
             : eventType == libusb_hotplug_event.LIBUSB_HOTPLUG_EVENT_DEVICE_LEFT ? _deviceLeft
             : null;
-        EventDispatch.RaiseSafely(handler, _logger, this, descriptor, descriptor.DeviceKey);
+        EventDispatch.RaiseSafely(callback, _logger, descriptor, descriptor.DeviceKey);
     }
 
     /// <inheritdoc/>
@@ -676,7 +661,7 @@ public sealed class Usb : IUsb, IHotplugProvider
         ISafeCallbackHandle? hotplugCallbackHandle;
         LibUsbEventLoop? eventLoop;
         ISafeContext? context;
-        EventHandler? providerDisposed = null;
+        Action? providerDisposed = null;
 
         // 1. Mark Usb as Disposing
         lock (_lock)
@@ -700,8 +685,8 @@ public sealed class Usb : IUsb, IHotplugProvider
             if (Environment.CurrentManagedThreadId == _eventLoopThreadId)
             {
                 // Thrown if called synchronously from one of the the internal hotplug
-                // IHotplugProvider.DeviceArrived or IHotplugProvider.DeviceLeft handlers. The
-                // handlers run on the libusb event-loop thread, and disposing joins that thread.
+                // IHotplugProvider.DeviceArrived or IHotplugProvider.DeviceLeft callbacks. The
+                // callbacks run on the libusb event-loop thread, and disposing joins that thread.
                 const string errorMessage =
                     "Dispose() was invoked from within a hotplug event handler. This is unsafe: "
                     + "hotplug callbacks execute on the libusb event-loop thread, and Dispose() "
@@ -767,9 +752,9 @@ public sealed class Usb : IUsb, IHotplugProvider
                 _ = Interlocked.Exchange(ref _instances, 0);
                 _disposeState = DisposeState.Disposed;
                 Monitor.PulseAll(_lock);
-                providerDisposed = _hotplugProviderDisposed;
+                providerDisposed = _providerDisposed;
             }
-            EventDispatch.RaiseSafely(providerDisposed, _logger, this);
+            EventDispatch.RaiseSafely(providerDisposed, _logger);
         }
     }
 }

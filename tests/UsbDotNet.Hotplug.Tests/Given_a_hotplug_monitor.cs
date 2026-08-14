@@ -192,7 +192,7 @@ public sealed class Given_a_hotplug_monitor : IDisposable
         var act = () => secondMonitor.Subscribe();
         act.Should()
             .Throw<InvalidOperationException>()
-            .WithMessage("*only one UsbHotplugMonitor may be active per IUsb*");
+            .WithMessage("*is already attached. Only one consumer may own the hotplug*");
     }
 
     public void Dispose()
