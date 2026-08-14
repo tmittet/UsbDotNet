@@ -192,7 +192,38 @@ public sealed class Given_a_hotplug_monitor : IDisposable
         var act = () => secondMonitor.Subscribe();
         act.Should()
             .Throw<InvalidOperationException>()
-            .WithMessage("*is already attached. Only one consumer may own the hotplug*");
+            .WithMessage("*only one UsbHotplugMonitor may be active per IUsb*");
+    }
+
+    [SkippableFact]
+    public async Task A_new_monitor_can_subscribe_after_the_previous_monitor_is_disposed()
+    {
+        var expectedKeys = _usb.GetDeviceList().Select(d => d.DeviceKey).ToHashSet();
+        Skip.If(expectedKeys.Count == 0, "No USB device available.");
+        using var first = _monitor.Subscribe();
+        Skip.If(
+            !_monitor.IsHotplugSupported,
+            "Hotplug not supported on this platform; nothing gets registered."
+        );
+        _ = await ReadAtLeastAsync(first.Reader, expectedKeys.Count, EventTimeout);
+
+        // Disposing the monitor releases its hotplug registration on the IUsb.
+        _monitor.Dispose();
+
+        using var secondMonitor = new UsbHotplugMonitor((IHotplugProvider)_usb, _loggerFactory);
+        using var subscription = secondMonitor.Subscribe();
+
+        // The new registration re-enumerates with a cleared device cache, so the connected
+        // devices are replayed rather than suppressed as duplicate arrivals.
+        var events = await ReadAtLeastAsync(subscription.Reader, expectedKeys.Count, EventTimeout);
+        events.Should().OnlyContain(e => e.Type == UsbHotplugEventType.Connected);
+        events
+            .Select(e => e.Descriptor.DeviceKey)
+            .Should()
+            .Contain(
+                expectedKeys,
+                because: "a new monitor must receive a fresh enumeration of connected devices"
+            );
     }
 
     public void Dispose()

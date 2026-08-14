@@ -1,5 +1,6 @@
 using UsbDotNet.Internal;
 using UsbDotNet.LibUsbNative;
+using UsbDotNet.Tests.Fakes;
 
 namespace UsbDotNet.Tests.Usb;
 
@@ -84,7 +85,7 @@ public sealed class Given_no_USB_device : IDisposable
     {
         using var usb = CreateUsb();
         var provider = (IHotplugProvider)usb;
-        var act = () => provider.RegisterHotplug();
+        var act = () => provider.RegisterHotplug(new TestHotplugListener());
         act.Should().Throw<InvalidOperationException>();
     }
 
@@ -94,25 +95,10 @@ public sealed class Given_no_USB_device : IDisposable
         using var usb = CreateUsb();
         usb.Initialize();
         var provider = (IHotplugProvider)usb;
-        provider.RegisterHotplug().Should().Be(HotplugRegistrationResult.Success);
-    }
-
-    [Fact]
-    public void Attaching_a_second_DeviceArrived_callback_throws()
-    {
-        using var usb = CreateUsb();
-        var provider = (IHotplugProvider)usb;
-        provider.DeviceArrived = _ => { };
-
-        // The callback slots are single-owner: a different non-null callback must be rejected so
-        // a second consumer cannot silently steal events from the first.
-        var act = () => provider.DeviceArrived = _ => { };
-        act.Should().Throw<InvalidOperationException>().WithMessage("*already attached*");
-
-        // Detaching (null) and re-attaching is allowed.
-        provider.DeviceArrived = null;
-        var reattach = () => provider.DeviceArrived = _ => { };
-        reattach.Should().NotThrow();
+        provider
+            .RegisterHotplug(new TestHotplugListener())
+            .Should()
+            .Be(HotplugRegistrationResult.Success);
     }
 
     [SkippableFact]
@@ -122,11 +108,56 @@ public sealed class Given_no_USB_device : IDisposable
         usb.Initialize();
         var provider = (IHotplugProvider)usb;
         Skip.IfNot(
-            provider.RegisterHotplug() == HotplugRegistrationResult.Success,
+            provider.RegisterHotplug(new TestHotplugListener())
+                == HotplugRegistrationResult.Success,
             "Hotplug is not supported on this platform."
         );
 
-        provider.RegisterHotplug().Should().Be(HotplugRegistrationResult.AlreadyRegistered);
+        // The second caller's listener is not attached; the first registration keeps its owner.
+        provider
+            .RegisterHotplug(new TestHotplugListener())
+            .Should()
+            .Be(HotplugRegistrationResult.AlreadyRegistered);
+    }
+
+    [SkippableFact]
+    public void RegisterHotplug_succeeds_again_after_the_owner_deregisters()
+    {
+        using var usb = CreateUsb();
+        usb.Initialize();
+        var provider = (IHotplugProvider)usb;
+        var owner = new TestHotplugListener();
+        Skip.IfNot(
+            provider.RegisterHotplug(owner) == HotplugRegistrationResult.Success,
+            "Hotplug is not supported on this platform."
+        );
+
+        provider.DeregisterHotplug(owner);
+
+        provider
+            .RegisterHotplug(new TestHotplugListener())
+            .Should()
+            .Be(HotplugRegistrationResult.Success);
+    }
+
+    [SkippableFact]
+    public void DeregisterHotplug_by_a_non_owner_does_not_release_the_registration()
+    {
+        using var usb = CreateUsb();
+        usb.Initialize();
+        var provider = (IHotplugProvider)usb;
+        Skip.IfNot(
+            provider.RegisterHotplug(new TestHotplugListener())
+                == HotplugRegistrationResult.Success,
+            "Hotplug is not supported on this platform."
+        );
+
+        provider.DeregisterHotplug(new TestHotplugListener());
+
+        provider
+            .RegisterHotplug(new TestHotplugListener())
+            .Should()
+            .Be(HotplugRegistrationResult.AlreadyRegistered);
     }
 
     public void Dispose()

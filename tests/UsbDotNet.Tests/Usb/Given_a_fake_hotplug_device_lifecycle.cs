@@ -49,9 +49,12 @@ public sealed class Given_a_fake_hotplug_device_lifecycle : IDisposable
         var provider = (IHotplugProvider)_usb;
         var arrivals = 0;
         string? leftKey = null;
-        provider.DeviceArrived = _ => arrivals++;
-        provider.DeviceLeft = d => leftKey = d.DeviceKey;
-        provider.RegisterHotplug().Should().Be(HotplugRegistrationResult.Success);
+        var listener = new TestHotplugListener
+        {
+            DeviceArrived = _ => arrivals++,
+            DeviceLeft = d => leftKey = d.DeviceKey,
+        };
+        provider.RegisterHotplug(listener).Should().Be(HotplugRegistrationResult.Success);
 
         // With LIBUSB_HOTPLUG_ENUMERATE libusb may notify the arrival of the same device twice
         // (once from registration enumeration, once from the live event loop).
@@ -73,9 +76,12 @@ public sealed class Given_a_fake_hotplug_device_lifecycle : IDisposable
         var provider = (IHotplugProvider)_usb;
         string? arrivedKey = null;
         string? leftKey = null;
-        provider.DeviceArrived = d => arrivedKey = d.DeviceKey;
-        provider.DeviceLeft = d => leftKey = d.DeviceKey;
-        provider.RegisterHotplug().Should().Be(HotplugRegistrationResult.Success);
+        var listener = new TestHotplugListener
+        {
+            DeviceArrived = d => arrivedKey = d.DeviceKey,
+            DeviceLeft = d => leftKey = d.DeviceKey,
+        };
+        provider.RegisterHotplug(listener).Should().Be(HotplugRegistrationResult.Success);
 
         // Arrival while the device is present: bus 3, address 17.
         Raise(libusb_hotplug_event.LIBUSB_HOTPLUG_EVENT_DEVICE_ARRIVED);
@@ -101,8 +107,8 @@ public sealed class Given_a_fake_hotplug_device_lifecycle : IDisposable
     {
         var provider = (IHotplugProvider)_usb;
         string? leftKey = null;
-        provider.DeviceLeft = d => leftKey = d.DeviceKey;
-        provider.RegisterHotplug().Should().Be(HotplugRegistrationResult.Success);
+        var listener = new TestHotplugListener { DeviceLeft = d => leftKey = d.DeviceKey };
+        provider.RegisterHotplug(listener).Should().Be(HotplugRegistrationResult.Success);
 
         // No arrival was cached for this device, so no DeviceArrived was ever emitted. A DeviceKey
         // built now would carry unreliable bus number/address, so the event must be dropped.
@@ -120,7 +126,10 @@ public sealed class Given_a_fake_hotplug_device_lifecycle : IDisposable
     {
         var timeout = TimeSpan.FromSeconds(5);
         var provider = (IHotplugProvider)_usb;
-        provider.RegisterHotplug().Should().Be(HotplugRegistrationResult.Success);
+        provider
+            .RegisterHotplug(new TestHotplugListener())
+            .Should()
+            .Be(HotplugRegistrationResult.Success);
 
         // Hold the event-loop thread inside libusb_handle_events_completed, simulating a thread
         // that cannot exit yet (in the real deadlock: blocked dispatching a hotplug event to a
@@ -134,12 +143,26 @@ public sealed class Given_a_fake_hotplug_device_lifecycle : IDisposable
         SpinWait.SpinUntil(() => _api.LastCallback is null, timeout).Should().BeTrue();
 
         // While Dispose waits for the event loop, another thread must still be able to take the
-        // instance lock (e.g. a UsbHotplugMonitor clearing its callbacks during its own dispose).
-        var detach = Task.Run(() => provider.DeviceArrived = null);
-        var completed = await Task.WhenAny(detach, Task.Delay(timeout));
+        // instance lock (e.g. a hotplug consumer calling in during shutdown). The call throws
+        // ObjectDisposedException once it has the lock; acquiring it is the point.
+        var lockProbe = Task.Run(() =>
+        {
+            try
+            {
+                _ = provider.RegisterHotplug(new TestHotplugListener());
+            }
+            catch (ObjectDisposedException)
+            {
+                // Expected: the instance is disposing.
+            }
+        });
+        var completed = await Task.WhenAny(lockProbe, Task.Delay(timeout));
         completed
             .Should()
-            .Be(detach, because: "the instance lock must not be held while joining the event loop");
+            .Be(
+                lockProbe,
+                because: "the instance lock must not be held while joining the event loop"
+            );
 
         dispose.IsCompleted.Should().BeFalse(because: "the event-loop thread is still held");
         _api.EventLoopRelease.Set();
@@ -154,25 +177,28 @@ public sealed class Given_a_fake_hotplug_device_lifecycle : IDisposable
         using var handlerReturned = new ManualResetEventSlim(false);
         Exception? caught = null;
 
-        provider.DeviceArrived = _ =>
+        var listener = new TestHotplugListener
         {
-            // This callback runs synchronously on the event-loop thread (see
-            // RunOnNextHandleEventsCompleted below). Usb.Dispose() would try to join that same
-            // thread; instead of hanging in a self-join, it must fail fast.
-            try
+            DeviceArrived = _ =>
             {
-                _usb.Dispose();
-            }
-            catch (Exception ex)
-            {
-                caught = ex;
-            }
-            finally
-            {
-                handlerReturned.Set();
-            }
+                // This callback runs synchronously on the event-loop thread (see
+                // RunOnNextHandleEventsCompleted below). Usb.Dispose() would try to join that same
+                // thread; instead of hanging in a self-join, it must fail fast.
+                try
+                {
+                    _usb.Dispose();
+                }
+                catch (Exception ex)
+                {
+                    caught = ex;
+                }
+                finally
+                {
+                    handlerReturned.Set();
+                }
+            },
         };
-        provider.RegisterHotplug().Should().Be(HotplugRegistrationResult.Success);
+        provider.RegisterHotplug(listener).Should().Be(HotplugRegistrationResult.Success);
 
         // Have the real event-loop thread invoke the hotplug callback itself, from inside
         // libusb_handle_events_completed, exactly as real libusb dispatches a pending event.

@@ -17,9 +17,7 @@ namespace UsbDotNet;
 /// <inheritdoc/>
 public sealed class Usb : IUsb, IHotplugProvider
 {
-    private Action<IUsbDeviceDescriptor>? _deviceArrived;
-    private Action<IUsbDeviceDescriptor>? _deviceLeft;
-    private Action? _providerDisposed;
+    private IHotplugListener? _hotplugListener;
 
     private static int _instances;
 
@@ -65,48 +63,6 @@ public sealed class Usb : IUsb, IHotplugProvider
     /// <inheritdoc/>
     bool IHotplugProvider.IsHotplugSupported =>
         _libUsb.HasCapability(libusb_capability.LIBUSB_CAP_HAS_HOTPLUG);
-
-    /// <inheritdoc/>
-    Action<IUsbDeviceDescriptor>? IHotplugProvider.DeviceArrived
-    {
-        get => _deviceArrived;
-        set =>
-            SetHotplugCallback(ref _deviceArrived, value, nameof(IHotplugProvider.DeviceArrived));
-    }
-
-    /// <inheritdoc/>
-    Action<IUsbDeviceDescriptor>? IHotplugProvider.DeviceLeft
-    {
-        get => _deviceLeft;
-        set => SetHotplugCallback(ref _deviceLeft, value, nameof(IHotplugProvider.DeviceLeft));
-    }
-
-    /// <inheritdoc/>
-    Action? IHotplugProvider.Disposed
-    {
-        get => _providerDisposed;
-        set => SetHotplugCallback(ref _providerDisposed, value, nameof(IHotplugProvider.Disposed));
-    }
-
-    /// <summary>
-    /// Single-owner callback slot: replacing a callback throws. A second consumer cannot silently
-    /// steal hotplug events from the current owner. Assigning null (detach) is always allowed.
-    /// </summary>
-    private void SetHotplugCallback<T>(ref T? callback, T? value, string callbackName)
-        where T : Delegate
-    {
-        lock (_lock)
-        {
-            if (callback is not null && value is not null)
-            {
-                throw new InvalidOperationException(
-                    $"{callbackName} is already attached. Only one consumer may own the hotplug "
-                        + "callbacks of a Usb instance; detach the existing callback first."
-                );
-            }
-            callback = value;
-        }
-    }
 
     /// <summary>
     /// Get the Usb library version.
@@ -246,8 +202,79 @@ public sealed class Usb : IUsb, IHotplugProvider
         };
 
     /// <inheritdoc/>
-    HotplugRegistrationResult IHotplugProvider.RegisterHotplug() =>
-        RegisterHotplugCore(deviceClass: null, vendorId: null, productId: null);
+    HotplugRegistrationResult IHotplugProvider.RegisterHotplug(IHotplugListener listener)
+    {
+        ArgumentNullException.ThrowIfNull(listener);
+        lock (_lock)
+        {
+            // Reject a second listener before touching the slot: EmitHotplugEvent reads
+            // _hotplugListener without _lock on the event loop thread, so even a briefly swapped-in
+            // listener could be handed a live event that belongs to the current owner.
+            if (_hotplugListener is not null)
+            {
+                return HotplugRegistrationResult.AlreadyRegistered;
+            }
+            // Attach before registering: with LIBUSB_HOTPLUG_ENUMERATE the native callback replays
+            // already-connected devices asynchronously on the event loop thread as soon as
+            // registration completes, and those must reach the listener. The rollback below covers
+            // the outcomes only the core can produce: AlreadyRegistered from a listenerless legacy
+            // RegisterHotplug registration, NotSupported, and throws for uninitialized/disposed.
+            _hotplugListener = listener;
+            try
+            {
+                var result = RegisterHotplugCore(
+                    deviceClass: null,
+                    vendorId: null,
+                    productId: null
+                );
+                if (result is not HotplugRegistrationResult.Success)
+                {
+                    _hotplugListener = null;
+                }
+                return result;
+            }
+            catch
+            {
+                _hotplugListener = null;
+                throw;
+            }
+        }
+    }
+
+    /// <inheritdoc/>
+    void IHotplugProvider.DeregisterHotplug(IHotplugListener listener)
+    {
+        // Deliberately no CheckDisposed on the cleanup path (typically UsbHotplugMonitor.Dispose)
+        // that may race Usb.Dispose; when Dispose already took the callback handle every step below
+        // is a safe no-op.
+        ArgumentNullException.ThrowIfNull(listener);
+        ISafeCallbackHandle? handle;
+        lock (_lock)
+        {
+            if (!ReferenceEquals(_hotplugListener, listener))
+            {
+                // Not the registration owner (or nothing registered); nothing to release.
+                return;
+            }
+            _hotplugListener = null;
+            handle = _hotplugCallbackHandle;
+            _hotplugCallbackHandle = null;
+        }
+        // Native deregister outside _lock, mirroring Dispose. An event already in flight on the
+        // event loop thread may have read the listener before it was cleared and still deliver
+        // one final event; listeners drop events after their own dispose.
+        handle?.Dispose();
+        // Release the cached device references (and their libusb refs). Without this, a later
+        // registration's LIBUSB_HOTPLUG_ENUMERATE replay would be suppressed by the
+        // duplicate-arrival check in HandleDeviceArrived and the new listener would see nothing.
+        foreach (var entry in _hotplugDevices.ToArray())
+        {
+            if (_hotplugDevices.TryRemove(entry.Key, out var cached))
+            {
+                cached.Device.Dispose();
+            }
+        }
+    }
 
     private HotplugRegistrationResult RegisterHotplugCore(
         UsbClass? deviceClass,
@@ -404,10 +431,14 @@ public sealed class Usb : IUsb, IHotplugProvider
             descriptor.DeviceClass,
             descriptor.DeviceKey
         );
-        var callback =
-            eventType == libusb_hotplug_event.LIBUSB_HOTPLUG_EVENT_DEVICE_ARRIVED ? _deviceArrived
-            : eventType == libusb_hotplug_event.LIBUSB_HOTPLUG_EVENT_DEVICE_LEFT ? _deviceLeft
-            : null;
+        if (_hotplugListener is not { } listener)
+        {
+            return;
+        }
+        Action<IUsbDeviceDescriptor> callback =
+            eventType == libusb_hotplug_event.LIBUSB_HOTPLUG_EVENT_DEVICE_ARRIVED
+                ? listener.OnDeviceArrived
+                : listener.OnDeviceLeft;
         EventDispatch.RaiseSafely(callback, _logger, descriptor, descriptor.DeviceKey);
     }
 
@@ -661,7 +692,7 @@ public sealed class Usb : IUsb, IHotplugProvider
         ISafeCallbackHandle? hotplugCallbackHandle;
         LibUsbEventLoop? eventLoop;
         ISafeContext? context;
-        Action? providerDisposed = null;
+        IHotplugListener? listener = null;
 
         // 1. Mark Usb as Disposing
         lock (_lock)
@@ -685,7 +716,7 @@ public sealed class Usb : IUsb, IHotplugProvider
             if (Environment.CurrentManagedThreadId == _eventLoopThreadId)
             {
                 // Thrown if called synchronously from one of the the internal hotplug
-                // IHotplugProvider.DeviceArrived or IHotplugProvider.DeviceLeft callbacks. The
+                // IHotplugListener.OnDeviceArrived or IHotplugListener.OnDeviceLeft callbacks. The
                 // callbacks run on the libusb event-loop thread, and disposing joins that thread.
                 const string errorMessage =
                     "Dispose() was invoked from within a hotplug event handler. This is unsafe: "
@@ -752,9 +783,12 @@ public sealed class Usb : IUsb, IHotplugProvider
                 _ = Interlocked.Exchange(ref _instances, 0);
                 _disposeState = DisposeState.Disposed;
                 Monitor.PulseAll(_lock);
-                providerDisposed = _providerDisposed;
+                listener = _hotplugListener;
             }
-            EventDispatch.RaiseSafely(providerDisposed, _logger);
+            if (listener is not null)
+            {
+                EventDispatch.RaiseSafely(listener.OnProviderDisposed, _logger);
+            }
         }
     }
 }
