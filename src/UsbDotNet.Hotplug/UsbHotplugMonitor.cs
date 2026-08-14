@@ -7,7 +7,7 @@ using UsbDotNet.Internal;
 namespace UsbDotNet.Hotplug;
 
 /// <inheritdoc/>
-public sealed class UsbHotplugMonitor : IUsbHotplugMonitor
+public sealed class UsbHotplugMonitor : IUsbHotplugMonitor, IHotplugListener
 {
     private const string AlreadyRegisteredMessage =
         "Hotplug is already registered on this IUsb. Only one UsbHotplugMonitor may "
@@ -84,33 +84,15 @@ public sealed class UsbHotplugMonitor : IUsbHotplugMonitor
             // enumeration event can be dispatched before the first subscriber is in the list.
             if (!_registered)
             {
-                // Attach before registering so the enumeration replay of already connected devices
-                // is never missed. The callback setters throw when another monitor is attached.
-                _provider.DeviceArrived = OnDeviceArrived;
-                _provider.DeviceLeft = OnDeviceLeft;
-                _provider.Disposed = OnProviderDisposed;
-                try
+                _registered = _provider.RegisterHotplug(this) switch
                 {
-                    if (_provider.RegisterHotplug() is HotplugRegistrationResult.AlreadyRegistered)
-                    {
-                        throw new InvalidOperationException(AlreadyRegisteredMessage);
-                    }
-                    if (!IsHotplugSupported)
-                    {
-                        throw new NotSupportedException(
-                            "Hotplug is not supported on this platform."
-                        );
-                    }
-                }
-                catch
-                {
-                    // Leave the provider unowned so a later monitor (or a retry) can attach.
-                    _provider.DeviceArrived = null;
-                    _provider.DeviceLeft = null;
-                    _provider.Disposed = null;
-                    throw;
-                }
-                _registered = true;
+                    HotplugRegistrationResult.Success => true,
+                    HotplugRegistrationResult.NotSupported => throw new NotSupportedException(
+                        "Hotplug is not supported on this platform."
+                    ),
+                    HotplugRegistrationResult.AlreadyRegistered =>
+                        throw new InvalidOperationException(AlreadyRegisteredMessage),
+                };
             }
 
             var subscription = new Subscription(this, filter);
@@ -132,10 +114,10 @@ public sealed class UsbHotplugMonitor : IUsbHotplugMonitor
         }
     }
 
-    private void OnDeviceArrived(IUsbDeviceDescriptor descriptor) =>
+    void IHotplugListener.OnDeviceArrived(IUsbDeviceDescriptor descriptor) =>
         Dispatch(UsbHotplugEventType.Connected, descriptor);
 
-    private void OnDeviceLeft(IUsbDeviceDescriptor descriptor) =>
+    void IHotplugListener.OnDeviceLeft(IUsbDeviceDescriptor descriptor) =>
         Dispatch(UsbHotplugEventType.Disconnected, descriptor);
 
     private void Dispatch(UsbHotplugEventType type, IUsbDeviceDescriptor descriptor)
@@ -176,7 +158,7 @@ public sealed class UsbHotplugMonitor : IUsbHotplugMonitor
     /// subscription channels so consumers observe a clean end-of-stream, and let Subscribe reject
     /// new subscribers instead of replaying stale devices.
     /// </summary>
-    private void OnProviderDisposed()
+    void IHotplugListener.OnProviderDisposed()
     {
         List<Subscription> subscriptions;
         lock (_lock)
@@ -210,14 +192,14 @@ public sealed class UsbHotplugMonitor : IUsbHotplugMonitor
     }
 
     /// <summary>
-    /// Detaches from the <see cref="IUsb"/> hotplug callbacks and completes all subscription channels.
-    /// Does not deregister the native hotplug callback or dispose the <see cref="IUsb"/> instance;
-    /// the native callback is deregistered when the <see cref="IUsb"/> instance itself is disposed.
+    /// Releases the hotplug registration this monitor owns (allowing a new monitor over the same
+    /// <see cref="IUsb"/> instance) and completes all subscription channels. Does not dispose the
+    /// <see cref="IUsb"/> instance.
     /// </summary>
     public void Dispose()
     {
         List<Subscription> subscriptions;
-        bool detach;
+        bool deregister;
         lock (_lock)
         {
             if (_disposed)
@@ -225,20 +207,18 @@ public sealed class UsbHotplugMonitor : IUsbHotplugMonitor
                 return;
             }
             _disposed = true;
-            detach = _registered; // Attached on Subscribe; don't clear callbacks we don't own
+            deregister = _registered;
             subscriptions = [.. _subscriptions];
             _subscriptions.Clear();
             _connected.Clear();
         }
-        // Detach outside _lock: the provider's callback setters take the Usb instance lock, and
-        // holding _lock across that call deadlocks against the libusb event-loop thread, which
-        // blocks on _lock in Dispatch while a disposing Usb instance waits for it to exit.
-        // Events dispatched before the detach completes are ignored by the _disposed check.
-        if (detach)
+        // Deregister outside _lock: the provider takes the Usb instance lock, and the event loop
+        // thread may concurrently be blocked on _lock in Dispatch; holding _lock across the call
+        // would couple the two locks. An event delivered before (or racing) the deregistration is
+        // dropped by the _disposed check in Dispatch.
+        if (deregister)
         {
-            _provider.DeviceArrived = null;
-            _provider.DeviceLeft = null;
-            _provider.Disposed = null;
+            _provider.DeregisterHotplug(this);
         }
         foreach (var subscription in subscriptions)
         {

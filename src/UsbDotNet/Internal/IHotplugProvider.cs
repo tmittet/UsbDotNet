@@ -1,47 +1,45 @@
-using UsbDotNet.Descriptor;
-
 namespace UsbDotNet.Internal;
 
 internal interface IHotplugProvider
 {
-    /// <summary>
-    /// Invoked on the libusb event loop thread when a device is connected (and once per
-    /// already-connected device at registration time). The callback must not block; exceptions it
-    /// throws are caught and logged so they cannot interrupt event handling for other devices.
-    /// </summary>
-    Action<IUsbDeviceDescriptor>? DeviceArrived { get; set; }
-
-    /// <summary>Invoked on the libusb event loop thread when a device is disconnected.</summary>
-    Action<IUsbDeviceDescriptor>? DeviceLeft { get; set; }
-
-    /// <summary>
-    /// Invoked exactly once, on the disposing thread, after the provider has completed its
-    /// teardown (no locks are held and no further hotplug events can be raised). Lets consumers
-    /// tracking device state (e.g. UsbHotplugMonitor) stop cleanly instead of serving a stale
-    /// snapshot of a provider that no longer exists.
-    /// </summary>
-    Action? Disposed { get; set; }
-
     /// <summary>True when hotplug is supported on the platform.</summary>
     bool IsHotplugSupported { get; }
 
     /// <summary>
-    /// Registers the single native hotplug callback that drives <see cref="DeviceArrived"/> and
-    /// <see cref="DeviceLeft"/>. The first successful call registers with enumeration enabled, so
-    /// every already-connected device is replayed as a <see cref="DeviceArrived"/> callback.
+    /// Registers the single native hotplug callback and the <paramref name="listener"/> it
+    /// notifies. The first successful call registers with enumeration enabled, so every
+    /// already-connected device is replayed to <see cref="IHotplugListener.OnDeviceArrived"/>.
     /// <para>
-    /// Returns <see cref="HotplugRegistrationResult.Success"/> on the first registration and
-    /// <see cref="HotplugRegistrationResult.AlreadyRegistered"/> on any subsequent call.
+    /// Returns <see cref="HotplugRegistrationResult.Success"/> when the registration is created,
+    /// <see cref="HotplugRegistrationResult.AlreadyRegistered"/> while another registration is
+    /// active, and <see cref="HotplugRegistrationResult.NotSupported"/> when the platform lacks
+    /// hotplug support. The listener is only attached on
+    /// <see cref="HotplugRegistrationResult.Success"/>; on any other outcome the provider keeps
+    /// its current listener (if any). After <see cref="DeregisterHotplug"/> a new registration
+    /// can succeed with a fresh enumeration.
     /// </para>
     /// <para>
     /// <see cref="HotplugRegistrationResult.AlreadyRegistered"/> should be treated as a caller
     /// error: registration is not repeated, so <b>no already-connected devices are enumerated</b>
-    /// for the second caller and it will only observe devices that arrive from then on.
-    /// A single caller must own registration (one registration feeds all subscribers); a second
-    /// attempt indicates two components are competing for the same instance.
+    /// for the second caller and it will never observe any events. A single caller must own
+    /// registration (one registration feeds all subscribers); a second attempt indicates two
+    /// components are competing for the same instance.
     /// </para>
     /// </summary>
     /// <exception cref="ObjectDisposedException">Thrown when the instance is disposed.</exception>
     /// <exception cref="InvalidOperationException">Thrown when the instance is not initialized.</exception>
-    HotplugRegistrationResult RegisterHotplug();
+    HotplugRegistrationResult RegisterHotplug(IHotplugListener listener);
+
+    /// <summary>
+    /// Releases the hotplug registration owned by <paramref name="listener"/>: deregisters the
+    /// native callback, detaches the listener and releases cached device references, so a later
+    /// <see cref="RegisterHotplug"/> can succeed with a fresh enumeration.
+    /// <para>
+    /// A no-op when <paramref name="listener"/> is not the currently attached listener (including
+    /// when nothing is registered or the provider is disposed), so disposal paths can call it
+    /// unconditionally. A hotplug event already in flight on the event loop thread may still
+    /// reach the listener after this returns; listeners must drop events after their own dispose.
+    /// </para>
+    /// </summary>
+    void DeregisterHotplug(IHotplugListener listener);
 }

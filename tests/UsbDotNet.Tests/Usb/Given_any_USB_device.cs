@@ -3,6 +3,7 @@ using UsbDotNet.Core;
 using UsbDotNet.Descriptor;
 using UsbDotNet.Internal;
 using UsbDotNet.LibUsbNative;
+using UsbDotNet.Tests.Fakes;
 
 namespace UsbDotNet.Tests.Usb;
 
@@ -240,18 +241,21 @@ public sealed class Given_any_USB_device : IDisposable
         var provider = (IHotplugProvider)_usb;
         var arrived = new ConcurrentQueue<IUsbDeviceDescriptor>();
         using var reachedExpected = new ManualResetEventSlim(false);
-        provider.DeviceArrived = descriptor =>
+        var listener = new TestHotplugListener
         {
-            arrived.Enqueue(descriptor);
-            // Events arrive on the libusb event loop thread; signal once we've seen them all.
-            if (arrived.Select(k => k.DeviceKey).Distinct().Count() >= expectedKeys.Count)
-                reachedExpected.Set();
+            DeviceArrived = descriptor =>
+            {
+                arrived.Enqueue(descriptor);
+                // Events arrive on the libusb event loop thread; signal once we've seen them all.
+                if (arrived.Select(k => k.DeviceKey).Distinct().Count() >= expectedKeys.Count)
+                    reachedExpected.Set();
+            },
         };
 
         // Registration with LIBUSB_HOTPLUG_ENUMERATE replays the connected devices as
         // DeviceArrived events, delivered on the libusb event loop thread.
         Skip.IfNot(
-            provider.RegisterHotplug() == HotplugRegistrationResult.Success,
+            provider.RegisterHotplug(listener) == HotplugRegistrationResult.Success,
             "Hotplug is not supported on this platform."
         );
         reachedExpected.Wait(EventTimeout);
@@ -292,15 +296,18 @@ public sealed class Given_any_USB_device : IDisposable
         var provider = (IHotplugProvider)_usb;
         var arrived = new ConcurrentDictionary<string, IUsbDeviceDescriptor>();
         using var matched = new ManualResetEventSlim(false);
-        provider.DeviceArrived = descriptor =>
+        var listener = new TestHotplugListener
         {
-            arrived[descriptor.DeviceKey] = descriptor;
-            if (arrived.ContainsKey(expected!.DeviceKey))
-                matched.Set();
+            DeviceArrived = descriptor =>
+            {
+                arrived[descriptor.DeviceKey] = descriptor;
+                if (arrived.ContainsKey(expected!.DeviceKey))
+                    matched.Set();
+            },
         };
 
         Skip.IfNot(
-            provider.RegisterHotplug() == HotplugRegistrationResult.Success,
+            provider.RegisterHotplug(listener) == HotplugRegistrationResult.Success,
             "Hotplug is not supported on this platform."
         );
         matched.Wait(EventTimeout);
@@ -320,12 +327,12 @@ public sealed class Given_any_USB_device : IDisposable
     }
 
     [Fact]
-    public void RegisterHotplug_without_subscribers_does_not_throw()
+    public void RegisterHotplug_with_a_noop_listener_does_not_throw()
     {
-        // With enumeration enabled the callback runs for connected devices; with no subscribers
-        // the raise path must be a safe no-op rather than throwing on a null handler.
+        // With enumeration enabled the callback runs for connected devices; delivering them to a
+        // listener whose callbacks do nothing must be safe.
         var provider = (IHotplugProvider)_usb;
-        var act = () => provider.RegisterHotplug();
+        var act = () => provider.RegisterHotplug(new TestHotplugListener());
         act.Should().NotThrow();
     }
 
@@ -339,14 +346,17 @@ public sealed class Given_any_USB_device : IDisposable
 
         var provider = (IHotplugProvider)_usb;
         using var callbackInvoked = new ManualResetEventSlim(false);
-        provider.DeviceArrived = _ =>
+        var listener = new TestHotplugListener
         {
-            callbackInvoked.Set();
-            throw new InvalidOperationException("Callback failure.");
+            DeviceArrived = _ =>
+            {
+                callbackInvoked.Set();
+                throw new InvalidOperationException("Callback failure.");
+            },
         };
 
         Skip.IfNot(
-            provider.RegisterHotplug() == HotplugRegistrationResult.Success,
+            provider.RegisterHotplug(listener) == HotplugRegistrationResult.Success,
             "Hotplug is not supported on this platform."
         );
 
