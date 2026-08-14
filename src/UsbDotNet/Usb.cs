@@ -336,6 +336,7 @@ public sealed class Usb : IUsb, IHotplugProvider
         try
         {
             using var token = _hotplugCallbackRundown.AcquireSharedToken();
+            // NOTE: The event handlers are implemented and expected to never throw.
             if (eventType is libusb_hotplug_event.LIBUSB_HOTPLUG_EVENT_DEVICE_ARRIVED)
             {
                 HandleDeviceArrived(device);
@@ -356,6 +357,9 @@ public sealed class Usb : IUsb, IHotplugProvider
         }
     }
 
+    /// <summary>
+    /// NOTE: This method is implemented and expected to never throw.
+    /// </summary>
     private void HandleDeviceArrived(ISafeDevice device)
     {
         UsbDeviceDescriptor descriptor;
@@ -366,7 +370,7 @@ public sealed class Usb : IUsb, IHotplugProvider
         // NOTE: Never throws; since libusb-1.0.16 libusb_get_device_descriptor always succeeds
         catch (UsbException ex)
         {
-            _logger.LogWarning("Hotplug event handling failed. {ErrorMessage}.", ex.Message);
+            _logger.LogError("Hotplug event handling failed. {ErrorMessage}.", ex.Message);
             device.Dispose();
             return;
         }
@@ -386,43 +390,47 @@ public sealed class Usb : IUsb, IHotplugProvider
         EmitHotplugEvent(libusb_hotplug_event.LIBUSB_HOTPLUG_EVENT_DEVICE_ARRIVED, descriptor);
     }
 
+    /// <summary>
+    /// NOTE: This method is implemented and expected to never throw.
+    /// </summary>
     private void HandleDeviceLeft(ISafeDevice device)
     {
+        // NOTE: The SafeDevice received on DEVICE_LEFT is not the same SafeDevice as the one
+        // received on DEVICE_ARRIVED, even though the underlying libusb_device pointer is the same.
+        // SafeContext creates a new SafeDevice for each callback, both must be disposed here.
+        if (_hotplugDevices.TryRemove(device.Id, out var cached))
+        {
+            device.Dispose(); // Dispose the throwaway instance created for the DEVICE_LEFT callback
+            cached.Device.Dispose(); // Release the reference taken on arrival
+            EmitHotplugEvent(
+                libusb_hotplug_event.LIBUSB_HOTPLUG_EVENT_DEVICE_LEFT,
+                cached.Descriptor
+            );
+            return;
+        }
+        // A device we never cached (per docs: removal may be notified without a prior arrival).
+        // Should not happen; we register with libusb_hotplug_flag.LIBUSB_HOTPLUG_ENUMERATE.
         try
         {
-            if (_hotplugDevices.TryRemove(device.Id, out var cached))
-            {
-                cached.Device.Dispose(); // Release the reference taken on arrival.
-                EmitHotplugEvent(
-                    libusb_hotplug_event.LIBUSB_HOTPLUG_EVENT_DEVICE_LEFT,
-                    cached.Descriptor
-                );
-                return;
-            }
-            // A device we never cached (per docs: removal may be notified without a prior arrival).
-            // Should not happen; we register with libusb_hotplug_flag.LIBUSB_HOTPLUG_ENUMERATE.
-            try
-            {
-                var descriptor = device.GetDeviceDescriptor();
-                _logger.LogWarning(
-                    "Hotplug 'DEVICE_LEFT' for an untracked device ignored. "
-                        + "VID=0x{VendorId:X4}, PID=0x{ProductId:X4}.",
-                    descriptor.idVendor,
-                    descriptor.idProduct
-                );
-            }
-            // NOTE: Never throws; since libusb-1.0.16 libusb_get_device_descriptor always succeeds
-            catch (UsbException ex)
-            {
-                _logger.LogWarning("Hotplug event handling failed. {ErrorMessage}.", ex.Message);
-            }
+            var descriptor = device.GetDeviceDescriptor();
+            _logger.LogWarning(
+                "Hotplug 'DEVICE_LEFT' for an untracked device ignored. "
+                    + "VID=0x{VendorId:X4}, PID=0x{ProductId:X4}.",
+                descriptor.idVendor,
+                descriptor.idProduct
+            );
         }
-        finally
+        // NOTE: Never throws; since libusb-1.0.16 libusb_get_device_descriptor always succeeds
+        catch (UsbException ex)
         {
-            device.Dispose(); // Dispose the throwaway instance created for the callback
+            _logger.LogError("Hotplug event handling failed. {ErrorMessage}.", ex.Message);
         }
+        device.Dispose(); // Dispose the throwaway instance created for the callback
     }
 
+    /// <summary>
+    /// NOTE: This method is implemented and expected to never throw.
+    /// </summary>
     private void EmitHotplugEvent(libusb_hotplug_event eventType, UsbDeviceDescriptor descriptor)
     {
         _logger.LogDebug(
