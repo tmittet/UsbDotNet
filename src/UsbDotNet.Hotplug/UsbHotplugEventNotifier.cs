@@ -80,7 +80,7 @@ public sealed class UsbHotplugEventNotifier : IDisposable
             {
                 return;
             }
-            // Subscribe before setting _started so a throwing Subscribe leaves the notifier
+            // Subscribe before setting _registered so a throwing Subscribe leaves the notifier
             // unstarted. The monitor replays already connected devices into the subscription
             // channel at subscribe time; the pump below delivers them to the attached handlers.
             var subscription = _monitor.Subscribe(_filter);

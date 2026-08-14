@@ -5,22 +5,22 @@ namespace UsbDotNet.Internal;
 internal interface IHotplugProvider
 {
     /// <summary>
-    /// Raised on the libusb event loop thread when a device is connected (and once per
-    /// already-connected device at registration time). Handlers must not block; exceptions they
-    /// throw are caught and logged so they cannot interrupt event handling for other devices.
+    /// Invoked on the libusb event loop thread when a device is connected (and once per
+    /// already-connected device at registration time). The callback must not block; exceptions it
+    /// throws are caught and logged so they cannot interrupt event handling for other devices.
     /// </summary>
-    event EventHandler<IUsbDeviceDescriptor>? DeviceArrived;
+    Action<IUsbDeviceDescriptor>? DeviceArrived { get; set; }
 
-    /// <summary>Raised on the libusb event loop thread when a device is disconnected.</summary>
-    event EventHandler<IUsbDeviceDescriptor>? DeviceLeft;
+    /// <summary>Invoked on the libusb event loop thread when a device is disconnected.</summary>
+    Action<IUsbDeviceDescriptor>? DeviceLeft { get; set; }
 
     /// <summary>
-    /// Raised exactly once, on the disposing thread, after the provider has completed its
+    /// Invoked exactly once, on the disposing thread, after the provider has completed its
     /// teardown (no locks are held and no further hotplug events can be raised). Lets consumers
     /// tracking device state (e.g. UsbHotplugMonitor) stop cleanly instead of serving a stale
     /// snapshot of a provider that no longer exists.
     /// </summary>
-    event EventHandler? Disposed;
+    Action? Disposed { get; set; }
 
     /// <summary>True when hotplug is supported on the platform.</summary>
     bool IsHotplugSupported { get; }
@@ -28,7 +28,7 @@ internal interface IHotplugProvider
     /// <summary>
     /// Registers the single native hotplug callback that drives <see cref="DeviceArrived"/> and
     /// <see cref="DeviceLeft"/>. The first successful call registers with enumeration enabled, so
-    /// every already-connected device is replayed as a <see cref="DeviceArrived"/> event.
+    /// every already-connected device is replayed as a <see cref="DeviceArrived"/> callback.
     /// <para>
     /// Returns <see cref="HotplugRegistrationResult.Success"/> on the first registration and
     /// <see cref="HotplugRegistrationResult.AlreadyRegistered"/> on any subsequent call.

@@ -9,6 +9,10 @@ namespace UsbDotNet.Hotplug;
 /// <inheritdoc/>
 public sealed class UsbHotplugMonitor : IUsbHotplugMonitor
 {
+    private const string AlreadyRegisteredMessage =
+        "Hotplug is already registered on this IUsb. Only one UsbHotplugMonitor may "
+        + "be active per IUsb instance; share one monitor and add subscribers.";
+
     private readonly object _lock = new();
     private readonly IHotplugProvider _provider;
     private readonly ILogger<UsbHotplugMonitor> _logger;
@@ -18,7 +22,7 @@ public sealed class UsbHotplugMonitor : IUsbHotplugMonitor
     private readonly Dictionary<string, IUsbDeviceDescriptor> _connected = [];
     private readonly List<Subscription> _subscriptions = [];
 
-    private bool _started;
+    private bool _registered;
     private bool _providerDisposed;
     private bool _disposed;
 
@@ -47,11 +51,6 @@ public sealed class UsbHotplugMonitor : IUsbHotplugMonitor
             ? NullLogger<UsbHotplugMonitor>.Instance
             : loggerFactory.CreateLogger<UsbHotplugMonitor>();
         IsHotplugSupported = _provider.IsHotplugSupported;
-        // Attach before registering (which happens on first Subscribe)
-        // so the enumeration of already connected devices is never missed.
-        _provider.DeviceArrived += OnDeviceArrived;
-        _provider.DeviceLeft += OnDeviceLeft;
-        _provider.Disposed += OnProviderDisposed;
     }
 
     private static IHotplugProvider AsHotplugProvider(IUsb usb)
@@ -83,20 +82,35 @@ public sealed class UsbHotplugMonitor : IUsbHotplugMonitor
             // LIBUSB_HOTPLUG_ENUMERATE events asynchronously on its event loop thread, which must
             // take _lock to dispatch; since we hold _lock until the subscriber is added below, no
             // enumeration event can be dispatched before the first subscriber is in the list.
-            if (!_started)
+            if (!_registered)
             {
-                if (_provider.RegisterHotplug() is HotplugRegistrationResult.AlreadyRegistered)
+                // Attach before registering so the enumeration replay of already connected devices
+                // is never missed. The callback setters throw when another monitor is attached.
+                _provider.DeviceArrived = OnDeviceArrived;
+                _provider.DeviceLeft = OnDeviceLeft;
+                _provider.Disposed = OnProviderDisposed;
+                try
                 {
-                    throw new InvalidOperationException(
-                        "Hotplug is already registered on this IUsb. Only one UsbHotplugMonitor may "
-                            + "be active per IUsb instance; share one monitor and add subscribers."
-                    );
+                    if (_provider.RegisterHotplug() is HotplugRegistrationResult.AlreadyRegistered)
+                    {
+                        throw new InvalidOperationException(AlreadyRegisteredMessage);
+                    }
+                    if (!IsHotplugSupported)
+                    {
+                        throw new NotSupportedException(
+                            "Hotplug is not supported on this platform."
+                        );
+                    }
                 }
-                if (!IsHotplugSupported)
+                catch
                 {
-                    throw new NotSupportedException("Hotplug is not supported on this platform.");
+                    // Leave the provider unowned so a later monitor (or a retry) can attach.
+                    _provider.DeviceArrived = null;
+                    _provider.DeviceLeft = null;
+                    _provider.Disposed = null;
+                    throw;
                 }
-                _started = true;
+                _registered = true;
             }
 
             var subscription = new Subscription(this, filter);
@@ -118,10 +132,10 @@ public sealed class UsbHotplugMonitor : IUsbHotplugMonitor
         }
     }
 
-    private void OnDeviceArrived(object? sender, IUsbDeviceDescriptor descriptor) =>
+    private void OnDeviceArrived(IUsbDeviceDescriptor descriptor) =>
         Dispatch(UsbHotplugEventType.Connected, descriptor);
 
-    private void OnDeviceLeft(object? sender, IUsbDeviceDescriptor descriptor) =>
+    private void OnDeviceLeft(IUsbDeviceDescriptor descriptor) =>
         Dispatch(UsbHotplugEventType.Disconnected, descriptor);
 
     private void Dispatch(UsbHotplugEventType type, IUsbDeviceDescriptor descriptor)
@@ -162,7 +176,7 @@ public sealed class UsbHotplugMonitor : IUsbHotplugMonitor
     /// subscription channels so consumers observe a clean end-of-stream, and let Subscribe reject
     /// new subscribers instead of replaying stale devices.
     /// </summary>
-    private void OnProviderDisposed(object? sender, EventArgs e)
+    private void OnProviderDisposed()
     {
         List<Subscription> subscriptions;
         lock (_lock)
@@ -196,13 +210,14 @@ public sealed class UsbHotplugMonitor : IUsbHotplugMonitor
     }
 
     /// <summary>
-    /// Detaches from the <see cref="IUsb"/> hotplug events and completes all subscription channels.
+    /// Detaches from the <see cref="IUsb"/> hotplug callbacks and completes all subscription channels.
     /// Does not deregister the native hotplug callback or dispose the <see cref="IUsb"/> instance;
     /// the native callback is deregistered when the <see cref="IUsb"/> instance itself is disposed.
     /// </summary>
     public void Dispose()
     {
         List<Subscription> subscriptions;
+        bool detach;
         lock (_lock)
         {
             if (_disposed)
@@ -210,17 +225,21 @@ public sealed class UsbHotplugMonitor : IUsbHotplugMonitor
                 return;
             }
             _disposed = true;
+            detach = _registered; // Attached on Subscribe; don't clear callbacks we don't own
             subscriptions = [.. _subscriptions];
             _subscriptions.Clear();
             _connected.Clear();
         }
-        // Detach outside _lock: the provider's event accessors take the Usb instance lock, and
+        // Detach outside _lock: the provider's callback setters take the Usb instance lock, and
         // holding _lock across that call deadlocks against the libusb event-loop thread, which
         // blocks on _lock in Dispatch while a disposing Usb instance waits for it to exit.
         // Events dispatched before the detach completes are ignored by the _disposed check.
-        _provider.DeviceArrived -= OnDeviceArrived;
-        _provider.DeviceLeft -= OnDeviceLeft;
-        _provider.Disposed -= OnProviderDisposed;
+        if (detach)
+        {
+            _provider.DeviceArrived = null;
+            _provider.DeviceLeft = null;
+            _provider.Disposed = null;
+        }
         foreach (var subscription in subscriptions)
         {
             subscription.Complete();

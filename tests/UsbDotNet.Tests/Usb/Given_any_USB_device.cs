@@ -240,7 +240,7 @@ public sealed class Given_any_USB_device : IDisposable
         var provider = (IHotplugProvider)_usb;
         var arrived = new ConcurrentQueue<IUsbDeviceDescriptor>();
         using var reachedExpected = new ManualResetEventSlim(false);
-        provider.DeviceArrived += (_, descriptor) =>
+        provider.DeviceArrived = descriptor =>
         {
             arrived.Enqueue(descriptor);
             // Events arrive on the libusb event loop thread; signal once we've seen them all.
@@ -292,7 +292,7 @@ public sealed class Given_any_USB_device : IDisposable
         var provider = (IHotplugProvider)_usb;
         var arrived = new ConcurrentDictionary<string, IUsbDeviceDescriptor>();
         using var matched = new ManualResetEventSlim(false);
-        provider.DeviceArrived += (_, descriptor) =>
+        provider.DeviceArrived = descriptor =>
         {
             arrived[descriptor.DeviceKey] = descriptor;
             if (arrived.ContainsKey(expected!.DeviceKey))
@@ -330,7 +330,7 @@ public sealed class Given_any_USB_device : IDisposable
     }
 
     [SkippableFact]
-    public void A_throwing_DeviceArrived_handler_does_not_prevent_delivery_to_other_handlers()
+    public void A_throwing_DeviceArrived_callback_does_not_escape_onto_the_event_loop_thread()
     {
         Skip.If(
             _usb.GetDeviceList().Count == 0,
@@ -338,19 +338,22 @@ public sealed class Given_any_USB_device : IDisposable
         );
 
         var provider = (IHotplugProvider)_usb;
-        using var secondHandlerReceived = new ManualResetEventSlim(false);
-        provider.DeviceArrived += (_, _) => throw new InvalidOperationException("Handler failure.");
-        provider.DeviceArrived += (_, _) => secondHandlerReceived.Set();
+        using var callbackInvoked = new ManualResetEventSlim(false);
+        provider.DeviceArrived = _ =>
+        {
+            callbackInvoked.Set();
+            throw new InvalidOperationException("Callback failure.");
+        };
 
         Skip.IfNot(
             provider.RegisterHotplug() == HotplugRegistrationResult.Success,
             "Hotplug is not supported on this platform."
         );
 
-        secondHandlerReceived
-            .Wait(EventTimeout)
-            .Should()
-            .BeTrue(because: "a throwing handler must not stop delivery to later handlers");
+        callbackInvoked.Wait(EventTimeout).Should().BeTrue();
+        // The exception is caught and logged on the event loop thread; the instance stays usable.
+        var act = () => _usb.GetDeviceList();
+        act.Should().NotThrow();
     }
 
     public void Dispose()

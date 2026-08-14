@@ -14,10 +14,15 @@ public sealed class Given_a_hotplug_monitor_over_a_fake_provider
         using var detachEntered = new ManualResetEventSlim(false);
         using var detachRelease = new ManualResetEventSlim(false);
         var provider = CreateFakeProvider();
-        // Removing a DeviceArrived handler signals detachEntered and blocks until detachRelease
-        // is set, simulating a detach that is stuck waiting for the Usb instance lock.
+        // Clearing the DeviceArrived callback (assigning null) signals detachEntered and blocks
+        // until detachRelease is set, simulating a detach that is stuck waiting for the Usb
+        // instance lock. The non-null assignment made by Subscribe is left unconfigured so the
+        // fake's property behavior records it.
         A.CallTo(provider)
-            .Where(call => call.Method.Name == "remove_DeviceArrived")
+            .Where(call =>
+                call.Method.Name == "set_DeviceArrived"
+                && call.Arguments.Get<Action<IUsbDeviceDescriptor>>(0) == null
+            )
             .Invokes(() =>
             {
                 detachEntered.Set();
@@ -145,13 +150,14 @@ public sealed class Given_a_hotplug_monitor_over_a_fake_provider
         return provider;
     }
 
+    // The monitor assigns its callbacks on first Subscribe; the fake's property behavior records
+    // them, so tests invoke the recorded callback to simulate the libusb event loop thread.
     private static void RaiseArrived(IHotplugProvider provider, UsbDeviceDescriptor descriptor) =>
-        provider.DeviceArrived += Raise.With<IUsbDeviceDescriptor>(provider, descriptor);
+        provider.DeviceArrived!.Invoke(descriptor);
 
     private static void RaiseLeft(IHotplugProvider provider, UsbDeviceDescriptor descriptor) =>
-        provider.DeviceLeft += Raise.With<IUsbDeviceDescriptor>(provider, descriptor);
+        provider.DeviceLeft!.Invoke(descriptor);
 
     /// <summary>Simulates the underlying Usb instance completing its Dispose.</summary>
-    private static void RaiseDisposed(IHotplugProvider provider) =>
-        provider.Disposed += Raise.WithEmpty();
+    private static void RaiseDisposed(IHotplugProvider provider) => provider.Disposed!.Invoke();
 }

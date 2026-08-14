@@ -97,6 +97,24 @@ public sealed class Given_no_USB_device : IDisposable
         provider.RegisterHotplug().Should().Be(HotplugRegistrationResult.Success);
     }
 
+    [Fact]
+    public void Attaching_a_second_DeviceArrived_callback_throws()
+    {
+        using var usb = CreateUsb();
+        var provider = (IHotplugProvider)usb;
+        provider.DeviceArrived = _ => { };
+
+        // The callback slots are single-owner: a different non-null callback must be rejected so
+        // a second consumer cannot silently steal events from the first.
+        var act = () => provider.DeviceArrived = _ => { };
+        act.Should().Throw<InvalidOperationException>().WithMessage("*already attached*");
+
+        // Detaching (null) and re-attaching is allowed.
+        provider.DeviceArrived = null;
+        var reattach = () => provider.DeviceArrived = _ => { };
+        reattach.Should().NotThrow();
+    }
+
     [SkippableFact]
     public void RegisterHotplug_returns_AlreadyRegistered_when_called_a_second_time()
     {

@@ -49,8 +49,8 @@ public sealed class Given_a_fake_hotplug_device_lifecycle : IDisposable
         var provider = (IHotplugProvider)_usb;
         var arrivals = 0;
         string? leftKey = null;
-        provider.DeviceArrived += (_, _) => arrivals++;
-        provider.DeviceLeft += (_, d) => leftKey = d.DeviceKey;
+        provider.DeviceArrived = _ => arrivals++;
+        provider.DeviceLeft = d => leftKey = d.DeviceKey;
         provider.RegisterHotplug().Should().Be(HotplugRegistrationResult.Success);
 
         // With LIBUSB_HOTPLUG_ENUMERATE libusb may notify the arrival of the same device twice
@@ -73,8 +73,8 @@ public sealed class Given_a_fake_hotplug_device_lifecycle : IDisposable
         var provider = (IHotplugProvider)_usb;
         string? arrivedKey = null;
         string? leftKey = null;
-        provider.DeviceArrived += (_, d) => arrivedKey = d.DeviceKey;
-        provider.DeviceLeft += (_, d) => leftKey = d.DeviceKey;
+        provider.DeviceArrived = d => arrivedKey = d.DeviceKey;
+        provider.DeviceLeft = d => leftKey = d.DeviceKey;
         provider.RegisterHotplug().Should().Be(HotplugRegistrationResult.Success);
 
         // Arrival while the device is present: bus 3, address 17.
@@ -101,7 +101,7 @@ public sealed class Given_a_fake_hotplug_device_lifecycle : IDisposable
     {
         var provider = (IHotplugProvider)_usb;
         string? leftKey = null;
-        provider.DeviceLeft += (_, d) => leftKey = d.DeviceKey;
+        provider.DeviceLeft = d => leftKey = d.DeviceKey;
         provider.RegisterHotplug().Should().Be(HotplugRegistrationResult.Success);
 
         // No arrival was cached for this device, so no DeviceArrived was ever emitted. A DeviceKey
@@ -134,9 +134,8 @@ public sealed class Given_a_fake_hotplug_device_lifecycle : IDisposable
         SpinWait.SpinUntil(() => _api.LastCallback is null, timeout).Should().BeTrue();
 
         // While Dispose waits for the event loop, another thread must still be able to take the
-        // instance lock (e.g. a UsbHotplugMonitor detaching its handlers during its own dispose).
-        EventHandler<IUsbDeviceDescriptor> noop = (_, _) => { };
-        var detach = Task.Run(() => provider.DeviceArrived -= noop);
+        // instance lock (e.g. a UsbHotplugMonitor clearing its callbacks during its own dispose).
+        var detach = Task.Run(() => provider.DeviceArrived = null);
         var completed = await Task.WhenAny(detach, Task.Delay(timeout));
         completed
             .Should()
@@ -155,9 +154,9 @@ public sealed class Given_a_fake_hotplug_device_lifecycle : IDisposable
         using var handlerReturned = new ManualResetEventSlim(false);
         Exception? caught = null;
 
-        provider.DeviceArrived += (_, _) =>
+        provider.DeviceArrived = _ =>
         {
-            // This handler runs synchronously on the event-loop thread (see
+            // This callback runs synchronously on the event-loop thread (see
             // RunOnNextHandleEventsCompleted below). Usb.Dispose() would try to join that same
             // thread; instead of hanging in a self-join, it must fail fast.
             try
