@@ -64,7 +64,6 @@ public sealed class Usb : IUsb, IHotplugProvider
     private LibUsbEventLoop? _eventLoop;
     private ISafeCallbackHandle? _hotplugCallbackHandle;
     private readonly RundownGuard _hotplugCallbackRundown = new();
-    private int _eventLoopThreadId;
     private DisposeState _disposeState;
 
     /// <inheritdoc/>
@@ -149,7 +148,6 @@ public sealed class Usb : IUsb, IHotplugProvider
                 _context
             );
             _eventLoop.Start();
-            _eventLoopThreadId = _eventLoop.ManagedThreadId!.Value;
         }
     }
 
@@ -291,15 +289,23 @@ public sealed class Usb : IUsb, IHotplugProvider
             }
             // Native deregister outside _lock, mirroring Dispose.
             handle?.Dispose();
-            // Release the cached device references (and their libusb refs). Without this, a later
-            // registration's LIBUSB_HOTPLUG_ENUMERATE replay would be suppressed by the
-            // duplicate-arrival check in HandleDeviceArrived and the new listener would see nothing.
-            foreach (var entry in _hotplugDevices.ToArray())
+            ReleaseHotplugDeviceCache();
+        }
+    }
+
+    /// <summary>
+    /// Releases the cached hotplug device references (and their libusb refs). Without this, a
+    /// later registration's LIBUSB_HOTPLUG_ENUMERATE replay would be suppressed by the
+    /// duplicate-arrival check in HandleDeviceArrived, and the cached devices would keep the
+    /// native context referenced.
+    /// </summary>
+    private void ReleaseHotplugDeviceCache()
+    {
+        foreach (var entry in _hotplugDevices.ToArray())
+        {
+            if (_hotplugDevices.TryRemove(entry.Key, out var cached))
             {
-                if (_hotplugDevices.TryRemove(entry.Key, out var cached))
-                {
-                    cached.Device.Dispose();
-                }
+                cached.Device.Dispose();
             }
         }
     }
@@ -752,7 +758,7 @@ public sealed class Usb : IUsb, IHotplugProvider
             }
             if (_disposeState is DisposeState.Disposing)
             {
-                if (Environment.CurrentManagedThreadId != _eventLoopThreadId)
+                if (Environment.CurrentManagedThreadId != _eventLoop?.ManagedThreadId)
                 {
                     while (_disposeState is not DisposeState.Disposed)
                     {
@@ -762,7 +768,7 @@ public sealed class Usb : IUsb, IHotplugProvider
                 return;
             }
 
-            if (Environment.CurrentManagedThreadId == _eventLoopThreadId)
+            if (Environment.CurrentManagedThreadId == _eventLoop?.ManagedThreadId)
             {
                 // Thrown if called synchronously from one of the the internal hotplug
                 // IHotplugListener.OnDeviceArrived or IHotplugListener.OnDeviceLeft callbacks. The
@@ -802,13 +808,7 @@ public sealed class Usb : IUsb, IHotplugProvider
             // 5. Stop and join libusb event loop
             eventLoop?.Dispose();
             // 6. Release cached hotplug device references
-            foreach (var entry in _hotplugDevices.ToArray())
-            {
-                if (_hotplugDevices.TryRemove(entry.Key, out var cached))
-                {
-                    cached.Device.Dispose();
-                }
-            }
+            ReleaseHotplugDeviceCache();
             // 7. Dispose SafeContext (libusb_exit)
             if (context is not null)
             {
@@ -825,7 +825,6 @@ public sealed class Usb : IUsb, IHotplugProvider
             lock (_lock)
             {
                 _eventLoop = null;
-                _eventLoopThreadId = 0;
                 _context = null;
 
                 LibUsbLogHandler.ClearLogger();
