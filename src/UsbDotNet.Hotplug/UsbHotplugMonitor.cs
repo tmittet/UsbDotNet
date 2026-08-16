@@ -19,6 +19,11 @@ public sealed class UsbHotplugMonitor : IUsbHotplugMonitor, IHotplugListener
 
     // Devices currently connected, keyed by DeviceKey. Mutated only under _lock, from the
     // hotplug events (libusb event loop thread) and read when replaying to late subscribers.
+    // Deliberately distinct from the provider's pointer-keyed device cache: this one is
+    // maintained under _lock atomically with the subscription channel writes, so a late
+    // subscriber's replay is exactly consistent with the live stream (no duplicated and no
+    // missed events). Snapshotting the provider's cache instead would race the in-flight
+    // dispatch that runs after the cache is updated.
     private readonly Dictionary<string, IUsbDeviceDescriptor> _connected = [];
     private readonly List<Subscription> _subscriptions = [];
 
