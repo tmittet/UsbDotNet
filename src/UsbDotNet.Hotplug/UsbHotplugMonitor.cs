@@ -46,7 +46,7 @@ public sealed class UsbHotplugMonitor : IUsbHotplugMonitor, IHotplugListener
 
     /// <summary>
     /// True when hotplug is supported on this platform. <see cref="Subscribe(IUsbDeviceFilter?)"/>
-    /// throws <see cref="InvalidOperationException"/> if hotplug is not supported.
+    /// throws <see cref="NotSupportedException"/> if hotplug is not supported.
     /// </summary>
     public bool IsHotplugSupported { get; }
 
