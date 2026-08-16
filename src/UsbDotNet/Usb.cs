@@ -413,7 +413,7 @@ public sealed class Usb : IUsb, IHotplugProvider
         try
         {
             var descriptor = device.GetDeviceDescriptor();
-            _logger.LogWarning(
+            _logger.LogDebug(
                 "Hotplug 'DEVICE_LEFT' for an untracked device ignored. "
                     + "VID=0x{VendorId:X4}, PID=0x{ProductId:X4}.",
                 descriptor.idVendor,
