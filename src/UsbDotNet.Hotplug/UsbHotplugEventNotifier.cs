@@ -23,7 +23,6 @@ public sealed class UsbHotplugEventNotifier : IDisposable
     private readonly ILogger<UsbHotplugEventNotifier> _logger;
     private IUsbHotplugSubscription? _subscription;
     private Task? _pump;
-    private bool _started;
     private bool _disposed;
 
     // Managed id of the thread currently invoking event handlers, or 0 when none is in flight.
@@ -76,16 +75,16 @@ public sealed class UsbHotplugEventNotifier : IDisposable
             {
                 throw new ObjectDisposedException(nameof(UsbHotplugEventNotifier));
             }
-            if (_started)
+            // A non-null _pump marks the notifier as started; it is only assigned below.
+            if (_pump is not null)
             {
                 return;
             }
-            // Subscribe before setting _registered so a throwing Subscribe leaves the notifier
+            // Subscribe before creating the pump so a throwing Subscribe leaves the notifier
             // unstarted. The monitor replays already connected devices into the subscription
             // channel at subscribe time; the pump below delivers them to the attached handlers.
             var subscription = _monitor.Subscribe(_filter);
             _subscription = subscription;
-            _started = true;
             // Read the token under _lock, and before scheduling: a concurrent Dispose cannot
             // dispose _cts between the disposed check above and this read, and the deferred
             // pump task never touches _cts itself.
