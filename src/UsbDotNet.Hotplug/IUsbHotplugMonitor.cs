@@ -23,5 +23,8 @@ public interface IUsbHotplugMonitor : IDisposable
     /// when hotplug is already registered on it (for example by another
     /// <see cref="IUsbHotplugMonitor"/>).
     /// </exception>
+    /// <exception cref="NotSupportedException">
+    /// Thrown when hotplug is not supported on the platform.
+    /// </exception>
     IUsbHotplugSubscription Subscribe(IUsbDeviceFilter? filter = null);
 }

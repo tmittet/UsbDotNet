@@ -310,14 +310,14 @@ public sealed class Usb : IUsb, IHotplugProvider
         ushort? productId
     )
     {
+        CheckDisposed();
+        var context = GetInitializedContextOrThrow();
+
         if (!_libUsb.HasCapability(libusb_capability.LIBUSB_CAP_HAS_HOTPLUG))
         {
             _logger.LogDebug("Hotplug not supported or unimplemented on this platform.");
             return HotplugRegistrationResult.NotSupported;
         }
-
-        CheckDisposed();
-        var context = GetInitializedContextOrThrow();
         if (_hotplugCallbackHandle is not null)
         {
             return HotplugRegistrationResult.AlreadyRegistered;
