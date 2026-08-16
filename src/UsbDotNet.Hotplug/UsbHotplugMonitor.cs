@@ -13,6 +13,10 @@ public sealed class UsbHotplugMonitor : IUsbHotplugMonitor, IHotplugListener
         "Hotplug is already registered on this IUsb. Only one UsbHotplugMonitor may "
         + "be active per IUsb instance; share one monitor and add subscribers.";
 
+    private const string ProviderDisposedMessage =
+        "The underlying IUsb instance is disposed; hotplug monitoring has stopped. "
+        + "Create a new IUsb instance and a new monitor to resume monitoring.";
+
     /// <summary>
     /// Guards registration and deregistration (see EnsureRegistered and Dispose). A separate lock
     /// because the provider dispatches into Dispatch (which takes _lock) both synchronously during
@@ -133,16 +137,29 @@ public sealed class UsbHotplugMonitor : IUsbHotplugMonitor, IHotplugListener
             {
                 return;
             }
-            _registered = _provider.RegisterHotplug(this) switch
+            try
             {
-                HotplugRegistrationResult.Success => true,
-                HotplugRegistrationResult.NotSupported => throw new NotSupportedException(
-                    "Hotplug is not supported on this platform."
-                ),
-                HotplugRegistrationResult.AlreadyRegistered => throw new InvalidOperationException(
-                    AlreadyRegisteredMessage
-                ),
-            };
+                _registered = _provider.RegisterHotplug(this) switch
+                {
+                    HotplugRegistrationResult.Success => true,
+                    HotplugRegistrationResult.NotSupported => throw new NotSupportedException(
+                        "Hotplug is not supported on this platform."
+                    ),
+                    HotplugRegistrationResult.AlreadyRegistered =>
+                        throw new InvalidOperationException(AlreadyRegisteredMessage),
+                };
+            }
+            catch (ObjectDisposedException ex)
+            {
+                // The provider is disposing/disposed concurrently: it signals Disposing at the
+                // start of its teardown but notifies OnProviderDisposed only at the end, so this
+                // exception is the only way to observe the window in between.
+                lock (_lock)
+                {
+                    _providerDisposed = true;
+                }
+                throw new InvalidOperationException(ProviderDisposedMessage, ex);
+            }
         }
     }
 
@@ -272,10 +289,7 @@ public sealed class UsbHotplugMonitor : IUsbHotplugMonitor, IHotplugListener
     {
         if (_providerDisposed)
         {
-            throw new InvalidOperationException(
-                "The underlying IUsb instance is disposed; hotplug monitoring has stopped. "
-                    + "Create a new IUsb instance and a new monitor to resume monitoring."
-            );
+            throw new InvalidOperationException(ProviderDisposedMessage);
         }
     }
 

@@ -127,6 +127,37 @@ public sealed class Given_a_hotplug_monitor_over_a_fake_provider
             .WithMessage("*IUsb instance is disposed*");
     }
 
+    [Fact]
+    public void Subscribing_while_the_provider_is_disposing_throws_InvalidOperationException()
+    {
+        // Usb signals Disposing at the start of its teardown but raises OnProviderDisposed only
+        // at the end; in that window RegisterHotplug throws ObjectDisposedException. The monitor
+        // must surface its documented contract (InvalidOperationException for a dead provider),
+        // reserving ObjectDisposedException for a disposed monitor.
+        var provider = A.Fake<IHotplugProvider>();
+        A.CallTo(() => provider.IsHotplugSupported).Returns(true);
+        A.CallTo(() => provider.RegisterHotplug(A<IHotplugListener>._))
+            .Throws(new ObjectDisposedException(nameof(IHotplugProvider)));
+        using var monitor = new UsbHotplugMonitor(provider);
+
+        FluentActions
+            .Invoking(() => monitor.Subscribe())
+            .Should()
+            .Throw<InvalidOperationException>()
+            .WithMessage("*IUsb instance is disposed*")
+            .WithInnerException<ObjectDisposedException>();
+
+        // Subsequent attempts fail fast with the same contract, without touching the disposed
+        // provider again.
+        FluentActions
+            .Invoking(() => monitor.Subscribe())
+            .Should()
+            .Throw<InvalidOperationException>()
+            .WithMessage("*IUsb instance is disposed*");
+        A.CallTo(() => provider.RegisterHotplug(A<IHotplugListener>._))
+            .MustHaveHappenedOnceExactly();
+    }
+
     private static IHotplugProvider CreateFakeProvider()
     {
         var provider = A.Fake<IHotplugProvider>();
