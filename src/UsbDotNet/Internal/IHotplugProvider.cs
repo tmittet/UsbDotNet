@@ -37,8 +37,9 @@ internal interface IHotplugProvider
     /// <para>
     /// A no-op when <paramref name="listener"/> is not the currently attached listener (including
     /// when nothing is registered or the provider is disposed), so disposal paths can call it
-    /// unconditionally. A hotplug event already in flight on the event loop thread may still
-    /// reach the listener after this returns; listeners must drop events after their own dispose.
+    /// unconditionally. Waits for any in-flight notification to complete; once this returns the
+    /// listener is never invoked again. Callers must therefore not hold a lock that the listener's
+    /// notification handling takes.
     /// </para>
     /// </summary>
     void DeregisterHotplug(IHotplugListener listener);

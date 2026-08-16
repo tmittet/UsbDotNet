@@ -22,6 +22,13 @@ public sealed class Usb : IUsb, IHotplugProvider
     private static int _instances;
 
     private readonly object _lock = new();
+
+    // Serializes IHotplugListener invocations across their two dispatch sources: the enumeration
+    // replay libusb runs synchronously inside libusb_hotplug_register_callback (on the registering
+    // thread) and live events from libusb_handle_events (on the event loop thread). Registration
+    // and deregistration acquire it BEFORE _lock, so the global lock order is
+    // _hotplugDispatchLock -> _lock; the dispatch path must never take _lock.
+    private readonly object _hotplugDispatchLock = new();
     private readonly ILibUsb _libUsb;
     private readonly ILoggerFactory _loggerFactory;
     private readonly ILogger<Usb> _logger;
@@ -193,50 +200,67 @@ public sealed class Usb : IUsb, IHotplugProvider
         UsbClass? deviceClass = default,
         ushort? vendorId = default,
         ushort? productId = default
-    ) =>
-        RegisterHotplugCore(deviceClass, vendorId, productId) switch
+    )
+    {
+        // Taken before _lock; all registration paths preserve the _hotplugDispatchLock -> _lock
+        // order. The enumeration replay re-enters the dispatch lock on this thread from
+        // HotplugEventCallback, while live events on the event loop thread wait until the
+        // registration (including its replay) completes.
+        lock (_hotplugDispatchLock)
         {
-            HotplugRegistrationResult.Success => true,
-            HotplugRegistrationResult.NotSupported => false,
-            HotplugRegistrationResult.AlreadyRegistered => true,
-        };
+            lock (_lock)
+            {
+                return RegisterHotplugUnlocked(deviceClass, vendorId, productId) switch
+                {
+                    HotplugRegistrationResult.Success => true,
+                    HotplugRegistrationResult.NotSupported => false,
+                    HotplugRegistrationResult.AlreadyRegistered => true,
+                };
+            }
+        }
+    }
 
     /// <inheritdoc/>
     HotplugRegistrationResult IHotplugProvider.RegisterHotplug(IHotplugListener listener)
     {
         ArgumentNullException.ThrowIfNull(listener);
-        lock (_lock)
+        // Taken before _lock; all registration paths preserve the _hotplugDispatchLock -> _lock
+        // order. The enumeration replay re-enters the dispatch lock on this thread from
+        // HotplugEventCallback, while live events on the event loop thread wait until the
+        // registration (including its replay) completes.
+        lock (_hotplugDispatchLock)
         {
-            // Reject a second listener before touching the slot: EmitHotplugEvent reads
-            // _hotplugListener without _lock on the event loop thread, so even a briefly swapped-in
-            // listener could be handed a live event that belongs to the current owner.
-            if (_hotplugListener is not null)
+            lock (_lock)
             {
-                return HotplugRegistrationResult.AlreadyRegistered;
-            }
-            // Attach before registering: with LIBUSB_HOTPLUG_ENUMERATE the native callback replays
-            // already-connected devices asynchronously on the event loop thread as soon as
-            // registration completes, and those must reach the listener. The rollback below covers
-            // the outcomes only the core can produce: AlreadyRegistered from a listenerless legacy
-            // RegisterHotplug registration, NotSupported, and throws for uninitialized/disposed.
-            _hotplugListener = listener;
-            try
-            {
-                var result = RegisterHotplugCore(
-                    deviceClass: null,
-                    vendorId: null,
-                    productId: null
-                );
-                if (result is not HotplugRegistrationResult.Success)
+                // Reject a second listener before touching the slot so a briefly swapped-in
+                // listener can never be handed an event that belongs to the current owner.
+                if (_hotplugListener is not null)
+                {
+                    return HotplugRegistrationResult.AlreadyRegistered;
+                }
+                // Attach before registering: the enumeration replay must reach the listener. The
+                // rollback below covers the registration outcomes: AlreadyRegistered from a
+                // listenerless legacy RegisterHotplug registration, NotSupported, and throws for
+                // uninitialized and disposed.
+                _hotplugListener = listener;
+                try
+                {
+                    var result = RegisterHotplugUnlocked(
+                        deviceClass: null,
+                        vendorId: null,
+                        productId: null
+                    );
+                    if (result is not HotplugRegistrationResult.Success)
+                    {
+                        _hotplugListener = null;
+                    }
+                    return result;
+                }
+                catch
                 {
                     _hotplugListener = null;
+                    throw;
                 }
-                return result;
-            }
-            catch
-            {
-                _hotplugListener = null;
-                throw;
             }
         }
     }
@@ -249,34 +273,38 @@ public sealed class Usb : IUsb, IHotplugProvider
         // is a safe no-op.
         ArgumentNullException.ThrowIfNull(listener);
         ISafeCallbackHandle? handle;
-        lock (_lock)
+        // Holding the dispatch lock makes deregistration a clean cutoff: any in-flight listener
+        // invocation holds this lock, so we wait for it, and any dispatch blocked acquiring it
+        // observes the cleared listener afterwards and drops the event.
+        lock (_hotplugDispatchLock)
         {
-            if (!ReferenceEquals(_hotplugListener, listener))
+            lock (_lock)
             {
-                // Not the registration owner (or nothing registered); nothing to release.
-                return;
+                if (!ReferenceEquals(_hotplugListener, listener))
+                {
+                    // Not the registration owner (or nothing registered); nothing to release.
+                    return;
+                }
+                _hotplugListener = null;
+                handle = _hotplugCallbackHandle;
+                _hotplugCallbackHandle = null;
             }
-            _hotplugListener = null;
-            handle = _hotplugCallbackHandle;
-            _hotplugCallbackHandle = null;
-        }
-        // Native deregister outside _lock, mirroring Dispose. An event already in flight on the
-        // event loop thread may have read the listener before it was cleared and still deliver
-        // one final event; listeners drop events after their own dispose.
-        handle?.Dispose();
-        // Release the cached device references (and their libusb refs). Without this, a later
-        // registration's LIBUSB_HOTPLUG_ENUMERATE replay would be suppressed by the
-        // duplicate-arrival check in HandleDeviceArrived and the new listener would see nothing.
-        foreach (var entry in _hotplugDevices.ToArray())
-        {
-            if (_hotplugDevices.TryRemove(entry.Key, out var cached))
+            // Native deregister outside _lock, mirroring Dispose.
+            handle?.Dispose();
+            // Release the cached device references (and their libusb refs). Without this, a later
+            // registration's LIBUSB_HOTPLUG_ENUMERATE replay would be suppressed by the
+            // duplicate-arrival check in HandleDeviceArrived and the new listener would see nothing.
+            foreach (var entry in _hotplugDevices.ToArray())
             {
-                cached.Device.Dispose();
+                if (_hotplugDevices.TryRemove(entry.Key, out var cached))
+                {
+                    cached.Device.Dispose();
+                }
             }
         }
     }
 
-    private HotplugRegistrationResult RegisterHotplugCore(
+    private HotplugRegistrationResult RegisterHotplugUnlocked(
         UsbClass? deviceClass,
         ushort? vendorId,
         ushort? productId
@@ -287,43 +315,50 @@ public sealed class Usb : IUsb, IHotplugProvider
             _logger.LogDebug("Hotplug not supported or unimplemented on this platform.");
             return HotplugRegistrationResult.NotSupported;
         }
-        lock (_lock)
+
+        CheckDisposed();
+        var context = GetInitializedContextOrThrow();
+        if (_hotplugCallbackHandle is not null)
         {
-            CheckDisposed();
-            var context = GetInitializedContextOrThrow();
-            if (_hotplugCallbackHandle is not null)
-            {
-                return HotplugRegistrationResult.AlreadyRegistered;
-            }
-            // We do not follow the recommended libusb init pattern: hotplug first then event loop.
-            // See: https://libusb.sourceforge.io/api-1.0/group__libusb__asyncio.html#eventthread
-            // This should not have any adverse effects as long as we register callback with the
-            // LibUsbHotplugFlag.Enumerate flag, as it will allow catching up with current devices.
-            _hotplugCallbackHandle = context.RegisterHotplugCallback(
-                libusb_hotplug_event.LIBUSB_HOTPLUG_EVENT_DEVICE_ARRIVED
-                    | libusb_hotplug_event.LIBUSB_HOTPLUG_EVENT_DEVICE_LEFT,
-                // Set flag LibUsbHotplugFlag.Enumerate to immediately invoke the
-                // HotplugEventCallback method for currently attached devices on register
-                libusb_hotplug_flag.LIBUSB_HOTPLUG_ENUMERATE,
-                HotplugEventCallback,
-                deviceClass is null ? null : (libusb_class_code)deviceClass,
-                vendorId,
-                productId
-            );
+            return HotplugRegistrationResult.AlreadyRegistered;
         }
+        // We do not follow the recommended libusb init pattern: hotplug first then event
+        // loop. See:
+        // https://libusb.sourceforge.io/api-1.0/group__libusb__asyncio.html#eventthread
+        // This should not have any adverse effects as long as we register callback with
+        // the LibUsbHotplugFlag.Enumerate flag, as it allows catching up with current
+        // devices.
+        _hotplugCallbackHandle = context.RegisterHotplugCallback(
+            libusb_hotplug_event.LIBUSB_HOTPLUG_EVENT_DEVICE_ARRIVED
+                | libusb_hotplug_event.LIBUSB_HOTPLUG_EVENT_DEVICE_LEFT,
+            // Set flag LibUsbHotplugFlag.Enumerate to immediately invoke the
+            // HotplugEventCallback method for currently attached devices on register
+            libusb_hotplug_flag.LIBUSB_HOTPLUG_ENUMERATE,
+            HotplugEventCallback,
+            deviceClass is null ? null : (libusb_class_code)deviceClass,
+            vendorId,
+            productId
+        );
         return HotplugRegistrationResult.Success;
     }
 
     /// <summary>
+    /// <para>
     /// NOTE:
-    /// This callback will run on the LibUsbEventLoop thread. When handling a DeviceArrived event
-    /// it's considered safe to call any libusb function that takes a libusb_device. It is also safe
-    /// to open a device and submit asynchronous transfers. However, most other functions that take
-    /// a libusb_device_handle are not safe to call. Examples of such functions are any of the
-    /// synchronous API functions or the blocking functions that retrieve various USB descriptors.
+    /// This callback runs on the LibUsbEventLoop thread for live events, and on the registering
+    /// thread for the LIBUSB_HOTPLUG_ENUMERATE replay; invocations are serialized by
+    /// _hotplugDispatchLock.
+    /// </para>
+    /// <para>
+    /// When handling a DEVICE_ARRIVED event it's considered safe to call any libusb function that
+    /// takes a libusb_device. It is also safe to open a device and submit asynchronous transfers.
+    /// However, most other functions that take a libusb_device_handle are not safe to call.
+    /// Examples of such functions are any of the synchronous API functions or the blocking
+    /// functions that retrieve various USB descriptors.
     /// See: https://libusb.sourceforge.io/api-1.0/group__libusb__desc.html
     /// These functions must be used outside of the context of the hotplug callback.
-    /// When handling a DeviceLeft event the only safe function is libusb_get_device_descriptor().
+    /// When handling a DEVICE_LEFT event the only safe function is libusb_get_device_descriptor().
+    /// </para>
     /// </summary>
     private libusb_hotplug_return HotplugEventCallback(
         ISafeContext context,
@@ -336,14 +371,20 @@ public sealed class Usb : IUsb, IHotplugProvider
         try
         {
             using var token = _hotplugCallbackRundown.AcquireSharedToken();
-            // NOTE: The event handlers are implemented and expected to never throw.
-            if (eventType is libusb_hotplug_event.LIBUSB_HOTPLUG_EVENT_DEVICE_ARRIVED)
+            // Serialize the two dispatch sources (enumeration replay on the registering thread,
+            // live events on the event loop thread) so the IHotplugListener is never invoked
+            // concurrently. Reentrant for the replay, whose registering thread already holds it.
+            lock (_hotplugDispatchLock)
             {
-                HandleDeviceArrived(device);
-            }
-            else
-            {
-                HandleDeviceLeft(device);
+                // NOTE: The event handlers are implemented and expected to never throw.
+                if (eventType is libusb_hotplug_event.LIBUSB_HOTPLUG_EVENT_DEVICE_ARRIVED)
+                {
+                    HandleDeviceArrived(device);
+                }
+                else
+                {
+                    HandleDeviceLeft(device);
+                }
             }
             return libusb_hotplug_return.REARM;
         }

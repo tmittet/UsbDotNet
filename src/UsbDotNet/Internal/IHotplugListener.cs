@@ -2,16 +2,28 @@ using UsbDotNet.Descriptor;
 
 namespace UsbDotNet.Internal;
 
+/// <summary>
+/// Receives hotplug notifications from an <see cref="IHotplugProvider"/>.
+/// <para>
+/// Threading: the provider serializes <see cref="OnDeviceArrived"/> and <see cref="OnDeviceLeft"/>
+/// invocations, but they may not run on the same thread: live events arrive on the libusb event
+/// loop thread, while the LIBUSB_HOTPLUG_ENUMERATE replay of already-connected devices arrives on
+/// the thread calling <see cref="IHotplugProvider.RegisterHotplug"/>.
+/// </para>
+/// </summary>
 internal interface IHotplugListener
 {
     /// <summary>
-    /// Invoked on the libusb event loop thread when a device is connected (and once per
-    /// already-connected device at registration time). Must not block; exceptions are caught and
-    /// logged so they cannot interrupt event handling for other devices.
+    /// Invoked when a device is connected, and once per already-connected device at registration
+    /// time (on the registering thread, see threading note on <see cref="IHotplugListener"/>).
+    /// Must not block; exceptions are caught and logged so they cannot interrupt event handling
+    /// for other devices.
     /// </summary>
     void OnDeviceArrived(IUsbDeviceDescriptor descriptor);
 
-    /// <summary>Invoked on the libusb event loop thread when a device is disconnected.</summary>
+    /// <summary>
+    /// Invoked on the libusb event loop thread when a device is disconnected.
+    /// </summary>
     void OnDeviceLeft(IUsbDeviceDescriptor descriptor);
 
     /// <summary>
