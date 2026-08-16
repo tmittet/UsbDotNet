@@ -41,9 +41,9 @@ public sealed class Given_a_hotplug_monitor_over_a_fake_provider
 
         monitor.Dispose();
 
-        // Deregistration does not wait for in-flight events: the event loop thread may have read
-        // the listener just before Dispose detached it and still invoke the disposed monitor;
-        // the event must be dropped.
+        // The provider promises not to invoke the listener after DeregisterHotplug returns, but
+        // the monitor keeps its _disposed guard as defense in depth (e.g. against a provider
+        // that breaks that promise); a disposed monitor must drop the event.
         RaiseLeft(monitor, new UsbDeviceDescriptor { DeviceKey = "fake-device", BcdUsb = 0x0200 });
 
         (await subscription.Reader.WaitToReadAsync(cts.Token))

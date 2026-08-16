@@ -220,6 +220,57 @@ public sealed class Given_a_fake_hotplug_device_lifecycle : IDisposable
         caught.Should().BeOfType<InvalidOperationException>();
     }
 
+    [Fact]
+    public async Task DeregisterHotplug_waits_for_an_in_flight_event()
+    {
+        var timeout = TimeSpan.FromSeconds(5);
+        var provider = (IHotplugProvider)_usb;
+        using var handlerEntered = new ManualResetEventSlim(false);
+        using var handlerRelease = new ManualResetEventSlim(false);
+        var listener = new TestHotplugListener
+        {
+            DeviceArrived = _ =>
+            {
+                handlerEntered.Set();
+                handlerRelease.Wait();
+            },
+        };
+        provider.RegisterHotplug(listener).Should().Be(HotplugRegistrationResult.Success);
+
+        // Have the event-loop thread dispatch an arrival that blocks inside the listener.
+        _api.RunOnNextHandleEventsCompleted(() =>
+            _api.LastCallback!.Invoke(
+                IntPtr.Zero,
+                DevicePtr,
+                libusb_hotplug_event.LIBUSB_HOTPLUG_EVENT_DEVICE_ARRIVED,
+                IntPtr.Zero
+            )
+        );
+        handlerEntered.Wait(timeout).Should().BeTrue();
+        try
+        {
+            var deregister = Task.Run(() => provider.DeregisterHotplug(listener));
+
+            // DeregisterHotplug promises the listener is never invoked after it returns, so it
+            // must block until the in-flight invocation (holding the dispatch lock) completes.
+            var completedEarly = await Task.WhenAny(deregister, Task.Delay(250));
+            completedEarly
+                .Should()
+                .NotBe(
+                    deregister,
+                    because: "DeregisterHotplug must wait for the in-flight listener invocation"
+                );
+
+            handlerRelease.Set();
+            await deregister.WaitAsync(timeout);
+        }
+        finally
+        {
+            // Release the gate so a failed assertion cannot hang the event loop and teardown.
+            handlerRelease.Set();
+        }
+    }
+
     private void Raise(libusb_hotplug_event eventType)
     {
         _api.LastCallback.Should().NotBeNull();

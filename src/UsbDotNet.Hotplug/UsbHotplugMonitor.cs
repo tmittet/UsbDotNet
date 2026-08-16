@@ -13,7 +13,20 @@ public sealed class UsbHotplugMonitor : IUsbHotplugMonitor, IHotplugListener
         "Hotplug is already registered on this IUsb. Only one UsbHotplugMonitor may "
         + "be active per IUsb instance; share one monitor and add subscribers.";
 
+    /// <summary>
+    /// Guards registration and deregistration (see EnsureRegistered and Dispose). A separate lock
+    /// because the provider dispatches into Dispatch (which takes _lock) both synchronously during
+    /// RegisterHotplug and from the event loop thread; holding _lock across those provider calls
+    /// would deadlock against a concurrent event.
+    /// </summary>
+    private readonly object _registerLock = new();
+
+    /// <summary>
+    /// Serializes _subscriptions, the _connected devices snapshot, the _disposed/_providerDisposed
+    /// lifecycle flags, and most importantly: every Dispatch from the provider.
+    /// </summary>
     private readonly object _lock = new();
+
     private readonly IHotplugProvider _provider;
     private readonly ILogger<UsbHotplugMonitor> _logger;
 
@@ -72,38 +85,19 @@ public sealed class UsbHotplugMonitor : IUsbHotplugMonitor, IHotplugListener
     public IUsbHotplugSubscription Subscribe(IUsbDeviceFilter? filter = null)
     {
         filter ??= UsbDeviceFilter.Any;
+        EnsureRegistered();
         lock (_lock)
         {
             ThrowIfDisposed();
-            if (_providerDisposed)
-            {
-                throw new InvalidOperationException(
-                    "The underlying IUsb instance is disposed; hotplug monitoring has stopped. "
-                        + "Create a new IUsb instance and a new monitor to resume monitoring."
-                );
-            }
-
-            // Register the native callback once, before adding the subscriber. libusb delivers the
-            // LIBUSB_HOTPLUG_ENUMERATE events asynchronously on its event loop thread, which must
-            // take _lock to dispatch; since we hold _lock until the subscriber is added below, no
-            // enumeration event can be dispatched before the first subscriber is in the list.
-            if (!_registered)
-            {
-                _registered = _provider.RegisterHotplug(this) switch
-                {
-                    HotplugRegistrationResult.Success => true,
-                    HotplugRegistrationResult.NotSupported => throw new NotSupportedException(
-                        "Hotplug is not supported on this platform."
-                    ),
-                    HotplugRegistrationResult.AlreadyRegistered =>
-                        throw new InvalidOperationException(AlreadyRegisteredMessage),
-                };
-            }
+            ThrowIfProviderDisposed();
 
             var subscription = new Subscription(this, filter);
             // Replay currently connected, matching devices as Connected events (per-subscriber
-            // enumeration). Empty for the very first subscriber; libusb enumeration then populates
-            // _connected and reaches this subscriber via the live dispatch path.
+            // enumeration), then add the subscription — atomically under one _lock acquisition:
+            // events dispatched before this point are reflected in _connected, events after
+            // reach the subscription via Dispatch, so the replay is exactly consistent with the
+            // live stream. For the very first subscriber _connected was populated by the
+            // synchronous LIBUSB_HOTPLUG_ENUMERATE replay inside EnsureRegistered.
             var matchingDevices = _connected.Values.Where(d => filter.Matches(d)).ToList();
             _logger.LogDebug(
                 "New subscriber with {Filter} registered; replaying {Connected} devices.",
@@ -116,6 +110,39 @@ public sealed class UsbHotplugMonitor : IUsbHotplugMonitor, IHotplugListener
             }
             _subscriptions.Add(subscription);
             return subscription;
+        }
+    }
+
+    /// <summary>
+    /// Registers this monitor as the provider's hotplug listener on the first call. Serialized on
+    /// _registerLock rather than _lock: the provider dispatches the LIBUSB_HOTPLUG_ENUMERATE
+    /// replay synchronously during RegisterHotplug while holding its dispatch lock, and that
+    /// dispatch takes _lock in Dispatch. Holding _lock across RegisterHotplug would invert the
+    /// provider's dispatch-lock/_lock order and deadlock against a concurrent live event.
+    /// </summary>
+    private void EnsureRegistered()
+    {
+        lock (_registerLock)
+        {
+            lock (_lock)
+            {
+                ThrowIfDisposed();
+                ThrowIfProviderDisposed();
+            }
+            if (_registered)
+            {
+                return;
+            }
+            _registered = _provider.RegisterHotplug(this) switch
+            {
+                HotplugRegistrationResult.Success => true,
+                HotplugRegistrationResult.NotSupported => throw new NotSupportedException(
+                    "Hotplug is not supported on this platform."
+                ),
+                HotplugRegistrationResult.AlreadyRegistered => throw new InvalidOperationException(
+                    AlreadyRegisteredMessage
+                ),
+            };
         }
     }
 
@@ -204,26 +231,28 @@ public sealed class UsbHotplugMonitor : IUsbHotplugMonitor, IHotplugListener
     public void Dispose()
     {
         List<Subscription> subscriptions;
-        bool deregister;
-        lock (_lock)
+        // _registerLock serializes this with an in-flight EnsureRegistered, so a registration
+        // completed by a racing Subscribe is always observed and released here.
+        lock (_registerLock)
         {
-            if (_disposed)
+            lock (_lock)
             {
-                return;
+                if (_disposed)
+                {
+                    return;
+                }
+                _disposed = true;
+                subscriptions = [.. _subscriptions];
+                _subscriptions.Clear();
+                _connected.Clear();
             }
-            _disposed = true;
-            deregister = _registered;
-            subscriptions = [.. _subscriptions];
-            _subscriptions.Clear();
-            _connected.Clear();
-        }
-        // Deregister outside _lock: the provider takes the Usb instance lock, and the event loop
-        // thread may concurrently be blocked on _lock in Dispatch; holding _lock across the call
-        // would couple the two locks. An event delivered before (or racing) the deregistration is
-        // dropped by the _disposed check in Dispatch.
-        if (deregister)
-        {
-            _provider.DeregisterHotplug(this);
+            // Deregister outside _lock: DeregisterHotplug waits for any in-flight listener
+            // invocation, which takes _lock in Dispatch; holding _lock here would deadlock.
+            // Once it returns the provider never invokes this monitor again.
+            if (_registered)
+            {
+                _provider.DeregisterHotplug(this);
+            }
         }
         foreach (var subscription in subscriptions)
         {
@@ -236,6 +265,17 @@ public sealed class UsbHotplugMonitor : IUsbHotplugMonitor, IHotplugListener
         if (_disposed)
         {
             throw new ObjectDisposedException(nameof(UsbHotplugMonitor));
+        }
+    }
+
+    private void ThrowIfProviderDisposed()
+    {
+        if (_providerDisposed)
+        {
+            throw new InvalidOperationException(
+                "The underlying IUsb instance is disposed; hotplug monitoring has stopped. "
+                    + "Create a new IUsb instance and a new monitor to resume monitoring."
+            );
         }
     }
 
