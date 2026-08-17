@@ -92,19 +92,6 @@ public sealed class UsbDeviceFilterTests
     }
 
     [Fact]
-    public void A_zeroed_descriptor_never_matches_any_filter()
-    {
-        // The Windows backend synthesizes descriptors with BcdUsb == 0 for root hubs and for
-        // devices whose real descriptor could not be read; their device keys cannot be resolved
-        // by the rest of the API, so no filter may ever match them.
-        UsbDeviceFilter.Any.Matches(Descriptor(bcdUsb: 0)).Should().BeFalse();
-        new UsbDeviceFilter(VendorIds: [0x2BD9])
-            .Matches(Descriptor(vendorId: 0x2BD9, bcdUsb: 0))
-            .Should()
-            .BeFalse();
-    }
-
-    [Fact]
     public void ToString_formats_VendorIds_and_ProductIds_as_hex()
     {
         var filter = new UsbDeviceFilter(VendorIds: [0x2BD9, 0x1234], ProductIds: [0x0021, 0x0031]);

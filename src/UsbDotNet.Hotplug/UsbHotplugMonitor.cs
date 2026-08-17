@@ -171,9 +171,9 @@ public sealed class UsbHotplugMonitor : IUsbHotplugMonitor, IHotplugListener
 
     private void Dispatch(UsbHotplugEventType type, IUsbDeviceDescriptor descriptor)
     {
-        // Devices no filter can ever match (synthesized descriptors, see UsbDeviceFilter) are
-        // neither tracked in _connected nor delivered to any subscriber.
-        if (!UsbDeviceFilter.Any.Matches(descriptor))
+        // Filter out devices with a synthesized descriptor (BcdUsb == 0), typically root hubs and
+        // devices with an unreadable descriptor. Aligns with Usb.GetDeviceList implementation.
+        if (!descriptor.HasValidBcdUsb())
         {
             return;
         }
