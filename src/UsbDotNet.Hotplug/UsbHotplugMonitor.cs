@@ -203,9 +203,10 @@ public sealed class UsbHotplugMonitor : IUsbHotplugMonitor, IHotplugListener
 
     /// <summary>
     /// The underlying IUsb has completed its teardown: no further hotplug events can arrive and
-    /// the tracked snapshot no longer reflects reality. Drop the snapshot, complete all
-    /// subscription channels so consumers observe a clean end-of-stream, and let Subscribe reject
-    /// new subscribers instead of replaying stale devices.
+    /// the tracked snapshot no longer reflects reality. Drop the snapshot, abort all subscription
+    /// channels (undelivered events are dropped and blocked readers wake to a cancellation, since
+    /// events describing devices the disposed IUsb can no longer reach make no sense to deliver),
+    /// and let Subscribe reject new subscribers instead of replaying stale devices.
     /// </summary>
     void IHotplugListener.OnProviderDisposed()
     {
@@ -223,11 +224,11 @@ public sealed class UsbHotplugMonitor : IUsbHotplugMonitor, IHotplugListener
         }
         _logger.LogInformation(
             "The underlying IUsb instance was disposed; hotplug monitoring stopped and all "
-                + "subscriptions were completed."
+                + "subscriptions were canceled."
         );
         foreach (var subscription in subscriptions)
         {
-            subscription.Complete();
+            subscription.Abort(new OperationCanceledException(ProviderDisposedMessage));
         }
     }
 
@@ -242,8 +243,10 @@ public sealed class UsbHotplugMonitor : IUsbHotplugMonitor, IHotplugListener
 
     /// <summary>
     /// Releases the hotplug registration this monitor owns (allowing a new monitor over the same
-    /// <see cref="IUsb"/> instance) and completes all subscription channels. Does not dispose the
-    /// <see cref="IUsb"/> instance.
+    /// <see cref="IUsb"/> instance) and aborts all subscription channels: undelivered events are
+    /// dropped and pending and future reads are canceled with
+    /// <see cref="OperationCanceledException"/> rather than observing a clean end-of-stream.
+    /// Does not dispose the <see cref="IUsb"/> instance.
     /// </summary>
     public void Dispose()
     {
@@ -273,7 +276,13 @@ public sealed class UsbHotplugMonitor : IUsbHotplugMonitor, IHotplugListener
         }
         foreach (var subscription in subscriptions)
         {
-            subscription.Complete();
+            // Abort rather than complete: blocked readers wake immediately, future reads throw,
+            // and undelivered events are dropped, so consumers can tell monitor disposal apart
+            // from a clean end-of-stream and never act on a device the monitor no longer tracks.
+            // A fresh exception per subscription since each reader rethrows it independently.
+            subscription.Abort(
+                new OperationCanceledException("The UsbHotplugMonitor was disposed.")
+            );
         }
     }
 
@@ -307,11 +316,13 @@ public sealed class UsbHotplugMonitor : IUsbHotplugMonitor, IHotplugListener
         {
             _monitor = monitor;
             Filter = filter;
-            // Unbounded and never dropping: hotplug is low-volume, and dropping a connect or
-            // disconnect would corrupt a consumer's view of device state. Multiple writer threads
-            // (event loop thread for live events, subscribing thread for the initial replay).
+            // Unbounded and never dropping while live: hotplug is low-volume, and dropping a
+            // connect or disconnect would corrupt a consumer's view of device state. Multiple
+            // writer threads (event loop thread for live events, subscribing thread for the
+            // initial replay). SingleReader is false because Abort drains the buffer from the
+            // disposing thread, potentially concurrent with a consumer read.
             _channel = Channel.CreateUnbounded<UsbHotplugEvent>(
-                new UnboundedChannelOptions { SingleReader = true, SingleWriter = false }
+                new UnboundedChannelOptions { SingleReader = false, SingleWriter = false }
             );
         }
 
@@ -320,6 +331,20 @@ public sealed class UsbHotplugMonitor : IUsbHotplugMonitor, IHotplugListener
             _channel.Writer.TryWrite(new UsbHotplugEvent(type, descriptor));
 
         public void Complete() => _channel.Writer.TryComplete();
+
+        /// <summary>
+        /// Cancels the subscription: pending and future reads observe <paramref name="error"/>,
+        /// and buffered events are dropped — they describe devices the disposed monitor or IUsb
+        /// can no longer reach. TryComplete stops new writes, so the drain terminates and the
+        /// error surfaces to the consumer immediately instead of after stale events. A consumer
+        /// read racing the drain may still win one already-buffered event, which is
+        /// indistinguishable from having read it just before the dispose.
+        /// </summary>
+        public void Abort(OperationCanceledException error)
+        {
+            _ = _channel.Writer.TryComplete(error);
+            while (_channel.Reader.TryRead(out _)) { }
+        }
 
         public void Dispose()
         {

@@ -126,7 +126,8 @@ public sealed class UsbHotplugEventNotifier : IDisposable
         }
         catch (OperationCanceledException)
         {
-            // Expected when disposed.
+            // Expected when this notifier (own token), the owning monitor, or the underlying
+            // IUsb is disposed; the latter two cancel the subscription channel.
         }
     }
 
