@@ -43,12 +43,19 @@ public sealed class Given_a_hotplug_monitor_over_a_fake_provider
 
         // The provider promises not to invoke the listener after DeregisterHotplug returns, but
         // the monitor keeps its _disposed guard as defense in depth (e.g. against a provider
-        // that breaks that promise); a disposed monitor must drop the event.
+        // that breaks that promise); a disposed monitor must drop the event. Had the event been
+        // written, WaitToReadAsync would return true instead of surfacing the cancellation.
         RaiseLeft(monitor, new UsbDeviceDescriptor { DeviceKey = "fake-device", BcdUsb = 0x0200 });
 
-        (await subscription.Reader.WaitToReadAsync(cts.Token))
-            .Should()
-            .BeFalse(because: "a disposed monitor must complete, not write to, its subscriptions");
+        var wait = async () => await subscription.Reader.WaitToReadAsync(cts.Token);
+        (
+            await wait.Should()
+                .ThrowAsync<OperationCanceledException>(
+                    because: "a disposed monitor must cancel, not write to, its subscriptions"
+                )
+        )
+            .Which.CancellationToken.Should()
+            .NotBe(cts.Token, because: "the abort must come from the monitor, not the timeout");
     }
 
     [Fact]
@@ -79,7 +86,7 @@ public sealed class Given_a_hotplug_monitor_over_a_fake_provider
     }
 
     [Fact]
-    public async Task When_the_provider_is_disposed_subscriptions_complete_cleanly()
+    public async Task When_the_provider_is_disposed_subscription_readers_are_canceled()
     {
         var provider = CreateFakeProvider();
         using var monitor = new UsbHotplugMonitor(provider);
@@ -93,13 +100,97 @@ public sealed class Given_a_hotplug_monitor_over_a_fake_provider
         var connected = await subscription.Reader.ReadAsync(cts.Token);
         connected.Type.Should().Be(UsbHotplugEventType.Connected);
 
+        // This event is never read before the teardown below; it must be dropped, not delivered.
+        RaiseArrived(
+            monitor,
+            new UsbDeviceDescriptor { DeviceKey = "stale-device", BcdUsb = 0x0200 }
+        );
+
         RaiseDisposed(monitor);
 
-        // The channel completes, so a consumer observes a clean end-of-stream instead of a
-        // subscription that stays silent forever on a provider that no longer exists.
-        (await subscription.Reader.WaitToReadAsync(cts.Token))
+        // The channel is canceled and undelivered events are dropped, so a consumer wakes and
+        // observes the teardown it did not initiate instead of a stale event, a subscription that
+        // stays silent forever, or a clean end-of-stream it cannot tell apart from a normal stop.
+        var wait = async () => await subscription.Reader.WaitToReadAsync(cts.Token);
+        (
+            await wait.Should()
+                .ThrowAsync<OperationCanceledException>()
+                .WithMessage("*IUsb instance is disposed*")
+        )
+            .Which.CancellationToken.Should()
+            .NotBe(cts.Token, because: "the cancellation must come from teardown, not the timeout");
+        subscription.Reader.Completion.IsCanceled.Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task Disposing_the_monitor_wakes_a_blocked_reader_with_a_cancellation()
+    {
+        var provider = CreateFakeProvider();
+        var monitor = new UsbHotplugMonitor(provider);
+        using var subscription = monitor.Subscribe();
+        using var cts = new CancellationTokenSource(Timeout);
+
+        // Block a reader on the empty channel before disposing; Dispose must wake it, and with a
+        // cancellation rather than an end-of-stream `false`.
+        var blockedRead = subscription.Reader.WaitToReadAsync(cts.Token);
+
+        monitor.Dispose();
+
+        OperationCanceledException? canceled = null;
+        try
+        {
+            _ = await blockedRead;
+        }
+        catch (OperationCanceledException ex)
+        {
+            canceled = ex;
+        }
+        canceled
             .Should()
-            .BeFalse();
+            .NotBeNull(because: "Dispose must wake the blocked reader with a cancellation");
+        canceled!
+            .CancellationToken.Should()
+            .NotBe(cts.Token, because: "the wake-up must come from Dispose, not the timeout");
+        subscription.Reader.Completion.IsCanceled.Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task Disposing_the_monitor_drops_buffered_events()
+    {
+        var provider = CreateFakeProvider();
+        var monitor = new UsbHotplugMonitor(provider);
+        using var subscription = monitor.Subscribe();
+        using var cts = new CancellationTokenSource(Timeout);
+
+        RaiseArrived(
+            monitor,
+            new UsbDeviceDescriptor { DeviceKey = "stale-device", BcdUsb = 0x0200 }
+        );
+
+        monitor.Dispose();
+
+        // Undelivered events describe devices the disposed monitor no longer tracks; they are
+        // dropped, so a reader that is behind observes the cancellation instead of acting on a
+        // stale event.
+        var read = async () => await subscription.Reader.ReadAsync(cts.Token);
+        await read.Should().ThrowAsync<OperationCanceledException>();
+        subscription.Reader.Completion.IsCanceled.Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task Disposing_a_subscription_completes_its_reader_cleanly()
+    {
+        var provider = CreateFakeProvider();
+        using var monitor = new UsbHotplugMonitor(provider);
+        var subscription = monitor.Subscribe();
+        using var cts = new CancellationTokenSource(Timeout);
+
+        // Self-dispose is the consumer's own stop request, so unlike monitor or provider
+        // disposal it must end the stream cleanly, not with a cancellation.
+        subscription.Dispose();
+
+        (await subscription.Reader.WaitToReadAsync(cts.Token)).Should().BeFalse();
+        subscription.Reader.Completion.IsCompletedSuccessfully.Should().BeTrue();
     }
 
     [Fact]

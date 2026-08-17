@@ -157,17 +157,26 @@ public sealed class Given_a_hotplug_monitor : IDisposable
     }
 
     [Fact]
-    public async Task Disposing_the_monitor_completes_all_subscription_readers()
+    public async Task Disposing_the_monitor_cancels_all_subscription_readers()
     {
         var first = _monitor.Subscribe();
         var second = _monitor.Subscribe();
 
         _monitor.Dispose();
 
-        await DrainToCompletionAsync(first.Reader, EventTimeout);
-        await DrainToCompletionAsync(second.Reader, EventTimeout);
-        first.Reader.Completion.IsCompletedSuccessfully.Should().BeTrue();
-        second.Reader.Completion.IsCompletedSuccessfully.Should().BeTrue();
+        // Undelivered events (the initial replay) are dropped and the abort surfaces as an
+        // OperationCanceledException instead of a clean end-of-stream. The monitor's exception
+        // carries no token, which distinguishes the abort from the drain helper's own timeout.
+        var drainFirst = () => DrainToCompletionAsync(first.Reader, EventTimeout);
+        var drainSecond = () => DrainToCompletionAsync(second.Reader, EventTimeout);
+        (await drainFirst.Should().ThrowAsync<OperationCanceledException>())
+            .Which.CancellationToken.Should()
+            .Be(CancellationToken.None);
+        (await drainSecond.Should().ThrowAsync<OperationCanceledException>())
+            .Which.CancellationToken.Should()
+            .Be(CancellationToken.None);
+        first.Reader.Completion.IsCanceled.Should().BeTrue();
+        second.Reader.Completion.IsCanceled.Should().BeTrue();
     }
 
     [Fact]
