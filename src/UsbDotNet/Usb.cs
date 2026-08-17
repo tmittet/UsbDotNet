@@ -427,10 +427,6 @@ public sealed class Usb : IUsb, IHotplugProvider
         {
             // With LIBUSB_HOTPLUG_ENUMERATE libusb may notify the arrival of the same device
             // twice: once from registration enumeration and once from the live event loop.
-            _logger.LogDebug(
-                "Duplicate hotplug arrival for device '{DeviceKey}' ignored.",
-                descriptor.DeviceKey
-            );
             device.Dispose();
             return;
         }
@@ -457,21 +453,6 @@ public sealed class Usb : IUsb, IHotplugProvider
         }
         // A device we never cached (per docs: removal may be notified without a prior arrival).
         // Should not happen; we register with libusb_hotplug_flag.LIBUSB_HOTPLUG_ENUMERATE.
-        try
-        {
-            var descriptor = device.GetDeviceDescriptor();
-            _logger.LogDebug(
-                "Hotplug 'DEVICE_LEFT' for an untracked device ignored. "
-                    + "VID=0x{VendorId:X4}, PID=0x{ProductId:X4}.",
-                descriptor.idVendor,
-                descriptor.idProduct
-            );
-        }
-        // NOTE: Never throws; since libusb-1.0.16 libusb_get_device_descriptor always succeeds
-        catch (UsbException ex)
-        {
-            _logger.LogError("Hotplug event handling failed. {ErrorMessage}.", ex.Message);
-        }
         device.Dispose(); // Dispose the throwaway instance created for the callback
     }
 
@@ -480,12 +461,6 @@ public sealed class Usb : IUsb, IHotplugProvider
     /// </summary>
     private void EmitHotplugEvent(libusb_hotplug_event eventType, UsbDeviceDescriptor descriptor)
     {
-        _logger.LogDebug(
-            "Hotplug '{EventType}'. Class: {DeviceClass}. Key: {DeviceKey}.",
-            eventType,
-            descriptor.DeviceClass,
-            descriptor.DeviceKey
-        );
         if (_hotplugListener is not { } listener)
         {
             return;
