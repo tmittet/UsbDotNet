@@ -510,7 +510,7 @@ public sealed class Usb : IUsb, IHotplugProvider
             [
                 .. GetDeviceDescriptors(_logger, deviceList)
                     .Select(d => d.Descriptor)
-                    .Where(d => filter.Matches(d))
+                    .Where(d => filter.Matches(d) && d.HasValidBcdUsb())
                     .Cast<IUsbDeviceDescriptor>(),
             ];
         }

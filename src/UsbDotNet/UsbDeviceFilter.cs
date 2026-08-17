@@ -25,12 +25,7 @@ public sealed record UsbDeviceFilter(
     public bool Matches(IUsbDeviceDescriptor descriptor)
     {
         ArgumentNullException.ThrowIfNull(descriptor);
-        return
-            // Devices with a synthesized descriptor (BcdUsb == 0) never match, regardless of the
-            // filter. The Windows libusb backend produces such descriptors for root hubs and
-            // devices with an unreadable descriptor.
-            descriptor.BcdUsb != 0
-            && (VendorIds is null || VendorIds.Contains(descriptor.VendorId))
+        return (VendorIds is null || VendorIds.Contains(descriptor.VendorId))
             && (ProductIds is null || ProductIds.Contains(descriptor.ProductId));
     }
 
