@@ -1,4 +1,3 @@
-using UsbDotNet.Internal;
 using UsbDotNet.LibUsbNative;
 
 namespace UsbDotNet.Hotplug.Tests;
@@ -24,7 +23,7 @@ public sealed class Given_an_uninitialized_usb : IDisposable
     [SkippableFact]
     public void Subscribe_throws_when_usb_is_not_initialized()
     {
-        using var monitor = new UsbHotplugMonitor((IHotplugProvider)_usb, _loggerFactory);
+        using var monitor = new UsbHotplugMonitor(_usb, _loggerFactory);
 
         Exception? caught = null;
         IUsbHotplugSubscription? subscription = null;

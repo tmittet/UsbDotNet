@@ -1,6 +1,5 @@
 using System.Collections.Concurrent;
 using UsbDotNet.Descriptor;
-using UsbDotNet.Internal;
 using UsbDotNet.LibUsbNative;
 
 namespace UsbDotNet.Hotplug.Tests;
@@ -27,7 +26,7 @@ public sealed class Given_a_hotplug_event_notifier : IDisposable
         try
         {
             _usb.Initialize();
-            _monitor = new UsbHotplugMonitor((IHotplugProvider)_usb, _loggerFactory);
+            _monitor = new UsbHotplugMonitor(_usb, _loggerFactory);
         }
         catch
         {
