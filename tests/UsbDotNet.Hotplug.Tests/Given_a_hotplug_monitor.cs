@@ -1,5 +1,4 @@
 using System.Threading.Channels;
-using UsbDotNet.Internal;
 using UsbDotNet.LibUsbNative;
 
 namespace UsbDotNet.Hotplug.Tests;
@@ -28,7 +27,7 @@ public sealed class Given_a_hotplug_monitor : IDisposable
         try
         {
             _usb.Initialize();
-            _monitor = new UsbHotplugMonitor((IHotplugProvider)_usb, _loggerFactory);
+            _monitor = new UsbHotplugMonitor(_usb, _loggerFactory);
         }
         catch
         {
@@ -188,7 +187,7 @@ public sealed class Given_a_hotplug_monitor : IDisposable
             "Hotplug not supported on this platform; nothing gets registered."
         );
 
-        using var secondMonitor = new UsbHotplugMonitor((IHotplugProvider)_usb, _loggerFactory);
+        using var secondMonitor = new UsbHotplugMonitor(_usb, _loggerFactory);
         var act = () => secondMonitor.Subscribe();
         act.Should()
             .Throw<InvalidOperationException>()
@@ -210,7 +209,7 @@ public sealed class Given_a_hotplug_monitor : IDisposable
         // Disposing the monitor releases its hotplug registration on the IUsb.
         _monitor.Dispose();
 
-        using var secondMonitor = new UsbHotplugMonitor((IHotplugProvider)_usb, _loggerFactory);
+        using var secondMonitor = new UsbHotplugMonitor(_usb, _loggerFactory);
         using var subscription = secondMonitor.Subscribe();
 
         // The new registration re-enumerates with a cleared device cache, so the connected

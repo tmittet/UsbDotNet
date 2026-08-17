@@ -54,15 +54,6 @@ public sealed class UsbHotplugMonitor : IUsbHotplugMonitor, IHotplugListener
     /// </summary>
     public bool IsHotplugSupported { get; }
 
-    /// <summary>
-    /// Creates a monitor over the given, externally owned and initialized, <see cref="IUsb"/>.
-    /// The monitor does not create, initialize or dispose the <see cref="IUsb"/> instance.
-    /// </summary>
-    /// <param name="usb">The USB instance to monitor. NOTE: Initialize before subscribing!</param>
-    /// <param name="loggerFactory">Optional logger factory. If null, logging is disabled.</param>
-    public UsbHotplugMonitor(IUsb usb, ILoggerFactory? loggerFactory = null)
-        : this(AsHotplugProvider(usb), loggerFactory) { }
-
     // The monitor is built from the hotplug provider; the public constructor takes IUsb only
     // because IHotplugProvider is internal (it cannot appear in a public signature) and consumers
     // only ever hold an IUsb.
