@@ -147,6 +147,16 @@ public sealed class UsbHotplugMonitor : IUsbHotplugMonitor, IHotplugListener
     void IHotplugListener.OnDeviceLeft(IUsbDeviceDescriptor descriptor) =>
         Dispatch(UsbHotplugEventType.Disconnected, descriptor);
 
+    /// <summary>
+    /// Runs inside the provider's hotplug dispatch: on the libusb event-loop thread for live
+    /// events and on the registering thread during the LIBUSB_HOTPLUG_ENUMERATE replay.
+    /// <para>
+    /// NOTE: Subscriber code must never execute synchronously from here; the channel writes
+    /// below resume readers on the thread pool. Usb.Dispose relies on this to guarantee it is
+    /// never called from inside a dispatch, where it would deadlock (see the note at the top
+    /// of Usb.Dispose).
+    /// </para>
+    /// </summary>
     private void Dispatch(UsbHotplugEventType type, IUsbDeviceDescriptor descriptor)
     {
         // Filter out devices with a synthesized descriptor (BcdUsb == 0), typically root hubs and
@@ -299,6 +309,10 @@ public sealed class UsbHotplugMonitor : IUsbHotplugMonitor, IHotplugListener
             // writer threads (event loop thread for live events, subscribing thread for the
             // initial replay). SingleReader is false because Abort drains the buffer from the
             // disposing thread, potentially concurrent with a consumer read.
+            // AllowSynchronousContinuations must stay at its default (false): with it enabled a
+            // blocked reader's continuation could run on the writing thread, i.e. consumer code
+            // inside a hotplug dispatch, breaking the no-user-code-in-dispatch rule that
+            // Usb.Dispose depends on (see the note at the top of Usb.Dispose).
             _channel = Channel.CreateUnbounded<UsbHotplugEvent>(
                 new UnboundedChannelOptions { SingleReader = false, SingleWriter = false }
             );
