@@ -351,7 +351,8 @@ internal sealed class HotplugProvider : IHotplugProvider
             return;
         }
         // A device we never cached (per docs: removal may be notified without a prior arrival).
-        // Should not happen; we register with libusb_hotplug_flag.LIBUSB_HOTPLUG_ENUMERATE.
+        // Unlikely, but possible despite LIBUSB_HOTPLUG_ENUMERATE: RegisterHotplug can race the
+        // event loop and enumerate before a newly arrived device becomes visible.
         device.Dispose(); // Dispose the throwaway instance created for the callback
     }
 
