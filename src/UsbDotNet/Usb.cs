@@ -452,7 +452,7 @@ public sealed class Usb : IUsb
             }
 
             Debug.Assert(
-                Environment.CurrentManagedThreadId == _eventLoop?.ManagedThreadId,
+                Environment.CurrentManagedThreadId != _eventLoop?.ManagedThreadId,
                 "Dispose invoked from within a hotplug event handler."
             );
 
