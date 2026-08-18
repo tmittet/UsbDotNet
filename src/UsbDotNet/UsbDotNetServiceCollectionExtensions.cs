@@ -2,7 +2,6 @@ using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using UsbDotNet;
-using UsbDotNet.Internal;
 using UsbDotNet.LibUsbNative;
 
 #pragma warning disable IDE0130 // Namespace does not match folder structure
@@ -41,7 +40,7 @@ public static class UsbDotNetServiceCollectionExtensions
             _ = services.Configure(configure);
         }
         services.TryAddSingleton<ILibUsb, LibUsb>();
-        services.TryAddSingleton<Usb>(sp =>
+        services.TryAddSingleton(sp =>
         {
             var loggerFactory = sp.GetRequiredService<ILoggerFactory>();
             var libUsb = sp.GetRequiredService<ILibUsb>();
@@ -49,7 +48,7 @@ public static class UsbDotNetServiceCollectionExtensions
             return new Usb(libUsb, loggerFactory, options);
         });
         services.TryAddSingleton<IUsb>(sp => sp.GetRequiredService<Usb>());
-        services.TryAddSingleton<IHotplugProvider>(sp => sp.GetRequiredService<Usb>());
+        services.TryAddSingleton(sp => sp.GetRequiredService<Usb>().HotplugProvider);
         return services;
     }
 }

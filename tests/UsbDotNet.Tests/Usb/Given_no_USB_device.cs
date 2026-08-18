@@ -84,7 +84,7 @@ public sealed class Given_no_USB_device : IDisposable
     public void RegisterHotplug_throws_when_called_without_Initialize()
     {
         using var usb = CreateUsb();
-        var provider = (IHotplugProvider)usb;
+        var provider = usb.HotplugProvider;
         var act = () => provider.RegisterHotplug(new TestHotplugListener());
         act.Should().Throw<InvalidOperationException>();
     }
@@ -94,7 +94,7 @@ public sealed class Given_no_USB_device : IDisposable
     {
         using var usb = CreateUsb();
         usb.Initialize();
-        var provider = (IHotplugProvider)usb;
+        var provider = usb.HotplugProvider;
         provider
             .RegisterHotplug(new TestHotplugListener())
             .Should()
@@ -106,7 +106,7 @@ public sealed class Given_no_USB_device : IDisposable
     {
         using var usb = CreateUsb();
         usb.Initialize();
-        var provider = (IHotplugProvider)usb;
+        var provider = usb.HotplugProvider;
         Skip.IfNot(
             provider.RegisterHotplug(new TestHotplugListener())
                 == HotplugRegistrationResult.Success,
@@ -125,7 +125,7 @@ public sealed class Given_no_USB_device : IDisposable
     {
         using var usb = CreateUsb();
         usb.Initialize();
-        var provider = (IHotplugProvider)usb;
+        var provider = usb.HotplugProvider;
         var owner = new TestHotplugListener();
         Skip.IfNot(
             provider.RegisterHotplug(owner) == HotplugRegistrationResult.Success,
@@ -145,7 +145,7 @@ public sealed class Given_no_USB_device : IDisposable
     {
         using var usb = CreateUsb();
         usb.Initialize();
-        var provider = (IHotplugProvider)usb;
+        var provider = usb.HotplugProvider;
         Skip.IfNot(
             provider.RegisterHotplug(new TestHotplugListener())
                 == HotplugRegistrationResult.Success,

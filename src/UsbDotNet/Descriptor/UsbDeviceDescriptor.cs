@@ -59,8 +59,23 @@ public readonly record struct UsbDeviceDescriptor : IUsbDeviceDescriptor
         return $"{vendorId:X4}_{productId:X4}_{busNumber}_{busAddress}";
     }
 
-    internal UsbDeviceDescriptor(
-        UsbDotNet.LibUsbNative.Structs.libusb_device_descriptor partialDescriptor,
+    /// <summary>
+    /// Get the USB device descriptor, cached in memory by libusb, for a given device.
+    /// <para>
+    /// NOTE: since libusb-1.0.16, LIBUSBX_API_VERSION >= 0x01000102, this function always succeeds.
+    /// </para>
+    /// </summary>
+    /// <exception cref="ObjectDisposedException">Thrown when device is disposed.</exception>
+    internal static UsbDeviceDescriptor FromDevice(LibUsbNative.SafeHandles.ISafeDevice device) =>
+        new(
+            device.GetDeviceDescriptor(),
+            device.GetBusNumber(),
+            device.GetDeviceAddress(),
+            device.GetPortNumber()
+        );
+
+    private UsbDeviceDescriptor(
+        LibUsbNative.Structs.libusb_device_descriptor partialDescriptor,
         byte busNumber,
         byte address,
         byte portNumber

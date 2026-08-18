@@ -46,7 +46,7 @@ public sealed class Given_a_fake_hotplug_device_lifecycle : IDisposable
     [Fact]
     public void A_duplicate_arrival_of_the_same_device_is_ignored()
     {
-        var provider = (IHotplugProvider)_usb;
+        var provider = _usb.HotplugProvider;
         var arrivals = 0;
         string? leftKey = null;
         var listener = new TestHotplugListener
@@ -73,7 +73,7 @@ public sealed class Given_a_fake_hotplug_device_lifecycle : IDisposable
     [Fact]
     public void DeviceLeft_reports_the_key_captured_on_arrival_even_when_bus_address_change()
     {
-        var provider = (IHotplugProvider)_usb;
+        var provider = _usb.HotplugProvider;
         string? arrivedKey = null;
         string? leftKey = null;
         var listener = new TestHotplugListener
@@ -105,7 +105,7 @@ public sealed class Given_a_fake_hotplug_device_lifecycle : IDisposable
     [Fact]
     public void DeviceLeft_without_a_prior_arrival_is_dropped()
     {
-        var provider = (IHotplugProvider)_usb;
+        var provider = _usb.HotplugProvider;
         string? leftKey = null;
         var listener = new TestHotplugListener { DeviceLeft = d => leftKey = d.DeviceKey };
         provider.RegisterHotplug(listener).Should().Be(HotplugRegistrationResult.Success);
@@ -125,7 +125,7 @@ public sealed class Given_a_fake_hotplug_device_lifecycle : IDisposable
     public async Task Dispose_does_not_hold_the_instance_lock_while_waiting_for_the_event_loop()
     {
         var timeout = TimeSpan.FromSeconds(5);
-        var provider = (IHotplugProvider)_usb;
+        var provider = _usb.HotplugProvider;
         provider
             .RegisterHotplug(new TestHotplugListener())
             .Should()
@@ -173,7 +173,7 @@ public sealed class Given_a_fake_hotplug_device_lifecycle : IDisposable
     public void Dispose_called_from_a_DeviceArrived_handler_on_the_event_loop_thread_throws_instead_of_deadlocking()
     {
         var timeout = TimeSpan.FromSeconds(5);
-        var provider = (IHotplugProvider)_usb;
+        var provider = _usb.HotplugProvider;
         using var handlerReturned = new ManualResetEventSlim(false);
         Exception? caught = null;
 
@@ -224,7 +224,7 @@ public sealed class Given_a_fake_hotplug_device_lifecycle : IDisposable
     public async Task DeregisterHotplug_waits_for_an_in_flight_event()
     {
         var timeout = TimeSpan.FromSeconds(5);
-        var provider = (IHotplugProvider)_usb;
+        var provider = _usb.HotplugProvider;
         using var handlerEntered = new ManualResetEventSlim(false);
         using var handlerRelease = new ManualResetEventSlim(false);
         var listener = new TestHotplugListener
