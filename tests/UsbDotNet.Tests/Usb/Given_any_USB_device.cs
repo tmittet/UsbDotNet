@@ -238,7 +238,7 @@ public sealed class Given_any_USB_device : IDisposable
             "No USB device available to emit a hotplug arrived event."
         );
 
-        var provider = (IHotplugProvider)_usb;
+        var provider = _usb.HotplugProvider;
         var arrived = new ConcurrentQueue<IUsbDeviceDescriptor>();
         using var reachedExpected = new ManualResetEventSlim(false);
         var listener = new TestHotplugListener
@@ -293,7 +293,7 @@ public sealed class Given_any_USB_device : IDisposable
         var expected = _usb.GetDeviceList().FirstOrDefault();
         Skip.If(expected is null, "No USB device available to emit a hotplug arrived event.");
 
-        var provider = (IHotplugProvider)_usb;
+        var provider = _usb.HotplugProvider;
         var arrived = new ConcurrentDictionary<string, IUsbDeviceDescriptor>();
         using var matched = new ManualResetEventSlim(false);
         var listener = new TestHotplugListener
@@ -331,7 +331,7 @@ public sealed class Given_any_USB_device : IDisposable
     {
         // With enumeration enabled the callback runs for connected devices; delivering them to a
         // listener whose callbacks do nothing must be safe.
-        var provider = (IHotplugProvider)_usb;
+        var provider = _usb.HotplugProvider;
         var act = () => provider.RegisterHotplug(new TestHotplugListener());
         act.Should().NotThrow();
     }
@@ -344,7 +344,7 @@ public sealed class Given_any_USB_device : IDisposable
             "No USB device available to emit a hotplug arrived event."
         );
 
-        var provider = (IHotplugProvider)_usb;
+        var provider = _usb.HotplugProvider;
         using var callbackInvoked = new ManualResetEventSlim(false);
         var listener = new TestHotplugListener
         {

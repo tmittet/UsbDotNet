@@ -26,7 +26,7 @@ public sealed class Given_a_hotplug_event_notifier : IDisposable
         try
         {
             _usb.Initialize();
-            _monitor = new UsbHotplugMonitor(_usb, _loggerFactory);
+            _monitor = new UsbHotplugMonitor(_usb.HotplugProvider, _loggerFactory);
         }
         catch
         {

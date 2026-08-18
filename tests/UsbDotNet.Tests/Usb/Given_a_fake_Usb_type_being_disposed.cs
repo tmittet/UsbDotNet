@@ -1,5 +1,4 @@
 using FakeItEasy;
-using UsbDotNet.Internal;
 using UsbDotNet.LibUsbNative;
 using UsbDotNet.LibUsbNative.SafeHandles;
 using UsbDotNet.Tests.Fakes;
@@ -54,7 +53,7 @@ public sealed class Given_a_fake_Usb_type_being_disposed : IDisposable
         // A hotplug registration in this window would leak: its callback handle is disposed by
         // nobody and pins the native context past _context.Dispose().
         FluentActions
-            .Invoking(() => ((IHotplugProvider)_usb).RegisterHotplug(new TestHotplugListener()))
+            .Invoking(() => _usb.HotplugProvider.RegisterHotplug(new TestHotplugListener()))
             .Should()
             .Throw<ObjectDisposedException>();
         dispose.IsCompleted.Should().BeFalse("teardown is still joining the event-loop thread");
