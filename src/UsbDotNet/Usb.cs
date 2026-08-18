@@ -417,6 +417,17 @@ public sealed class Usb : IUsb
     /// </summary>
     public void Dispose()
     {
+        // NOTE: Dispose must never run inside a hotplug dispatch. It would deadlock on either
+        // dispatch source: live events run on the libusb event-loop thread, which teardown joins
+        // (step 4), and the LIBUSB_HOTPLUG_ENUMERATE replay runs on the registering thread while
+        // holding a rundown token that Shutdown (step 2) waits out. No guard is needed because no
+        // user code can execute inside a dispatch: IHotplugListener is internal, its only
+        // implementation (UsbHotplugMonitor) only writes to channels whose readers resume on the
+        // thread pool, and transfer completions merely signal an event on the submitting thread.
+        //
+        // Reintroduce a guard covering BOTH dispatch sources if that ever changes; e.g. a public
+        // listener API or hotplug implementation with synchronous continuations.
+
         UsbDevice[] openDevices;
         LibUsbEventLoop? eventLoop;
         ISafeContext? context;
@@ -440,20 +451,6 @@ public sealed class Usb : IUsb
                 return;
             }
 
-            if (Environment.CurrentManagedThreadId == _eventLoop?.ManagedThreadId)
-            {
-                // Thrown if called synchronously from one of the the internal hotplug
-                // IHotplugListener.OnDeviceArrived or IHotplugListener.OnDeviceLeft callbacks. The
-                // callbacks run on the libusb event-loop thread, and disposing joins that thread.
-                const string errorMessage =
-                    "Dispose() was invoked from within a hotplug event handler. This is unsafe: "
-                    + "hotplug callbacks execute on the libusb event-loop thread, and Dispose() "
-                    + "attempts to join that same thread during teardown, causing a deadlock.";
-                _logger.LogError(errorMessage);
-#pragma warning disable CA1065 // Do not raise exceptions in unexpected locations
-                throw new InvalidOperationException(errorMessage);
-#pragma warning restore CA1065
-            }
             _disposeState = DisposeState.Disposing;
 
             openDevices = [.. _openDevices.Values];

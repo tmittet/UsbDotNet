@@ -170,57 +170,6 @@ public sealed class Given_a_fake_hotplug_device_lifecycle : IDisposable
     }
 
     [Fact]
-    public void Dispose_called_from_a_DeviceArrived_handler_on_the_event_loop_thread_throws_instead_of_deadlocking()
-    {
-        var timeout = TimeSpan.FromSeconds(5);
-        var provider = _usb.HotplugProvider;
-        using var handlerReturned = new ManualResetEventSlim(false);
-        Exception? caught = null;
-
-        var listener = new TestHotplugListener
-        {
-            DeviceArrived = _ =>
-            {
-                // This callback runs synchronously on the event-loop thread (see
-                // RunOnNextHandleEventsCompleted below). Usb.Dispose() would try to join that same
-                // thread; instead of hanging in a self-join, it must fail fast.
-                try
-                {
-                    _usb.Dispose();
-                }
-                catch (Exception ex)
-                {
-                    caught = ex;
-                }
-                finally
-                {
-                    handlerReturned.Set();
-                }
-            },
-        };
-        provider.RegisterHotplug(listener).Should().Be(HotplugRegistrationResult.Success);
-
-        // Have the real event-loop thread invoke the hotplug callback itself, from inside
-        // libusb_handle_events_completed, exactly as real libusb dispatches a pending event.
-        _api.RunOnNextHandleEventsCompleted(() =>
-            _api.LastCallback!.Invoke(
-                IntPtr.Zero,
-                DevicePtr,
-                libusb_hotplug_event.LIBUSB_HOTPLUG_EVENT_DEVICE_ARRIVED,
-                IntPtr.Zero
-            )
-        );
-
-        handlerReturned
-            .Wait(timeout)
-            .Should()
-            .BeTrue(
-                because: "Dispose called from the event-loop thread must not self-join and hang"
-            );
-        caught.Should().BeOfType<InvalidOperationException>();
-    }
-
-    [Fact]
     public async Task DeregisterHotplug_waits_for_an_in_flight_event()
     {
         var timeout = TimeSpan.FromSeconds(5);
