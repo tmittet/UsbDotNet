@@ -54,9 +54,6 @@ public sealed class UsbHotplugMonitor : IUsbHotplugMonitor, IHotplugListener
     /// </summary>
     public bool IsHotplugSupported { get; }
 
-    // The monitor is built from the hotplug provider; the public constructor takes IUsb only
-    // because IHotplugProvider is internal (it cannot appear in a public signature) and consumers
-    // only ever hold an IUsb.
     internal UsbHotplugMonitor(IHotplugProvider provider, ILoggerFactory? loggerFactory = null)
     {
         _provider = provider ?? throw new ArgumentNullException(nameof(provider));
@@ -64,16 +61,6 @@ public sealed class UsbHotplugMonitor : IUsbHotplugMonitor, IHotplugListener
             ? NullLogger<UsbHotplugMonitor>.Instance
             : loggerFactory.CreateLogger<UsbHotplugMonitor>();
         IsHotplugSupported = _provider.IsHotplugSupported;
-    }
-
-    private static IHotplugProvider AsHotplugProvider(IUsb usb)
-    {
-        ArgumentNullException.ThrowIfNull(usb);
-        return usb as IHotplugProvider
-            ?? throw new ArgumentException(
-                "The IUsb implementation does not support hotplug registration.",
-                nameof(usb)
-            );
     }
 
     /// <inheritdoc/>
