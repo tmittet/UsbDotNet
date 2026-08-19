@@ -52,6 +52,17 @@ public sealed class Given_no_USB_device : IDisposable
     }
 
     [Fact]
+    public void Dispose_succeeds_when_called_without_Initialize()
+    {
+        using var usb = CreateUsb();
+        var act = () => usb.Dispose();
+        act.Should().NotThrow();
+        // The instance still transitions to Disposed, not back to an unusable Live state
+        var getDeviceList = () => usb.GetDeviceList();
+        getDeviceList.Should().Throw<ObjectDisposedException>();
+    }
+
+    [Fact]
     public void Initialize_throws_when_called_a_second_time()
     {
         using var usb = CreateUsb();
