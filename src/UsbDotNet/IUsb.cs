@@ -1,7 +1,6 @@
 using Microsoft.Extensions.Logging;
 using UsbDotNet.Core;
 using UsbDotNet.Descriptor;
-using UsbDotNet.LibUsbNative.SafeHandles;
 
 namespace UsbDotNet;
 
@@ -12,19 +11,6 @@ namespace UsbDotNet;
 /// </summary>
 public interface IUsb : IDisposable
 {
-    /// <summary>True when hotplug is supported on the platform.</summary>
-    internal bool IsHotplugSupported { get; }
-
-    /// <summary>
-    /// Runs <paramref name="action"/> with the initialized <see cref="ISafeContext"/> under
-    /// the Usb type's lifetime lock, so the context cannot be disposed while the action runs.
-    /// </summary>
-    /// <exception cref="ObjectDisposedException">Thrown when the Usb type is disposed.</exception>
-    /// <exception cref="InvalidOperationException">
-    /// Thrown when the Usb type is not initialized.
-    /// </exception>
-    internal T WithInitializedContext<T>(Func<ISafeContext, T> action);
-
     /// <summary>
     /// Initializes the USB library (libusb), attaches a log callback and starts the
     /// background thread that handles USB events and drives async transfers. The libusb
