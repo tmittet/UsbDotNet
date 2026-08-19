@@ -11,7 +11,7 @@ namespace UsbDotNet.Internal;
 /// <summary>
 /// Owns the hotplug registration state and event dispatch for a <see cref="Usb"/> instance: the
 /// native callback handle, the attached <see cref="IHotplugListener"/> and the arrived-device
-/// cache. Context access and disposal checks go through <see cref="IUsb"/>; teardown is
+/// cache. Context access and disposal checks go through <see cref="IUsbInternal"/>; teardown is
 /// orchestrated by <see cref="Usb.Dispose"/> via <see cref="Shutdown"/>,
 /// <see cref="ReleaseDeviceCache"/> and <see cref="NotifyProviderDisposed"/>.
 /// </summary>
@@ -22,7 +22,7 @@ namespace UsbDotNet.Internal;
 internal sealed class HotplugProvider : IHotplugProvider
 #pragma warning restore CA1001 // Types that own disposable fields should be disposable
 {
-    private readonly IUsb _usb;
+    private readonly IUsbInternal _usb;
     private readonly ILogger _logger;
 
     private IHotplugListener? _listener;
@@ -31,7 +31,7 @@ internal sealed class HotplugProvider : IHotplugProvider
     // replay libusb runs synchronously inside libusb_hotplug_register_callback (on the registering
     // thread) and live events from libusb_handle_events (on the event loop thread). Registration
     // and deregistration acquire it BEFORE the usb's lifetime lock (entered via
-    // IUsb.WithInitializedContext), so the global lock order is
+    // IUsbInternal.WithInitializedContext), so the global lock order is
     // _dispatchLock -> usb lifetime lock; the dispatch path must never enter the usb.
     private readonly object _dispatchLock = new();
 
@@ -64,7 +64,7 @@ internal sealed class HotplugProvider : IHotplugProvider
 #pragma warning restore CA2213 // Disposable fields should be disposed
     private readonly RundownGuard _callbackRundown = new();
 
-    internal HotplugProvider(IUsb usb, ILogger logger)
+    internal HotplugProvider(IUsbInternal usb, ILogger logger)
     {
         _usb = usb ?? throw new ArgumentNullException(nameof(usb));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));

@@ -14,7 +14,7 @@ using UsbDotNet.LibUsbNative.SafeHandles;
 namespace UsbDotNet;
 
 /// <inheritdoc/>
-public sealed class Usb : IUsb
+public sealed class Usb : IUsb, IUsbInternal
 {
     private static int _instances;
 
@@ -37,10 +37,11 @@ public sealed class Usb : IUsb
     internal IHotplugProvider HotplugProvider => _hotplug;
 
     /// <inheritdoc/>
-    bool IUsb.IsHotplugSupported => _libUsb.HasCapability(libusb_capability.LIBUSB_CAP_HAS_HOTPLUG);
+    bool IUsbInternal.IsHotplugSupported =>
+        _libUsb.HasCapability(libusb_capability.LIBUSB_CAP_HAS_HOTPLUG);
 
     /// <inheritdoc/>
-    T IUsb.WithInitializedContext<T>(Func<ISafeContext, T> action)
+    T IUsbInternal.WithInitializedContext<T>(Func<ISafeContext, T> action)
     {
         lock (_lock)
         {
