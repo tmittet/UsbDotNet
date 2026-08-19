@@ -12,12 +12,12 @@ namespace UsbDotNet.Internal;
 /// Owns the hotplug registration state and event dispatch for a <see cref="Usb"/> instance: the
 /// native callback handle, the attached <see cref="IHotplugListener"/> and the arrived-device
 /// cache. Context access and disposal checks go through <see cref="IUsbInternal"/>; teardown is
-/// orchestrated by <see cref="Usb.Dispose"/> via <see cref="Shutdown"/>,
-/// <see cref="ReleaseDeviceCache"/> and <see cref="NotifyProviderDisposed"/>.
+/// orchestrated by <see cref="Usb.Dispose"/> via <see cref="Shutdown"/> and
+/// <see cref="NotifyProviderDisposed"/>.
 /// </summary>
 #pragma warning disable CA1001 // Types that own disposable fields should be disposable
-// CA1001: teardown is owned by Usb.Dispose (Shutdown -> ReleaseDeviceCache ->
-// NotifyProviderDisposed). Implementing IDisposable would make the DI container, which tracks
+// CA1001: teardown is owned by Usb.Dispose (Shutdown -> NotifyProviderDisposed).
+// Implementing IDisposable would make the DI container, which tracks
 // every IDisposable it resolves, dispose the provider a second time behind Usb's back.
 internal sealed class HotplugProvider : IHotplugProvider
 #pragma warning restore CA1001 // Types that own disposable fields should be disposable
@@ -159,12 +159,12 @@ internal sealed class HotplugProvider : IHotplugProvider
     }
 
     /// <summary>
-    /// Deregisters the native callback and waits for any in-flight hotplug callback to finish.
-    /// Called from <see cref="Usb.Dispose"/> after the dispose state is set, so no new
-    /// registration can recreate the handle. Must not take <see cref="_dispatchLock"/>: an
-    /// in-flight listener invocation holds it, and the rundown wait below is the mechanism that
-    /// waits for it. <see cref="ReleaseDeviceCache"/> and <see cref="NotifyProviderDisposed"/>
-    /// remain safe to call afterwards; they complete the teardown at their steps of
+    /// Deregisters the native callback, waits for any in-flight hotplug callback to finish and
+    /// releases the cached device references. Called from <see cref="Usb.Dispose"/> after the
+    /// dispose state is set, so no new registration can recreate the handle. Must not take
+    /// <see cref="_dispatchLock"/>: an in-flight listener invocation holds it, and the rundown
+    /// wait below is the mechanism that waits for it. <see cref="NotifyProviderDisposed"/>
+    /// remains safe to call afterwards; it completes the teardown at the end of
     /// <see cref="Usb.Dispose"/>.
     /// </summary>
     internal void Shutdown()
@@ -172,6 +172,11 @@ internal sealed class HotplugProvider : IHotplugProvider
         var handle = Interlocked.Exchange(ref _callbackHandle, null);
         handle?.Dispose();
         _callbackRundown.Dispose();
+        // Only after the rundown wait is the device cache frozen: an in-flight dispatch may still
+        // add to it, while a later callback invocation fails the token acquisition and never
+        // touches it. Releasing here (before Usb.Dispose reaches libusb_exit) drops the last
+        // libusb device references held on behalf of this registration.
+        ReleaseDeviceCache();
     }
 
     /// <summary>
@@ -180,7 +185,7 @@ internal sealed class HotplugProvider : IHotplugProvider
     /// duplicate-arrival check in HandleDeviceArrived, and the cached devices would keep the
     /// native context referenced.
     /// </summary>
-    internal void ReleaseDeviceCache()
+    private void ReleaseDeviceCache()
     {
         foreach (var entry in _devices.ToArray())
         {

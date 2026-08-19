@@ -465,7 +465,8 @@ public sealed class Usb : IUsb, IUsbInternal
         }
         try
         {
-            // 2. Deregister hotplug callback and wait for in-flight hotplug callbacks to finish
+            // 2. Deregister hotplug callback, wait for in-flight hotplug callbacks to finish
+            //    and release cached hotplug device references
             _hotplug.Shutdown();
             // 3. Dispose devices and cancel transfers
             foreach (var device in openDevices)
@@ -478,9 +479,7 @@ public sealed class Usb : IUsb, IUsbInternal
             }
             // 4. Stop and join libusb event loop
             eventLoop?.Dispose();
-            // 5. Release cached hotplug device references
-            _hotplug.ReleaseDeviceCache();
-            // 6. Dispose SafeContext (libusb_exit)
+            // 5. Dispose SafeContext (libusb_exit)
             if (context is not null)
             {
                 context.Dispose();
