@@ -54,6 +54,29 @@ public sealed class UsbHotplugMonitor : IUsbHotplugMonitor, IHotplugListener
     /// </summary>
     public bool IsHotplugSupported { get; }
 
+    /// <summary>
+    /// Creates a new <see cref="UsbHotplugMonitor"/> over the given <see cref="IUsb"/> instance.
+    /// </summary>
+    /// <param name="usb">
+    /// The IUsb instance to monitor for hotplug events (must be of type <see cref="Usb"/>).
+    /// </param>
+    /// <param name="loggerFactory">A <see cref="ILoggerFactory"/> to create loggers.</param>
+    /// <exception cref="ArgumentException">
+    /// Thrown if <paramref name="usb"/> is not of type <see cref="Usb"/>,
+    /// which is required to support hotplug registration.
+    /// </exception>
+    public static UsbHotplugMonitor Create(IUsb usb, ILoggerFactory? loggerFactory = null)
+    {
+        ArgumentNullException.ThrowIfNull(usb);
+        var usbWithProvider =
+            usb as Usb
+            ?? throw new ArgumentException(
+                "The IUsb implementation must be of type Usb to support hotplug registration.",
+                nameof(usb)
+            );
+        return new UsbHotplugMonitor(usbWithProvider.HotplugProvider, loggerFactory);
+    }
+
     internal UsbHotplugMonitor(IHotplugProvider provider, ILoggerFactory? loggerFactory = null)
     {
         _provider = provider ?? throw new ArgumentNullException(nameof(provider));
