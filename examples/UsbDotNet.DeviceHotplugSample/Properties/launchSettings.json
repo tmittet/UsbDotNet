@@ -2,14 +2,19 @@
   "profiles": {
     "Subscribe to events in 'Stream' mode": {
       "commandName": "Project",
+      "commandLineArgs": "--mode stream"
     },
     "Subscribe to events in classic 'Events' mode": {
       "commandName": "Project",
       "commandLineArgs": "--mode events"
     },
+    "Subscribe to events in background 'Start' mode": {
+      "commandName": "Project",
+      "commandLineArgs": "--mode background"
+    },
     "Subscribe to events; filter on VID and PID": {
       "commandName": "Project",
-      "commandLineArgs": "--vid 0x2BD9 --pid 0x0021"
+      "commandLineArgs": "--mode stream --vid 0x2BD9 --pid 0x0021"
     }
   }
 }
