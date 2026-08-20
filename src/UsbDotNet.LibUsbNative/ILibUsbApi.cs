@@ -421,5 +421,4 @@ public interface ILibUsbApi
     /// another <see cref="libusb_error"/> code on other failure
     /// </returns>
     libusb_error libusb_attach_kernel_driver(IntPtr dev, int interface_number);
-
 }

@@ -191,13 +191,22 @@ class PInvokeLibUsbApi : ILibUsbApi
 
     #region Attach/Detach Kernel Driver
     [LibraryImport(Lib)]
-    private static partial libusb_error libusb_set_auto_detach_kernel_driver(IntPtr dev, int interface_number);
+    private static partial libusb_error libusb_set_auto_detach_kernel_driver(
+        IntPtr dev,
+        int interface_number
+    );
 
     [LibraryImport(Lib)]
-    private static partial libusb_error libusb_detach_kernel_driver(IntPtr dev, int interface_number);
+    private static partial libusb_error libusb_detach_kernel_driver(
+        IntPtr dev,
+        int interface_number
+    );
 
     [LibraryImport(Lib)]
-    private static partial libusb_error libusb_attach_kernel_driver(IntPtr dev, int interface_number);
+    private static partial libusb_error libusb_attach_kernel_driver(
+        IntPtr dev,
+        int interface_number
+    );
 
     #endregion
 
@@ -375,13 +384,22 @@ class PInvokeLibUsbApi : ILibUsbApi
     #region Attach/Detach Kernel Driver
 
     [DllImport(Lib, CallingConvention = CallingConvention.Cdecl)]
-    private static extern libusb_error libusb_set_auto_detach_kernel_driver(IntPtr dev, int interface_number);
+    private static extern libusb_error libusb_set_auto_detach_kernel_driver(
+        IntPtr dev,
+        int interface_number
+    );
 
     [DllImport(Lib, CallingConvention = CallingConvention.Cdecl)]
-    private static extern libusb_error libusb_detach_kernel_driver(IntPtr dev, int interface_number);
+    private static extern libusb_error libusb_detach_kernel_driver(
+        IntPtr dev,
+        int interface_number
+    );
 
     [DllImport(Lib, CallingConvention = CallingConvention.Cdecl)]
-    private static extern libusb_error libusb_attach_kernel_driver(IntPtr dev, int interface_number);
+    private static extern libusb_error libusb_attach_kernel_driver(
+        IntPtr dev,
+        int interface_number
+    );
 
     #endregion
 
@@ -390,8 +408,10 @@ class PInvokeLibUsbApi : ILibUsbApi
     #region Expose via interface
 
     /// <inheritdoc/>
-    libusb_error ILibUsbApi.libusb_set_auto_detach_kernel_driver(IntPtr dev, int interface_number) =>
-        libusb_set_auto_detach_kernel_driver(dev, interface_number);
+    libusb_error ILibUsbApi.libusb_set_auto_detach_kernel_driver(
+        IntPtr dev,
+        int interface_number
+    ) => libusb_set_auto_detach_kernel_driver(dev, interface_number);
 
     /// <inheritdoc/>
     libusb_error ILibUsbApi.libusb_detach_kernel_driver(IntPtr dev, int interface_number) =>
@@ -551,4 +571,3 @@ class PInvokeLibUsbApi : ILibUsbApi
 
     #endregion
 }
-
