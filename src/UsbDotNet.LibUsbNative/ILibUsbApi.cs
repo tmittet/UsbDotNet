@@ -368,4 +368,57 @@ public interface ILibUsbApi
     /// This function is safe to call from within a hotplug callback.
     /// </summary>
     void libusb_hotplug_deregister_callback(IntPtr ctx, IntPtr callbackHandle);
+
+    /// <summary>
+    /// Enable/disable libusb's automatic kernel driver detachment.
+    /// When this is enabled libusb will automatically detach the kernel driver on an interface when claiming the interface, and attach it when releasing the interface.
+    /// Automatic kernel driver detachment is disabled on newly opened device handles by default.
+    /// </summary>
+    /// <remarks>
+    /// On platforms which do not have <see cref="libusb_capability.LIBUSB_CAP_SUPPORTS_DETACH_KERNEL_DRIVER"/> this function will return <see cref="libusb_error.LIBUSB_ERROR_NOT_SUPPORTED"/>,
+    /// and libusb will continue as if this function was never called.
+    /// </remarks>
+    /// <param name="dev"><see cref="IntPtr"/> to the libusb device handle.</param>
+    /// <param name="enable">Whether to enable automatic kernel driver detachment (non-zero) or disable it (zero).</param>
+    /// <returns>A <see cref="libusb_error"/>;
+    /// <see cref="libusb_error.LIBUSB_SUCCESS"/> on success
+    /// <see cref="libusb_error.LIBUSB_ERROR_NOT_SUPPORTED"/> on platforms where the functionality is not available
+    /// </returns>
+    libusb_error libusb_set_auto_detach_kernel_driver(IntPtr dev, int enable);
+
+    /// <summary>
+    /// Detach a kernel driver from an interface.
+    /// If successful, you will then be able to claim the interface and perform I/O.
+    /// This functionality is not available on Windows.
+    /// </summary>
+    /// <remarks>
+    /// Note that libusb itself also talks to the device through a special kernel driver, if this driver is already attached to the device, this call will not detach it and return LIBUSB_ERROR_NOT_FOUND.
+    /// </remarks>
+    /// <param name="dev"><see cref="IntPtr"/> to the libusb device handle.</param>
+    /// <param name="interface_number">The interface number on the USB device.</param>
+    /// <returns>A <see cref="libusb_error"/>;
+    /// <see cref="libusb_error.LIBUSB_SUCCESS"/> (0) on success
+    /// <see cref="libusb_error.LIBUSB_ERROR_NOT_FOUND"/> if no kernel driver was active
+    /// <see cref="libusb_error.LIBUSB_ERROR_INVALID_PARAM"/> if the interface does not exist
+    /// <see cref="libusb_error.LIBUSB_ERROR_NO_DEVICE"/> if the device has been disconnected
+    /// <see cref="libusb_error.LIBUSB_ERROR_NOT_SUPPORTED"/> on platforms where the functionality is not available
+    /// another <see cref="libusb_error"/> code on other failure
+    /// </returns>
+    libusb_error libusb_detach_kernel_driver(IntPtr dev, int interface_number);
+
+    /// <summary>
+    /// Re-attach an interface's kernel driver, which was previously detached using libusb_detach_kernel_driver().
+    /// This functionality is not available on Windows.
+    /// </summary>
+    /// <param name="dev"><see cref="IntPtr"/> to the libusb device handle.</param>
+    /// <param name="interface_number">The interface number on the USB device.</param>
+    /// <returns>A <see cref="libusb_error"/>;
+    /// <see cref="libusb_error.LIBUSB_SUCCESS"/> (0) on success
+    /// <see cref="libusb_error.LIBUSB_ERROR_NOT_FOUND"/> if no kernel driver was active
+    /// <see cref="libusb_error.LIBUSB_ERROR_INVALID_PARAM"/> if the interface does not exist
+    /// <see cref="libusb_error.LIBUSB_ERROR_NO_DEVICE"/> if the device has been disconnected
+    /// <see cref="libusb_error.LIBUSB_ERROR_NOT_SUPPORTED"/> on platforms where the functionality is not available
+    /// another <see cref="libusb_error"/> code on other failure
+    /// </returns>
+    libusb_error libusb_attach_kernel_driver(IntPtr dev, int interface_number);
 }
