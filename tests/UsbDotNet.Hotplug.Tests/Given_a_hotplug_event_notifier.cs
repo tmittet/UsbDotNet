@@ -20,7 +20,7 @@ public sealed class Given_a_hotplug_event_notifier
         var provider = CreateFakeProvider();
         using var monitor = new UsbHotplugMonitor(provider);
         using var cts = new CancellationTokenSource(Timeout);
-        var notifier = new UsbHotplugEventNotifier(monitor);
+        await using var notifier = new UsbHotplugEventNotifier(monitor);
         var arrived = new TaskCompletionSource<IUsbDeviceDescriptor>(
             TaskCreationOptions.RunContinuationsAsynchronously
         );
@@ -50,7 +50,7 @@ public sealed class Given_a_hotplug_event_notifier
         var provider = CreateFakeProvider();
         using var monitor = new UsbHotplugMonitor(provider);
         using var cts = new CancellationTokenSource(Timeout);
-        var notifier = new UsbHotplugEventNotifier(monitor);
+        await using var notifier = new UsbHotplugEventNotifier(monitor);
         var left = new TaskCompletionSource<IUsbDeviceDescriptor>(
             TaskCreationOptions.RunContinuationsAsynchronously
         );
@@ -72,7 +72,7 @@ public sealed class Given_a_hotplug_event_notifier
         var provider = CreateFakeProvider();
         var monitor = new UsbHotplugMonitor(provider);
         using var cts = new CancellationTokenSource(Timeout);
-        var notifier = new UsbHotplugEventNotifier(monitor);
+        await using var notifier = new UsbHotplugEventNotifier(monitor);
 
         var run = notifier.RunAsync(cts.Token);
         monitor.SubscriptionCount.Should().Be(1);
@@ -91,6 +91,51 @@ public sealed class Given_a_hotplug_event_notifier
         )
             .Which.CancellationToken.Should()
             .Be(CancellationToken.None);
+    }
+
+    [Fact]
+    public async Task Start_registers_the_subscription_before_it_returns()
+    {
+        var provider = CreateFakeProvider();
+        using var monitor = new UsbHotplugMonitor(provider);
+        await using var notifier = new UsbHotplugEventNotifier(monitor);
+
+        notifier.Start();
+
+        monitor
+            .SubscriptionCount.Should()
+            .Be(1, because: "Start registers before it can park on an empty stream");
+    }
+
+    [Fact]
+    public async Task Disposal_unsubscribes_from_the_monitor()
+    {
+        var provider = CreateFakeProvider();
+        using var monitor = new UsbHotplugMonitor(provider);
+        await using var notifier = new UsbHotplugEventNotifier(monitor);
+        notifier.Start();
+
+        await notifier.DisposeAsync().AsTask().WaitAsync(Timeout, CancellationToken.None);
+
+        // Awaiting the run loop is what makes this observable at the point disposal returns: the
+        // enumerator's finally is what unsubscribes.
+        monitor.SubscriptionCount.Should().Be(0);
+    }
+
+    [Fact]
+    public async Task An_arrival_after_disposal_reaches_no_handler()
+    {
+        var provider = CreateFakeProvider();
+        using var monitor = new UsbHotplugMonitor(provider);
+        await using var notifier = new UsbHotplugEventNotifier(monitor);
+        var seen = new List<string>();
+        notifier.DeviceConnected += (_, e) => seen.Add(e.Descriptor.DeviceKey);
+        notifier.Start();
+
+        await notifier.DisposeAsync().AsTask().WaitAsync(Timeout, CancellationToken.None);
+        RaiseArrived(monitor, Device("too-late"));
+
+        seen.Should().BeEmpty();
     }
 
     /// <summary>Ends a live run and observes its cancellation, bounded so a hang fails the test.</summary>
