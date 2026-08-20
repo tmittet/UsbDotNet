@@ -16,15 +16,15 @@ on:
         required: true
       configuration:
         description: "MSBuild config (Hotplug for support on Windows)"
-        default: "Release-Hotplug"
+        default: "Release-Hotplug-MT"
         type: choice
         options:
-          # NOTE: The 'Release-Hotplug' configuration (added in libusb 1.0.30) sets
+          # NOTE: The 'Release-Hotplug-MT' configuration (added in libusb 1.0.30) sets
           # EnableWindowsHotplug=true, which defines LIBUSB_WINDOWS_HOTPLUG and compiles
           # windows_hotplug.c. Without it, libusb_has_capability(LIBUSB_CAP_HAS_HOTPLUG)
           # returns false on Windows and hotplug callbacks are never delivered.
-          - Release-Hotplug
-          - Release
+          - Release-Hotplug-MT
+          - Release-MT
         required: true
 
 permissions:
