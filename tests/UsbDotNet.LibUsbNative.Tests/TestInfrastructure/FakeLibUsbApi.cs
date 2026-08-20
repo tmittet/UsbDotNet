@@ -543,4 +543,8 @@ internal sealed class FakeLibusbApi : ILibUsbApi
         if (_versionDescPtr != IntPtr.Zero)
             Marshal.FreeHGlobal(_versionDescPtr);
     }
+
+    public libusb_error libusb_set_auto_detach_kernel_driver(nint dev, int interface_number) => libusb_error.LIBUSB_SUCCESS;
+    public libusb_error libusb_detach_kernel_driver(nint dev, int interface_number) => libusb_error.LIBUSB_SUCCESS;
+    public libusb_error libusb_attach_kernel_driver(nint dev, int interface_number) => libusb_error.LIBUSB_SUCCESS;
 }
