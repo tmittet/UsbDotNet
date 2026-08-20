@@ -4,7 +4,7 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using UsbDotNet.DeviceHotplugSample;
 
-var mode = ParseMode(GetArg(args, "--mode")); // stream|events
+var mode = ParseMode(GetArg(args, "--mode")); // stream|events|background
 var vendorFilter = TryParseHex(GetArg(args, "--vid")); // e.g. '0x2BD9'
 var productFilter = TryParseHex(GetArg(args, "--pid")); // e.g. '0x0021'
 
@@ -34,9 +34,10 @@ static string? GetArg(string[] args, string name)
 }
 
 static HotplugMode ParseMode(string? value) =>
-    string.Equals(value, "events", StringComparison.OrdinalIgnoreCase)
-        ? HotplugMode.Events
-        : HotplugMode.Stream;
+    string.Equals(value, "events", StringComparison.OrdinalIgnoreCase) ? HotplugMode.Events
+    : string.Equals(value, "background", StringComparison.OrdinalIgnoreCase)
+        ? HotplugMode.BackgroundEvents
+    : HotplugMode.Stream;
 
 static ushort? TryParseHex(string? value) =>
     string.IsNullOrEmpty(value) ? null

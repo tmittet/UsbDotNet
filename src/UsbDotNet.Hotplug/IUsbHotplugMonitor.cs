@@ -20,17 +20,14 @@ public interface IUsbHotplugMonitor : IDisposable
     /// for every matching device connected at the moment enumeration starts, followed by live
     /// events.
     /// <para>
-    /// <strong>Nothing happens until you enumerate.</strong> The subscription is created — and the
-    /// snapshot of connected devices taken — on the first read, not when this method returns.
-    /// Discarding the returned stream therefore costs nothing: no registration, no channel, no
-    /// buffered events. Conversely, the exceptions listed below surface on that first read rather
-    /// than at this call.
+    /// <strong>Nothing happens until you enumerate.</strong> The subscription is created, and the
+    /// snapshot taken, on the first read — so discarding the stream costs nothing, and the
+    /// exceptions below surface on that read rather than at this call.
     /// </para>
     /// <para>
-    /// Enumeration is what holds the subscription, and disposing the enumerator is what releases
-    /// it; <c>await foreach</c> does that for you, including on <c>break</c> and on an exception.
-    /// The returned stream is reusable rather than single-use: enumerating it again — or
-    /// concurrently — starts an independent subscription with its own snapshot.
+    /// Disposing the enumerator releases the subscription, which <c>await foreach</c> does for you.
+    /// The stream is reusable: enumerating it again starts an independent subscription with its own
+    /// snapshot.
     /// </para>
     /// </summary>
     /// <exception cref="ObjectDisposedException">Thrown when the monitor is disposed.</exception>

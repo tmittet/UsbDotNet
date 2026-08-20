@@ -8,4 +8,10 @@ internal enum HotplugMode
 
     /// <summary>Attach classic .NET event handlers via <c>UsbHotplugEventNotifier</c>.</summary>
     Events,
+
+    /// <summary>
+    /// Classic .NET event handlers again, but with the notifier owning the subscription: start it
+    /// and dispose it, rather than awaiting a run task.
+    /// </summary>
+    BackgroundEvents,
 }

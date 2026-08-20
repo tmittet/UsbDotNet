@@ -172,7 +172,11 @@ public sealed class UsbHotplugEventNotifier : IAsyncDisposable
 
         if (cts is not null)
         {
+#if NET8_0_OR_GREATER
             await cts.CancelAsync().ConfigureAwait(false);
+#else
+            cts.Cancel();
+#endif
         }
         try
         {

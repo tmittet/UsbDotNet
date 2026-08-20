@@ -11,8 +11,9 @@ namespace UsbDotNet.DeviceHotplugSample;
 /// <summary>
 /// Prints a JSON line to stdout each time a device is connected or disconnected, until the host is
 /// stopped (Ctrl+C). Devices already connected at startup are printed as "connected". Demonstrates
-/// both ways to consume <see cref="IUsbHotplugMonitor"/>: enumerating the subscription directly
-/// (default) and the <see cref="UsbHotplugEventNotifier"/> events adapter.
+/// all three ways to consume <see cref="IUsbHotplugMonitor"/>: enumerating the subscription directly
+/// (default), the <see cref="UsbHotplugEventNotifier"/> events adapter as a task the worker owns,
+/// and the same adapter started and disposed instead.
 /// </summary>
 internal sealed class DeviceHotplugWorker(
     IUsb usb,
@@ -40,6 +41,10 @@ internal sealed class DeviceHotplugWorker(
                 {
                     HotplugMode.Stream => RunWithStreamAsync(filter, stoppingToken),
                     HotplugMode.Events => RunWithEventsAsync(filter, stoppingToken),
+                    HotplugMode.BackgroundEvents => RunWithBackgroundEventsAsync(
+                        filter,
+                        stoppingToken
+                    ),
                 }
             );
         }
@@ -75,6 +80,28 @@ internal sealed class DeviceHotplugWorker(
         notifier.DeviceConnected += (_, e) => PrintDevice("connected", e.Descriptor);
         notifier.DeviceDisconnected += (_, e) => PrintDevice("disconnected", e.Descriptor);
         await notifier.RunAsync(stoppingToken);
+    }
+
+    /// <summary>
+    /// Alternative approach: the same events, with the notifier owning the subscription instead of
+    /// handing back a task.
+    /// </summary>
+    private async Task RunWithBackgroundEventsAsync(
+        IUsbDeviceFilter filter,
+        CancellationToken stoppingToken
+    )
+    {
+        await using var notifier = new UsbHotplugEventNotifier(monitor, filter, loggerFactory);
+        // Attach the handlers before Start: the already-connected devices are delivered inside it.
+        notifier.DeviceConnected += (_, e) => PrintDevice("connected", e.Descriptor);
+        notifier.DeviceDisconnected += (_, e) => PrintDevice("disconnected", e.Descriptor);
+        notifier.Start(stoppingToken);
+
+        // Start already returned, so there is nothing to await but the shutdown itself; disposal on
+        // the way out stops the subscription. The trade-off against the other two modes is that the
+        // notifier absorbs a monitor teardown, so this mode cannot report one — it would sit here
+        // with a dead subscription until Ctrl+C.
+        await Task.Delay(Timeout.Infinite, stoppingToken);
     }
 
     private static string StateOf(UsbHotplugEventType type) =>
