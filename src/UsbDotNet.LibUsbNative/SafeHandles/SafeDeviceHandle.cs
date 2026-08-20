@@ -96,6 +96,11 @@ internal sealed class SafeDeviceHandle : SafeHandle, ISafeDeviceHandle
     {
         SafeHelper.ThrowIfClosed(this);
 
+        // HARMLESS: Ignored if platform doesn't support auto-detach kernel driver.
+        // And if the kernel driver is already detached, this is a no-op.
+        // Hence; return value is ignored - and no exceptions needed.
+        _ = _context.Api.libusb_set_auto_detach_kernel_driver(handle, interfaceNumber);
+
         var result = _context.Api.libusb_claim_interface(handle, interfaceNumber);
         result.ThrowLibUsbExceptionForApi(
             nameof(_context.Api.libusb_claim_interface),
