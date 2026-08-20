@@ -152,7 +152,13 @@ internal sealed class SafeDevice : SafeHandle, ISafeDevice
         SafeHelper.ThrowIfClosed(this);
 
         var result = _context.Api.libusb_open(handle, out var deviceHandle);
+
         result.ThrowLibUsbExceptionForApi(nameof(_context.Api.libusb_open));
+
+        // HARMLESS: Ignored if platform doesn't support auto-detach kernel driver.
+        // And if the kernel driver is already detached, this is a no-op.
+        // Hence; return value is ignored - and no exceptions needed.
+        _ = _context.Api.libusb_set_auto_detach_kernel_driver(deviceHandle, 1);
 
         // Ref counter for context incremented here, not the SafeDevice ref counter.
         // This is intentional since the device pointer is "owned" by the context,

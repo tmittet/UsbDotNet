@@ -230,7 +230,6 @@ public sealed class UsbDevice : IUsbDevice
                 throw new InvalidOperationException($"Interface {existing} already claimed.");
             }
 
-            // TODO: libusb_set_auto_detach_kernel_driver on Linux?
             var claimedInterface = Handle.ClaimInterface(descriptor.InterfaceNumber);
 
             var usbInterface = new UsbInterface(
