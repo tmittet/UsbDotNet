@@ -51,7 +51,7 @@ internal sealed class DeviceHotplugWorker(
         {
             // The monitor or the underlying IUsb was disposed under us, so undelivered events were
             // dropped and monitoring cannot resume. The absent token is what tells this apart from
-            // our own shutdown above. 
+            // our own shutdown above.
         }
     }
 
@@ -67,14 +67,14 @@ internal sealed class DeviceHotplugWorker(
     }
 
     /// <summary>Alternative approach: classic events via the notifier adapter.</summary>
-    private Task RunWithEventsAsync(IUsbDeviceFilter filter, CancellationToken stoppingToken)
+    private async Task RunWithEventsAsync(IUsbDeviceFilter filter, CancellationToken stoppingToken)
     {
-        var notifier = new UsbHotplugEventNotifier(monitor, filter, loggerFactory);
+        await using var notifier = new UsbHotplugEventNotifier(monitor, filter, loggerFactory);
         // Attach the handlers before RunAsync: it is what subscribes, and the already-connected
         // devices are delivered inside its synchronous prologue.
         notifier.DeviceConnected += (_, e) => PrintDevice("connected", e.Descriptor);
         notifier.DeviceDisconnected += (_, e) => PrintDevice("disconnected", e.Descriptor);
-        return notifier.RunAsync(stoppingToken);
+        await notifier.RunAsync(stoppingToken);
     }
 
     private static string StateOf(UsbHotplugEventType type) =>
