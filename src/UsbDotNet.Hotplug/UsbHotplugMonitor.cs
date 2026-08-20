@@ -95,7 +95,7 @@ public sealed class UsbHotplugMonitor : IUsbHotplugMonitor, IHotplugListener
                 return _subscribers.Count;
             }
         }
-   }
+    }
 
     /// <summary>Tracked connected devices.</summary>
     internal int ConnectedCount
@@ -121,10 +121,10 @@ public sealed class UsbHotplugMonitor : IUsbHotplugMonitor, IHotplugListener
     /// <inheritdoc/>
     /// <remarks>
     /// An iterator which yields hotplug events for:
-    /// 1. Devices already connected when the subscription start
+    /// 1. Devices already connected when the subscription starts
     /// 2. New events as they arrive from libusb
-    /// 
-    /// Doesn't run until the consumer's first read. 
+    ///
+    /// Doesn't start running until the first consumer read.
     /// </remarks>
     public async IAsyncEnumerable<UsbHotplugEvent> Subscribe(
         IUsbDeviceFilter? filter = null,
@@ -323,7 +323,7 @@ public sealed class UsbHotplugMonitor : IUsbHotplugMonitor, IHotplugListener
     /// <summary>
     /// Wakes every consumer of <paramref name="channels"/> with a cancellation. Completing a writer
     /// with an <see cref="OperationCanceledException"/> hands that exact instance to a consumer
-    /// parked in WaitToReadAsync and to every later read, so the wake-up is immediate. 
+    /// parked in WaitToReadAsync and to every later read, so the wake-up is immediate.
     /// </summary>
     private static void Terminate(List<Channel<UsbHotplugEvent>> channels, string reason)
     {
