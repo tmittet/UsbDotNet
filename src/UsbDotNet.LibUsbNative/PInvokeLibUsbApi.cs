@@ -7,29 +7,212 @@ namespace UsbDotNet.LibUsbNative;
 
 // TODO: Research using DefaultDllImportSearchPaths attribute reduce risk of DLL preloading attacks
 // SYSLIB1054: LibraryImportAttribute not available in .NET6, silence until removal of .NET6 support
-#pragma warning disable CA5392, SYSLIB1054 // CA5392: Use DefaultDllImportSearchPaths attribute for P/Invokes
+#pragma warning disable CA5392 // CA5392: Use DefaultDllImportSearchPaths attribute for P/Invokes
 
-/// <summary>Concrete ILibUsbApi using direct DllImports.</summary>
-public sealed class PInvokeLibUsbApi : ILibUsbApi
+/// <summary>Concrete ILibUsbApi using P/Invoke.</summary>
+public sealed
+#if NET7_0_OR_GREATER
+partial
+#endif
+class PInvokeLibUsbApi : ILibUsbApi
 {
     private const string Lib = "libusb-1.0";
 
+#if NET7_0_OR_GREATER
+
     #region Context/Options
 
-    [DllImport(Lib, CallingConvention = CallingConvention.Cdecl)]
-    private static extern libusb_error libusb_set_auto_detach_kernel_driver(IntPtr dev, int enable);
+    [LibraryImport(Lib)]
+    private static partial libusb_error libusb_init(out IntPtr ctx);
 
-    [DllImport(Lib, CallingConvention = CallingConvention.Cdecl)]
-    private static extern libusb_error libusb_detach_kernel_driver(
+    [LibraryImport(Lib)]
+    private static partial void libusb_exit(IntPtr ctx);
+
+    [LibraryImport(Lib)]
+    private static partial libusb_error libusb_set_option(IntPtr ctx, int option, int value);
+
+    [LibraryImport(Lib)]
+    private static partial libusb_error libusb_set_option(IntPtr ctx, int option, IntPtr value);
+
+    [LibraryImport(Lib)]
+    private static partial int libusb_handle_events_completed(IntPtr ctx, IntPtr completed);
+
+    [LibraryImport(Lib)]
+    private static partial void libusb_interrupt_event_handler(IntPtr ctx);
+
+    [LibraryImport(Lib)]
+    private static partial IntPtr libusb_get_version();
+
+    [LibraryImport(Lib)]
+    private static partial int libusb_has_capability(libusb_capability capability);
+
+    [LibraryImport(Lib)]
+    private static partial IntPtr libusb_strerror(libusb_error errcode);
+
+    #endregion
+
+    #region Device list/refs
+
+    [LibraryImport(Lib)]
+    private static partial libusb_error libusb_get_device_list(IntPtr ctx, out IntPtr list);
+
+    [LibraryImport(Lib)]
+    private static partial void libusb_free_device_list(IntPtr list, int unrefDevices);
+
+    [LibraryImport(Lib)]
+    private static partial IntPtr libusb_ref_device(IntPtr dev);
+
+    [LibraryImport(Lib)]
+    private static partial void libusb_unref_device(IntPtr dev);
+
+    #endregion
+
+    #region Device metadata
+
+    [LibraryImport(Lib)]
+    private static partial libusb_error libusb_get_device_descriptor(
+        IntPtr dev,
+        out libusb_device_descriptor d
+    );
+
+    [LibraryImport(Lib)]
+    private static partial libusb_error libusb_get_active_config_descriptor(
+        IntPtr dev,
+        out IntPtr cfg
+    );
+
+    [LibraryImport(Lib)]
+    private static partial libusb_error libusb_get_config_descriptor(
+        IntPtr dev,
+        ushort index,
+        out IntPtr cfg
+    );
+
+    [LibraryImport(Lib)]
+    private static partial void libusb_free_config_descriptor(IntPtr cfg);
+
+    [LibraryImport(Lib)]
+    private static partial byte libusb_get_bus_number(IntPtr dev);
+
+    [LibraryImport(Lib)]
+    private static partial byte libusb_get_device_address(IntPtr dev);
+
+    [LibraryImport(Lib)]
+    private static partial byte libusb_get_port_number(IntPtr dev);
+
+    #endregion
+
+    #region Open/close
+
+
+    [LibraryImport(Lib)]
+    private static partial libusb_error libusb_open(IntPtr dev, out IntPtr handle);
+
+    [LibraryImport(Lib)]
+    private static partial void libusb_close(IntPtr handle);
+
+    #endregion
+
+    #region Config/Interfaces
+
+    [LibraryImport(Lib)]
+    private static partial libusb_error libusb_claim_interface(IntPtr h, int iface);
+
+    [LibraryImport(Lib)]
+    private static partial libusb_error libusb_release_interface(IntPtr h, int iface);
+
+    #endregion
+
+    #region Strings
+
+    [LibraryImport(Lib)]
+    private static partial libusb_error libusb_get_device_string(
+        IntPtr dev,
+        libusb_device_string_type string_type,
+        byte[] data,
+        int length
+    );
+
+    [LibraryImport(Lib)]
+    private static partial libusb_error libusb_get_string_descriptor_ascii(
+        IntPtr h,
+        byte idx,
+        byte[] data,
+        int len
+    );
+
+    #endregion
+
+    #region Halt/Reset
+
+    [LibraryImport(Lib)]
+    private static partial libusb_error libusb_reset_device(IntPtr h);
+
+    #endregion
+
+    #region Events/Async
+
+    [LibraryImport(Lib)]
+    private static partial IntPtr libusb_alloc_transfer(int iso);
+
+    [LibraryImport(Lib)]
+    private static partial void libusb_free_transfer(IntPtr t);
+
+    [LibraryImport(Lib)]
+    private static partial libusb_error libusb_submit_transfer(IntPtr t);
+
+    [LibraryImport(Lib)]
+    private static partial libusb_error libusb_cancel_transfer(IntPtr t);
+
+    #endregion
+
+    #region Hotplug
+
+    [LibraryImport(Lib)]
+    private static partial libusb_error libusb_hotplug_register_callback(
+        IntPtr ctx,
+        libusb_hotplug_event events,
+        libusb_hotplug_flag flags,
+        int vendor,
+        int product,
+        int devClass,
+        libusb_hotplug_callback_fn cb,
+        IntPtr user_data,
+        out IntPtr callbackHandle
+    );
+
+    [LibraryImport(Lib)]
+    private static partial void libusb_hotplug_deregister_callback(
+        IntPtr ctx,
+        IntPtr callbackHandle
+    );
+
+    #endregion
+
+    #region Attach/Detach Kernel Driver
+    [LibraryImport(Lib)]
+    private static partial libusb_error libusb_set_auto_detach_kernel_driver(
+        IntPtr dev,
+        int enable
+    );
+
+    [LibraryImport(Lib)]
+    private static partial libusb_error libusb_detach_kernel_driver(
         IntPtr dev,
         int interface_number
     );
 
-    [DllImport(Lib, CallingConvention = CallingConvention.Cdecl)]
-    private static extern libusb_error libusb_attach_kernel_driver(
+    [LibraryImport(Lib)]
+    private static partial libusb_error libusb_attach_kernel_driver(
         IntPtr dev,
         int interface_number
     );
+
+    #endregion
+
+#else
+
+    #region Context/Options
 
     [DllImport(Lib, CallingConvention = CallingConvention.Cdecl)]
     private static extern libusb_error libusb_init(out IntPtr ctx);
@@ -198,6 +381,27 @@ public sealed class PInvokeLibUsbApi : ILibUsbApi
 
     #endregion
 
+    #region Attach/Detach Kernel Driver
+
+    [DllImport(Lib, CallingConvention = CallingConvention.Cdecl)]
+    private static extern libusb_error libusb_set_auto_detach_kernel_driver(IntPtr dev, int enable);
+
+    [DllImport(Lib, CallingConvention = CallingConvention.Cdecl)]
+    private static extern libusb_error libusb_detach_kernel_driver(
+        IntPtr dev,
+        int interface_number
+    );
+
+    [DllImport(Lib, CallingConvention = CallingConvention.Cdecl)]
+    private static extern libusb_error libusb_attach_kernel_driver(
+        IntPtr dev,
+        int interface_number
+    );
+
+    #endregion
+
+#endif
+
     #region Expose via interface
 
     /// <inheritdoc/>
@@ -362,5 +566,3 @@ public sealed class PInvokeLibUsbApi : ILibUsbApi
 
     #endregion
 }
-
-#pragma warning restore CA5392, SYSLIB1054 // CA5392: Use DefaultDllImportSearchPaths attribute for P/Invokes
