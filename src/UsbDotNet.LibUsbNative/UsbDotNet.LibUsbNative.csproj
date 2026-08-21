@@ -94,7 +94,28 @@
     </PropertyGroup>
     <ItemGroup>
         <!-- linux-arm64 - NOTE: Rely on OS specific libusb (apt-get) on Linux -->
-        <!-- linux-x64 - NOTE: Rely on OS specific libusb (apt-get) on Linux -->
+        <!--
+        linux-x64 - NOTE: Local development only; opt in with VendoredLibUsb_Linux=true.
+        Released packages still rely on the OS specific libusb (apt-get) on Linux, so this
+        binary is deliberately not packed. Ubuntu 24.04 ships libusb 1.0.27, which predates
+        libusb_get_device_string (new in 1.0.30), making the tests that call it fail with
+        EntryPointNotFoundException.
+        To rebuild: download the libusb 1.0.30 release tarball (libusb-1.0.30.tar.bz2, not a
+        git checkout; only the tarball ships a pre-generated configure script), run
+        "configure" with the "disable-dependency-tracking" and "disable-static" options,
+        then "make", and finally strip libusb/.libs/libusb-1.0.so.0.* into
+        runtimes/linux-x64/native/libusb-1.0.so. Keep the udev backend (the default) so
+        device enumeration and hotplug behave like the distro build.
+    -->
+        <None
+            Condition="'$(VendoredLibUsb_Linux)'=='true'"
+            Include="runtimes\linux-x64\native\libusb-1.0.so"
+        >
+            <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+            <Link>%(Filename)%(Extension)</Link>
+            <TargetPath>libusb-1.0%(Extension)</TargetPath>
+            <Visible>False</Visible>
+        </None>
         <!-- maccatalyst-arm64 - NOTE: Not tested -->
         <!-- maccatalyst-x64 - NOTE: Not tested -->
         <!-- osx-arm64 -->
@@ -137,6 +158,11 @@
         </None>
     </ItemGroup>
     <Target Name="PostBuild" AfterTargets="PostBuildEvent">
+        <Message
+            Condition="'$(VendoredLibUsb_Linux)'=='true'"
+            Importance="high"
+            Text="** Using vendored linux-x64 libusb-1.0 (local development only) **"
+        />
         <Message
             Condition="'$(IsOsxA64)'=='true'"
             Importance="high"
