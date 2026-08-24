@@ -123,6 +123,10 @@ public sealed class Given_any_USB_device : IDisposable
     [SkippableFact]
     public void GetDeviceManufacturer_from_OS_matches_value_read_from_open_device()
     {
+        Skip.If(
+            UsbDotNet.Usb.GetVersion() < new Version(1, 0, 30),
+            "libusb v1.0.30 or later is required to get device strings from the operating system."
+        );
         using var device = _deviceSource.OpenUsbDeviceOrSkip();
         // Read the string descriptor directly from the open device
         var fromDevice = device.GetManufacturer();
@@ -153,6 +157,10 @@ public sealed class Given_any_USB_device : IDisposable
     [SkippableFact]
     public void GetDeviceProduct_from_OS_matches_value_read_from_open_device()
     {
+        Skip.If(
+            UsbDotNet.Usb.GetVersion() < new Version(1, 0, 30),
+            "libusb v1.0.30 or later is required to get device strings from the operating system."
+        );
         using var device = _deviceSource.OpenUsbDeviceOrSkip();
         // Read the string descriptor directly from the open device
         var fromDevice = device.GetProduct();
@@ -183,6 +191,10 @@ public sealed class Given_any_USB_device : IDisposable
     [SkippableFact]
     public void GetDeviceSerial_from_OS_matches_value_read_from_open_device()
     {
+        Skip.If(
+            UsbDotNet.Usb.GetVersion() < new Version(1, 0, 30),
+            "libusb v1.0.30 or later is required to get device strings from the operating system."
+        );
         using var device = _deviceSource.OpenUsbDeviceOrSkip();
         // Read the string descriptor directly from the open device
         var fromDevice = device.GetSerialNumber();
