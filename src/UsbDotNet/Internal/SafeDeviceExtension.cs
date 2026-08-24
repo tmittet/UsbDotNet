@@ -121,12 +121,12 @@ internal static class SafeDeviceExtension
             else
             {
                 logger.LogWarning(
+                    ex,
                     "Unable to get {StringType} for device '{DeviceKey}' from the operating system "
-                        + "via libusb v{LibUsbVersion}. {ErrorMessage}. Falling back to device read.",
+                        + "via libusb v{LibUsbVersion}. Falling back to device read.",
                     stringType,
                     deviceKey,
-                    libUsbVersion,
-                    ex.Message
+                    libUsbVersion
                 );
             }
         }
