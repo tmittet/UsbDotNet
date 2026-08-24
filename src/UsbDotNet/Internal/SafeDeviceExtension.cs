@@ -11,10 +11,10 @@ namespace UsbDotNet.Internal;
 internal static class SafeDeviceExtension
 {
     /// <summary>
-    /// Get cached USB device descriptors for a given, already in memory, device descriptor list.
+    /// Get USB device descriptors (from libusb's cached descriptors) for an already-materialized device list.
     /// </summary>
     /// <param name="logger">A logger.</param>
-    /// <param name="devices">Pointer to device list returned by libusb_get_device_list.</param>
+    /// <param name="devices">Device list returned by libusb_get_device_list (via ISafeContext.GetDeviceList()).</param>
     /// <param name="findKey">Return first instance with this key.</param>
     /// <exception cref="ObjectDisposedException">Thrown when device is disposed.</exception>
     internal static List<(ISafeDevice device, UsbDeviceDescriptor Descriptor)> GetDeviceDescriptors(
