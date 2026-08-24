@@ -313,11 +313,11 @@ public sealed class UsbHotplugMonitor : IUsbHotplugMonitor, IHotplugListener
             _subscribers.Clear();
             _connected.Clear();
         }
-        _logger.LogInformation(
+        Terminate(channels, ProviderDisposedMessage);
+        _logger.LogDebug(
             "The underlying IUsb instance was disposed; hotplug monitoring stopped and all "
                 + "subscriptions were canceled."
         );
-        Terminate(channels, ProviderDisposedMessage);
     }
 
     /// <summary>
