@@ -296,29 +296,60 @@ public sealed class Usb : IUsb, IUsbInternal
     {
         using var deviceList = context.GetDeviceList();
         (var listDevice, _) = GetListDeviceUnlocked(deviceList, deviceKey);
-        if (listDevice.TryGetDeviceString(stringType, out value, out var error))
+        try
         {
-            if (!string.IsNullOrEmpty(value))
+            var successful = listDevice.TryGetDeviceString(stringType, out value, out var error);
+            if (successful)
             {
-                return true;
+                if (!string.IsNullOrEmpty(value))
+                {
+                    return true;
+                }
+                _logger.LogDebug(
+                    "The {StringType} value read from the operating system "
+                        + "for device '{DeviceKey}' is empty. Falling back to device read.",
+                    stringType,
+                    deviceKey
+                );
             }
-            _logger.LogDebug(
-                "The {StringType} value read from the operating system "
-                    + "for device '{DeviceKey}' is empty. Falling back to device read.",
-                stringType,
-                deviceKey
-            );
+            else
+            {
+                _logger.LogWarning(
+                    "Failed to get {StringType} for device '{DeviceKey}' from the "
+                        + "operating system: {ErrorMessage}. Falling back to device read.",
+                    stringType,
+                    deviceKey,
+                    error!.Value.GetMessage()
+                );
+            }
         }
-        else
+        catch (EntryPointNotFoundException ex)
         {
-            _logger.LogWarning(
-                "Failed to get {StringType} for device '{DeviceKey}' from the "
-                    + "operating system: {ErrorMessage}. Falling back to device read.",
-                stringType,
-                deviceKey,
-                error.Value.GetMessage()
-            );
+            var libUsbVersion = GetVersion();
+            if (libUsbVersion < new Version(1, 0, 30))
+            {
+                _logger.LogDebug(
+                    "Unable to get {StringType} for device '{DeviceKey}' from the operating system "
+                        + "via libusb v{LibUsbVersion}; v1.0.30 or later is required. "
+                        + "Falling back to device read.",
+                    stringType,
+                    deviceKey,
+                    libUsbVersion
+                );
+            }
+            else
+            {
+                _logger.LogWarning(
+                    "Unable to get {StringType} for device '{DeviceKey}' from the operating system "
+                        + "via libusb v{LibUsbVersion}. {ErrorMessage}. Falling back to device read.",
+                    stringType,
+                    deviceKey,
+                    libUsbVersion,
+                    ex.Message
+                );
+            }
         }
+        value = null;
         return false;
     }
 
