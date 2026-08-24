@@ -430,8 +430,6 @@ public sealed class Usb : IUsb, IUsbInternal
         // listener API or hotplug implementation with synchronous continuations.
 
         UsbDevice[] openDevices;
-        LibUsbEventLoop? eventLoop;
-        ISafeContext? context;
 
         // 1. Mark Usb as Disposing
         lock (_lock)
@@ -460,8 +458,6 @@ public sealed class Usb : IUsb, IUsbInternal
             _disposeState = DisposeState.Disposing;
 
             openDevices = [.. _openDevices.Values];
-            eventLoop = _eventLoop;
-            context = _context;
         }
         try
         {
@@ -478,25 +474,24 @@ public sealed class Usb : IUsb, IUsbInternal
                 device.Dispose();
             }
             // 4. Stop and join libusb event loop
-            eventLoop?.Dispose();
+            _eventLoop?.Dispose();
+            _eventLoop = null;
             // 5. Dispose SafeContext (libusb_exit)
-            if (context is not null)
+            if (_context is not null)
             {
-                context.Dispose();
-                Debug.Assert(context.IsClosed, "SafeContext was not closed after Usb.Dispose().");
-                if (!context.IsClosed)
+                _context.Dispose();
+                Debug.Assert(_context.IsClosed, "SafeContext was not closed after Usb.Dispose().");
+                if (!_context.IsClosed)
                 {
                     _logger.LogWarning("SafeContext remained referenced after Usb.Dispose().");
                 }
+                _context = null;
             }
         }
         finally
         {
             lock (_lock)
             {
-                _eventLoop = null;
-                _context = null;
-
                 LibUsbLogHandler.ClearLogger();
                 _ = Interlocked.Exchange(ref _instances, 0);
                 _disposeState = DisposeState.Disposed;
