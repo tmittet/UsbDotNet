@@ -365,6 +365,51 @@ public sealed class Given_a_hotplug_event_notifier_over_a_fake_monitor
     }
 
     [Fact]
+    public async Task Disposing_from_inside_a_handler_during_the_initial_burst_is_safe()
+    {
+        using var monitor = CreateFakeMonitor(Connected("first"), Connected("second"));
+        await using var notifier = new UsbHotplugEventNotifier(monitor);
+        var seen = new List<string>();
+        notifier.DeviceConnected += (_, e) =>
+        {
+            seen.Add(e.Descriptor.DeviceKey);
+            notifier.Dispose();
+        };
+
+        // The burst is dispatched inside Start's synchronous prologue, before _run is published,
+        // so this disposal runs with no task to take with it. Start must hand the loop's end over
+        // to the disposal machinery instead of rethrowing the cancellation the disposer caused.
+        var starting = () => notifier.Start();
+        starting.Should().NotThrow();
+        seen.Should().Equal("first");
+    }
+
+    [Fact]
+    public async Task A_failure_after_disposal_from_inside_the_initial_burst_is_not_rethrown()
+    {
+        using var monitor = CreateGatedMonitor(
+            [Connected("first")],
+            Task.CompletedTask,
+            [],
+            new InvalidOperationException("the subscription broke")
+        );
+        await using var notifier = new UsbHotplugEventNotifier(monitor);
+        var seen = new List<string>();
+        notifier.DeviceConnected += (_, e) =>
+        {
+            seen.Add(e.Descriptor.DeviceKey);
+            notifier.Dispose();
+        };
+
+        // The stream throws while the disposal-cut-short prologue unwinds. Like any failure found
+        // by a disposal made from inside a handler, it is logged rather than rethrown — and above
+        // all it must not surface from Start as if the subscription had been refused.
+        var starting = () => notifier.Start();
+        starting.Should().NotThrow();
+        seen.Should().Equal("first");
+    }
+
+    [Fact]
     public async Task Disposing_synchronously_without_starting_is_harmless()
     {
         using var monitor = CreateFakeMonitor(Connected("device-a"));

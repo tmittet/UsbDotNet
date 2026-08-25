@@ -106,6 +106,15 @@ public sealed class UsbHotplugEventNotifier : IDisposable, IAsyncDisposable
             // already-connected devices before its first incomplete await, so a handler attached
             // before this call cannot miss them.
             var run = SubscribeAsync(_cts.Token);
+            if (_disposed)
+            {
+                // A handler disposed us during the prologue above, before _run existed for the
+                // disposal to take with it. Finish its job here instead, exactly as a disposal
+                // from a live event's handler would.
+                _ = FinishDisposalAsync(run, _cts);
+                _cts = null;
+                return;
+            }
             if (run.IsFaulted)
             {
                 // The monitor rejected the subscription during the prologue above. Nothing is left
@@ -217,7 +226,7 @@ public sealed class UsbHotplugEventNotifier : IDisposable, IAsyncDisposable
         }
         if (run is null)
         {
-            cts?.Dispose();
+            // Nothing to wait for: never started, or run through RunAsync.
             return;
         }
         if (calledFromHandler)
