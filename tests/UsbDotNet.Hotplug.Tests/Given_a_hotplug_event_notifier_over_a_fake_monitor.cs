@@ -367,6 +367,68 @@ public sealed class Given_a_hotplug_event_notifier_over_a_fake_monitor
         A.CallTo(() => monitor.Dispose()).MustNotHaveHappened();
     }
 
+    [Fact]
+    public async Task Disposing_asynchronously_from_inside_a_handler_completes()
+    {
+        var gate = new TaskCompletionSource();
+        using var monitor = CreateGatedMonitor(
+            [],
+            gate.Task,
+            [Connected("first"), Connected("second")]
+        );
+        await using var notifier = new UsbHotplugEventNotifier(monitor);
+        var seen = new List<string>();
+        var disposing = new TaskCompletionSource<Task>();
+        notifier.DeviceConnected += (_, e) =>
+        {
+            seen.Add(e.Descriptor.DeviceKey);
+            // A sync handler cannot await, so hand the disposal task out to the test — it must
+            // complete even though the handler that started it is still on the loop's stack.
+            disposing.SetResult(notifier.DisposeAsync().AsTask());
+        };
+
+        notifier.Start();
+        gate.SetResult();
+
+        var disposal = await disposing.Task.WaitAsync(Timeout, CancellationToken.None);
+        await disposal.WaitAsync(Timeout, CancellationToken.None);
+        seen.Should().Equal("first");
+    }
+
+    [Fact]
+    public async Task Blocking_on_disposal_from_inside_a_handler_does_not_deadlock()
+    {
+        var gate = new TaskCompletionSource();
+        using var monitor = CreateGatedMonitor(
+            [],
+            gate.Task,
+            [Connected("first"), Connected("second")]
+        );
+        await using var notifier = new UsbHotplugEventNotifier(monitor);
+        var seen = new List<string>();
+        var handlerReturned = new TaskCompletionSource();
+        notifier.DeviceConnected += (_, e) =>
+        {
+            seen.Add(e.Descriptor.DeviceKey);
+            // Unlike the async variant above, a synchronous wait closes the cycle a disposal must
+            // break to stay hang-free: disposal waits for the loop to unwind, and the loop waits
+            // for this very handler to return. This is what Dispose-on-shutdown callers do.
+            // VSTHRD002: the blocking wait is the subject under test.
+#pragma warning disable VSTHRD002
+            notifier.DisposeAsync().AsTask().GetAwaiter().GetResult();
+#pragma warning restore VSTHRD002
+            handlerReturned.SetResult();
+        };
+
+        notifier.Start();
+        gate.SetResult();
+
+        // Bounded: a disposal that deadlocks never lets the handler return, and a TimeoutException
+        // is a far better failure than a hung test run.
+        await handlerReturned.Task.WaitAsync(Timeout, CancellationToken.None);
+        seen.Should().Equal("first");
+    }
+
     private static IUsbHotplugMonitor CreateFakeMonitor(params UsbHotplugEvent[] events)
     {
         var monitor = A.Fake<IUsbHotplugMonitor>();
