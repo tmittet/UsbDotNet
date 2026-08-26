@@ -30,7 +30,15 @@ public sealed class UsbInterface : IUsbInterface
     private readonly GCHandle _bulkWriteBufferHandle;
     private readonly Lazy<IUsbEndpointDescriptor> _writeEndpoint;
     private readonly object _bulkWriteLock = new();
+#pragma warning disable CA2213 // Disposable fields should be disposed
+    // Never disposed: BulkRead/BulkWrite threads may still be queued on the lock when
+    // Dispose() releases the write lock, and ReaderWriterLockSlim.Dispose throws
+    // SynchronizationLockException while the lock is held or has waiters. Leaving the
+    // lock undisposed does not leak: its EventWaitHandles are created lazily, only when
+    // a thread actually blocks on contention, and each wraps a SafeWaitHandle whose
+    // finalizer closes the OS handle when this UsbInterface becomes unreachable.
     private readonly ReaderWriterLockSlim _disposeLock = new();
+#pragma warning restore CA2213 // Disposable fields should be disposed
     private readonly CancellationTokenSource _disposeCts;
     private volatile bool _disposed;
 
@@ -283,7 +291,14 @@ public sealed class UsbInterface : IUsbInterface
             finally
             {
                 _disposeLock.ExitWriteLock();
-                _disposeLock.Dispose();
+                // Deliberately not disposing _disposeLock: readers queued on
+                // EnterReadLock while the write lock was held are only released by the
+                // ExitWriteLock above, so at this point they may still be waiting on (or
+                // just acquiring) the lock, and ReaderWriterLockSlim.Dispose throws
+                // SynchronizationLockException while the lock is held or has waiters.
+                // Those late readers exit through the _disposed check and report
+                // UsbResult.Interrupted. The undisposed lock is left for the GC; see the
+                // comment on the _disposeLock field for why this does not leak.
             }
         }
     }
