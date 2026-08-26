@@ -60,12 +60,27 @@ public sealed class Given_a_claimed_USB_interface : IDisposable
             var readResults = new UsbResult[ReaderCount];
             var readerThreads = Enumerable
                 .Range(0, ReaderCount)
-                .Select(reader => new Thread(() =>
+                .Select(reader =>
                 {
-                    writeLockHeld.Wait(WaitTimeout);
-                    var buffer = new byte[16];
-                    readResults[reader] = usbInterface.BulkRead(buffer, out _, Timeout.Infinite);
-                }))
+                    var thread = new Thread(() =>
+                    {
+                        if (!writeLockHeld.Wait(WaitTimeout))
+                        {
+                            readResults[reader] = UsbResult.Timeout;
+                            return;
+                        }
+                        var buffer = new byte[16];
+                        readResults[reader] = usbInterface.BulkRead(
+                            buffer,
+                            out _,
+                            Timeout.Infinite
+                        );
+                    })
+                    {
+                        IsBackground = true,
+                    };
+                    return thread;
+                })
                 .ToArray();
             foreach (var readerThread in readerThreads)
             {
