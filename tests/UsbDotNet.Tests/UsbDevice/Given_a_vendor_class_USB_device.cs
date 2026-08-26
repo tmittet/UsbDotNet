@@ -152,11 +152,14 @@ public sealed class Given_a_vendor_class_USB_device : IDisposable
         );
 
         // Halt support on EP0 is optional in the USB spec, and some driver
-        // stacks (e.g. WinUSB) reserve standard CLEAR_FEATURE requests, so a
-        // stall is a valid response; it only means this particular device
-        // can't be used to verify a successful control write.
+        // stacks reserve standard CLEAR_FEATURE requests: WinUSB completes
+        // them with a stall, while macOS IOUSBHost refuses them with an error
+        // that libusb maps to a generic IoError. Both only mean this device
+        // or OS can't be used to verify a successful control write. On Linux
+        // the request reaches the bus, so there an IoError is a real failure.
         Skip.If(
-            writeResult == UsbResult.PipeError,
+            writeResult == UsbResult.PipeError
+                || (OperatingSystem.IsMacOS() && writeResult == UsbResult.IoError),
             $"Device '{device.Descriptor.DeviceKey}' or its driver stack "
                 + "rejected CLEAR_FEATURE(ENDPOINT_HALT) on endpoint 0."
         );
