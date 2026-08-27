@@ -30,15 +30,15 @@ public sealed class UsbInterface : IUsbInterface
     private readonly GCHandle _bulkWriteBufferHandle;
     private readonly Lazy<IUsbEndpointDescriptor> _writeEndpoint;
     private readonly object _bulkWriteLock = new();
-#pragma warning disable CA2213 // Disposable fields should be disposed
-    // Never disposed: BulkRead/BulkWrite threads may still be queued on the lock when
-    // Dispose() releases the write lock, and ReaderWriterLockSlim.Dispose throws
-    // SynchronizationLockException while the lock is held or has waiters. Leaving the
-    // lock undisposed does not leak: its EventWaitHandles are created lazily, only when
-    // a thread actually blocks on contention, and each wraps a SafeWaitHandle whose
-    // finalizer closes the OS handle when this UsbInterface becomes unreachable.
+
+    /// <summary>
+    /// Guards entry into and teardown of _disposeLock. This is a separate lock from _disposeLock
+    /// because the latter is a ReaderWriterLockSlim, which throws SynchronizationLockException when
+    /// disposed while held or with waiters, so readers must only enter via zero-timeout
+    /// TryEnterReadLock while holding this monitor.
+    /// </summary>
+    private readonly object _disposeLockSync = new();
     private readonly ReaderWriterLockSlim _disposeLock = new();
-#pragma warning restore CA2213 // Disposable fields should be disposed
     private readonly CancellationTokenSource _disposeCts;
     private volatile bool _disposed;
 
@@ -126,14 +126,20 @@ public sealed class UsbInterface : IUsbInterface
         CheckTransferTimeout(timeout);
         try
         {
-            // Use read lock for reads and writes, to support duplex
-            _disposeLock.EnterReadLock();
-            try
+            lock (_disposeLockSync)
             {
-                if (_disposed)
+                // Uses a read lock for both reads and writes, to support duplex.
+                //
+                // Try enter the lock with a zero timeout. The write lock is only taken by Dispose,
+                // so failing to enter means dispose has started. Never block on _disposeLock while
+                // holding _disposeLockSync, since Dispose() needs it to exit the write lock.
+                if (_disposed || !_disposeLock.TryEnterReadLock(0))
                 {
                     throw new ObjectDisposedException(nameof(UsbInterface));
                 }
+            }
+            try
+            {
                 var bufferLength = Math.Min(destination.Length, ReadBufferSize);
                 lock (_bulkReadLock)
                 {
@@ -178,14 +184,20 @@ public sealed class UsbInterface : IUsbInterface
         CheckTransferTimeout(timeout);
         try
         {
-            // Use read lock for reads and writes, to support duplex
-            _disposeLock.EnterReadLock();
-            try
+            lock (_disposeLockSync)
             {
-                if (_disposed)
+                // Uses a read lock for both reads and writes, to support duplex.
+                //
+                // Try enter the lock with a zero timeout. The write lock is only taken by Dispose,
+                // so failing to enter means dispose has started. Never block on _disposeLock while
+                // holding _disposeLockSync, since Dispose() needs it to exit the write lock.
+                if (_disposed || !_disposeLock.TryEnterReadLock(0))
                 {
                     throw new ObjectDisposedException(nameof(UsbInterface));
                 }
+            }
+            try
+            {
                 var bufferLength = Math.Min(source.Length, WriteBufferSize);
                 lock (_bulkWriteLock)
                 {
@@ -290,15 +302,13 @@ public sealed class UsbInterface : IUsbInterface
             }
             finally
             {
-                _disposeLock.ExitWriteLock();
-                // Deliberately not disposing _disposeLock: readers queued on
-                // EnterReadLock while the write lock was held are only released by the
-                // ExitWriteLock above, so at this point they may still be waiting on (or
-                // just acquiring) the lock, and ReaderWriterLockSlim.Dispose throws
-                // SynchronizationLockException while the lock is held or has waiters.
-                // Those late readers exit through the _disposed check and report
-                // UsbResult.Interrupted. The undisposed lock is left for the GC; see the
-                // comment on the _disposeLock field for why this does not leak.
+                // Safe to dispose _disposeLock here: readers only TryEnter it with a zero-timeout
+                // while holding _disposeLockSync, and the only writer is this thread via Dispose.
+                lock (_disposeLockSync)
+                {
+                    _disposeLock.ExitWriteLock();
+                    _disposeLock.Dispose();
+                }
             }
         }
     }
