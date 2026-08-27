@@ -1,5 +1,3 @@
-using System.Diagnostics;
-using System.Reflection;
 using FakeItEasy;
 using Microsoft.Extensions.Logging.Abstractions;
 using UsbDotNet.Core;
@@ -21,13 +19,14 @@ public sealed class Given_a_claimed_USB_interface : IDisposable
     public void Dispose() => _usb.Dispose();
 
     [Fact]
-    public void Dispose_does_not_throw_when_BulkReads_are_waiting_on_the_dispose_lock()
+    public void Dispose_does_not_throw_when_BulkReads_race_an_in_progress_dispose()
     {
         // Deterministic repro of the race behind the failure in
         // Disposing_the_USB_interface_cancels_an_ongoing_Huddly_device_transfer:
-        // BulkRead threads queue on the dispose lock while Dispose holds the
-        // write lock, and Dispose then tears the lock down with readers still
-        // waiting on it, throwing SynchronizationLockException.
+        // BulkRead threads enter while Dispose holds the dispose write lock, and
+        // Dispose then tears the lock down. Dispose must neither throw
+        // SynchronizationLockException nor deadlock with the racing readers, and
+        // every racing BulkRead must report UsbResult.Interrupted.
         var handle = A.Fake<ISafeDeviceHandle>();
         using var device = new UsbDotNet.UsbDevice(
             NullLoggerFactory.Instance,
@@ -43,18 +42,19 @@ public sealed class Given_a_claimed_USB_interface : IDisposable
             var claimedInterface = A.Fake<ISafeDeviceInterface>();
             A.CallTo(() => handle.ClaimInterface(A<byte>._)).Returns(claimedInterface);
             var usbInterface = device.ClaimInterface(descriptor);
-            var disposeLock = GetDisposeLock(usbInterface);
 
             using var writeLockHeld = new ManualResetEventSlim();
-            var allReadersWereWaiting = false;
+            using var readersFinished = new CountdownEvent(ReaderCount);
+            var allReadersFinishedWhileDisposing = false;
             // The claimed interface is disposed on the disposing thread while
-            // UsbInterface.Dispose() holds the write lock. Release the readers here and keep
-            // holding the write lock until every reader is queued on it.
+            // UsbInterface.Dispose() holds the write lock. Release the readers here and
+            // keep holding the write lock until every reader's BulkRead has returned,
+            // proving that all readers observed the in-progress dispose.
             A.CallTo(() => claimedInterface.Dispose())
                 .Invokes(() =>
                 {
                     writeLockHeld.Set();
-                    allReadersWereWaiting = WaitForWaitingReaders(disposeLock, ReaderCount);
+                    allReadersFinishedWhileDisposing = readersFinished.Wait(WaitTimeout);
                 });
 
             var readResults = new UsbResult[ReaderCount];
@@ -75,6 +75,7 @@ public sealed class Given_a_claimed_USB_interface : IDisposable
                             out _,
                             Timeout.Infinite
                         );
+                        readersFinished.Signal();
                     })
                     {
                         IsBackground = true,
@@ -89,41 +90,14 @@ public sealed class Given_a_claimed_USB_interface : IDisposable
 
             var dispose = () => usbInterface.Dispose();
             dispose.Should().NotThrow($"dispose failed on iteration {iteration}");
-            allReadersWereWaiting
+            allReadersFinishedWhileDisposing
                 .Should()
-                .BeTrue("all BulkRead threads should have been waiting on the dispose lock");
+                .BeTrue("all BulkRead threads should have completed during the dispose");
             foreach (var readerThread in readerThreads)
             {
                 readerThread.Join(WaitTimeout).Should().BeTrue("readers should not hang");
             }
             readResults.Should().AllBeEquivalentTo(UsbResult.Interrupted);
         }
-    }
-
-    private static ReaderWriterLockSlim GetDisposeLock(IUsbInterface usbInterface)
-    {
-        // The dispose lock is an implementation detail, but this
-        // test must observe it to make the race deterministic.
-        var field = typeof(UsbDotNet.UsbInterface).GetField(
-            "_disposeLock",
-            BindingFlags.NonPublic | BindingFlags.Instance
-        );
-        field.Should().NotBeNull("UsbInterface is expected to have a '_disposeLock' field");
-        return (ReaderWriterLockSlim)field!.GetValue(usbInterface)!;
-    }
-
-    private static bool WaitForWaitingReaders(ReaderWriterLockSlim disposeLock, int readerCount)
-    {
-        var stopwatch = Stopwatch.StartNew();
-        var spinWait = new SpinWait();
-        while (disposeLock.WaitingReadCount < readerCount)
-        {
-            if (stopwatch.Elapsed > WaitTimeout)
-            {
-                return false;
-            }
-            spinWait.SpinOnce();
-        }
-        return true;
     }
 }
