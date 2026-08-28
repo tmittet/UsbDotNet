@@ -312,15 +312,21 @@ public sealed class UsbDevice : IUsbDevice
         }
         try
         {
+            // Snapshot interfaces inside the lock, then dispose interfaces outside.
+            // UsbInterface.Dispose() calls back into ReleaseInterface(), which takes
+            // _interfaceLock, so disposing while holding the lock can deadlock against
+            // a concurrent UsbInterface.Dispose()
+            UsbInterface[] claimedInterfaces;
             lock (_interfaceLock)
             {
-                // Release all claimed USB interfaces
-                foreach (var usbInterface in _claimedInterfaces.Values)
-                {
-                    usbInterface.Dispose();
-                }
-                _claimedInterfaces.Clear();
+                claimedInterfaces = [.. _claimedInterfaces.Values];
             }
+            // Release all claimed USB interfaces
+            foreach (var usbInterface in claimedInterfaces)
+            {
+                usbInterface.Dispose();
+            }
+            _claimedInterfaces.Clear();
             // Ask Usb to close device and remove it from list of open devices
             _usb.CloseDevice(Descriptor.DeviceKey, Handle);
             _logger.LogInformation("UsbDevice '{DeviceKey}' disposed.", Descriptor.DeviceKey);
