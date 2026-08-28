@@ -1,5 +1,7 @@
+using UsbDotNet.Core;
 using UsbDotNet.Descriptor;
 using UsbDotNet.LibUsbNative;
+using UsbDotNet.Transfer;
 
 namespace UsbDotNet.Tests.UsbDevice;
 
@@ -123,6 +125,49 @@ public sealed class Given_a_vendor_class_USB_device : IDisposable
             subClass: interfaceSubClass
         );
         vendorInterfaces.Should().NotBeEmpty();
+    }
+
+    [SkippableFact]
+    public void ControlWrite_is_successful_given_params_to_clear_endpoint_zero_halt()
+    {
+        const byte clearFeatureRequest = 0x01;
+        const ushort endpointHaltFeature = 0x00;
+
+        using var device = _deviceSource.OpenUsbDeviceOrSkip();
+
+        // CLEAR_FEATURE(ENDPOINT_HALT) on endpoint 0 is a harmless no-op:
+        // EP0 is never halted, there is no data stage, and no kernel-cached
+        // device state (configuration, altsetting, data toggles) is affected.
+        // Note: SET_CONFIGURATION is unsuitable here; libusb fakes its success
+        // on Windows without ever reaching the device, and on Linux the raw
+        // request bypasses and corrupts the kernel's cached device state.
+        var writeResult = device.ControlWrite(
+            [],
+            out var bytesWritten,
+            ControlRequestRecipient.Endpoint,
+            ControlRequestType.Standard,
+            clearFeatureRequest,
+            endpointHaltFeature,
+            0 // wIndex = endpoint address 0
+        );
+
+        // Halt support on EP0 is optional in the USB spec, and some driver
+        // stacks reserve standard CLEAR_FEATURE requests: WinUSB completes
+        // them with a stall, while macOS IOUSBHost refuses them with an error
+        // that libusb maps to a generic IoError. Both only mean this device
+        // or OS can't be used to verify a successful control write. On Linux
+        // the request reaches the bus, so there an IoError is a real failure.
+        Skip.If(
+            writeResult == UsbResult.PipeError
+                || (OperatingSystem.IsMacOS() && writeResult == UsbResult.IoError),
+            $"Device '{device.Descriptor.DeviceKey}' or its driver stack "
+                + "rejected CLEAR_FEATURE(ENDPOINT_HALT) on endpoint 0."
+        );
+
+        using var scope = new AssertionScope();
+        writeResult.Should().Be(UsbResult.Success);
+        // We did not provide a payload, expect zero bytes written
+        bytesWritten.Should().Be(0);
     }
 
     public void Dispose()

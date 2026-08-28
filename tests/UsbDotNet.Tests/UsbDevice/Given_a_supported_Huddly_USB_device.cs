@@ -122,12 +122,18 @@ public sealed class Given_a_supported_Huddly_USB_device : IDisposable
         using var device = _deviceSource.OpenUsbDeviceOrSkip();
         using var usbInterface = device.ClaimInterface(UsbClass.VendorSpecific, HLinkSubClass);
         // Send Huddly "reset"
-        usbInterface.BulkWrite([], 0, out _, 200).Should().Be(UsbResult.Success);
-        usbInterface.BulkWrite([], 0, out _, 200).Should().Be(UsbResult.Success);
+        usbInterface
+            .BulkWrite([], 0, out _, 200)
+            .Should()
+            .Be(UsbResult.Success, "first reset should not fail");
+        usbInterface
+            .BulkWrite([], 0, out _, 200)
+            .Should()
+            .Be(UsbResult.Success, "second reset should not fail");
         // Send Huddly "salute"
         var writeError = usbInterface.BulkWrite([0x00], 1, out var writeLength, 200);
-        writeError.Should().Be(UsbResult.Success);
-        writeLength.Should().Be(1);
+        writeError.Should().Be(UsbResult.Success, "salute should not fail");
+        writeLength.Should().Be(1, "salute should write 1 byte");
     }
 
     [SkippableTheory]
@@ -141,20 +147,36 @@ public sealed class Given_a_supported_Huddly_USB_device : IDisposable
         using var device = _deviceSource.OpenUsbDeviceOrSkip();
         using var usbInterface = device.ClaimInterface(UsbClass.VendorSpecific, HLinkSubClass);
         // Send Huddly "reset"
-        usbInterface.BulkWrite([], 0, out _, 200).Should().Be(UsbResult.Success);
-        usbInterface.BulkWrite([], 0, out _, 200).Should().Be(UsbResult.Success);
+        usbInterface
+            .BulkWrite([], 0, out _, 200)
+            .Should()
+            .Be(UsbResult.Success, "first reset should not fail");
+        usbInterface
+            .BulkWrite([], 0, out _, 200)
+            .Should()
+            .Be(UsbResult.Success, "second reset should not fail");
         // Send Huddly "salute"
         var writeError = usbInterface.BulkWrite([0x00], 1, out var writeLength, 200);
-        writeError.Should().Be(UsbResult.Success);
-        writeLength.Should().Be(1);
+        writeError.Should().Be(UsbResult.Success, "salute should not fail");
+        writeLength.Should().Be(1, "salute should write 1 byte");
         // Wait for salute response
         const string expectedSaluteResponse = "HLink v0";
         var expectedSaluteBytes = Encoding.UTF8.GetBytes(expectedSaluteResponse);
         var buffer = new byte[8];
         var readError = usbInterface.BulkRead(buffer, out var readLength, 1000);
-        readError.Should().Be(UsbResult.Success);
-        readLength.Should().Be(expectedSaluteBytes.Length);
-        buffer.Should().BeEquivalentTo(expectedSaluteBytes);
+        readError.Should().Be(UsbResult.Success, "salute response read should not fail");
+        readLength
+            .Should()
+            .Be(
+                expectedSaluteBytes.Length,
+                $"salute response '{expectedSaluteResponse}' is expected"
+            );
+        buffer
+            .Should()
+            .BeEquivalentTo(
+                expectedSaluteBytes,
+                $"salute response '{expectedSaluteResponse}' is expected"
+            );
     }
 
     [SkippableFact]

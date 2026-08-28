@@ -108,49 +108,6 @@ public sealed class Given_any_USB_device : IDisposable
             .Be(device.Descriptor.ProductId);
     }
 
-    [SkippableFact]
-    public void ControlWrite_is_successful_given_params_to_set_current_Configuration()
-    {
-        const byte getConfigurationRequest = 0x08;
-        const byte setConfigurationRequest = 0x09;
-
-        using var device = _deviceSource.OpenUsbDeviceOrSkip();
-
-        // Start by getting current device configuration
-        var readBuffer = new byte[1];
-        var readResult = device.ControlRead(
-            readBuffer,
-            out var bytesRead,
-            ControlRequestRecipient.Device,
-            ControlRequestType.Standard,
-            getConfigurationRequest,
-            0, // Always zero for Device, GetConfigurationRequest
-            0 // Always zero for Device, GetConfigurationRequest
-        );
-        readResult
-            .Should()
-            .Be(UsbResult.Success, "The write test can't continue when read is unsuccessful.");
-        bytesRead
-            .Should()
-            .Be(1, "The write test can't continue when an invalid number of bytes are read.");
-
-        // When configuration read is successful, write the same config value back to the device
-        var writeResult = device.ControlWrite(
-            [],
-            out var bytesWritten,
-            ControlRequestRecipient.Device,
-            ControlRequestType.Standard,
-            setConfigurationRequest,
-            readBuffer[0],
-            0 // Always zero for Device, SetConfigurationRequest
-        );
-
-        using var scope = new AssertionScope();
-        writeResult.Should().Be(UsbResult.Success);
-        // We did not provide a payload, expect zero bytes written
-        bytesWritten.Should().Be(0);
-    }
-
     public void Dispose()
     {
         _usb.Dispose();
