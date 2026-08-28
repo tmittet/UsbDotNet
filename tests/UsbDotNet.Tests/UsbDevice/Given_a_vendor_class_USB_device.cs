@@ -140,6 +140,7 @@ public sealed class Given_a_vendor_class_USB_device : IDisposable
             {
                 var buffer = new byte[32 * 1024];
                 // Wait forever for data; unblocked by the interface dispose
+                // Not required to reproduce race; but makes the race more likely to occur
                 readResult = usbInterface.BulkRead(buffer, out _, Timeout.Infinite);
             });
             await Task.Delay(50); // Give BulkRead some time to submit the transfer
