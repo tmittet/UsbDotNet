@@ -23,9 +23,31 @@ public sealed class UsbDevice : IUsbDevice
     private readonly ILogger<UsbDevice> _logger;
     private readonly ConcurrentDictionary<byte, UsbInterface> _claimedInterfaces = new();
     private readonly ConcurrentDictionary<byte, string> _descriptorCache = new();
-    private readonly object _cacheLock = new();
+
+    /// <summary>
+    /// Makes read/update of the cache atomic; so a string is read only once under contention.
+    /// </summary>
+    private readonly object _descriptorCacheLock = new();
+
+    /// <summary>
+    /// Protects the native device handle from teardown while in use. IO operations hold a shared
+    /// token while ClaimInterface and Reset holds an exclusive token. Dispose runs down the guard,
+    /// waiting for in-flight operations to drain while rejecting new ones.
+    /// </summary>
     private readonly RundownGuard _rundownGuard = new();
+
+    /// <summary>
+    /// Makes claim and release of interfaces atomic. Never hold this lock while calling
+    /// UsbInterface.Dispose(), since that dispose calls back into ReleaseInterface.
+    /// </summary>
     private readonly object _interfaceLock = new();
+
+    /// <summary>
+    /// Cancels any ongoing IO when Dispose is called.
+    /// <para>
+    /// NOTE: Not used by interface transfers; they do their own cancellation on interface dispose.
+    /// </para>
+    /// </summary>
     private readonly CancellationTokenSource _disposeCts = new();
 
     /// <inheritdoc/>
@@ -75,7 +97,7 @@ public sealed class UsbDevice : IUsbDevice
             return cachedValue1;
         }
 
-        lock (_cacheLock)
+        lock (_descriptorCacheLock)
         {
             if (_descriptorCache.TryGetValue(descriptorIndex, out var cachedValue2))
             {
