@@ -127,6 +127,33 @@ public sealed class Given_a_vendor_class_USB_device : IDisposable
         vendorInterfaces.Should().NotBeEmpty();
     }
 
+    [SkippableFact(Timeout = 20000)] // Normal execution time is ~2 seconds on success
+    public async Task Concurrent_device_and_interface_dispose_does_not_deadlock()
+    {
+        for (var i = 0; i < 30; i++) // Takes 10-15 iterations on my machine
+        {
+            var device = _deviceSource.OpenUsbDeviceOrSkip();
+            var usbInterface = device.ClaimInterface(UsbClass.VendorSpecific);
+
+            var readResult = UsbResult.UnknownError;
+            var readTask = Task.Run(() =>
+            {
+                var buffer = new byte[32 * 1024];
+                // Wait forever for data; unblocked by the interface dispose
+                // Not required to reproduce race; but makes the race more likely to occur
+                readResult = usbInterface.BulkRead(buffer, out _, Timeout.Infinite);
+            });
+            await Task.Delay(50); // Give BulkRead some time to submit the transfer
+
+            var interfaceDispose = Task.Run(usbInterface.Dispose);
+            await Task.Delay(Random.Shared.Next(4)); // Random stagger to increase chance of race
+            var deviceDispose = Task.Run(device.Dispose);
+
+            await Task.WhenAll(interfaceDispose, deviceDispose, readTask);
+            readResult.Should().Be(UsbResult.Interrupted);
+        }
+    }
+
     [SkippableFact]
     public void ControlWrite_is_successful_given_params_to_clear_endpoint_zero_halt()
     {

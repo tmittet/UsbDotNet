@@ -8,10 +8,11 @@ dotnet_diagnostic.CA2201.severity = suggestion # Do not raise reserved exception
 dotnet_diagnostic.CS0618.severity = suggestion # 'member' is obsolete
 
 dotnet_diagnostic.CA1515.severity = none # Consider making public types internal
+dotnet_diagnostic.CA1707.severity = none # Remove the underscore from type name
 dotnet_diagnostic.CA2007.severity = none # Do not directly await a Task
 dotnet_diagnostic.CA2202.severity = none # Do Not Dispose Objects Multiple Times
+dotnet_diagnostic.CA5394.severity = none # Do not use insecure randomness; test timing jitter, not security
 dotnet_diagnostic.CS1591.severity = none # XML-Comment warnings
-dotnet_diagnostic.CA1707.severity = none # Remove the underscore from type name
 dotnet_diagnostic.IDE0058.severity = none # Expression value is never used
 
 dotnet_diagnostic.xUnit1004.severity = error  # Test methods should not be skipped
