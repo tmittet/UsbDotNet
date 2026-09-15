@@ -5,6 +5,7 @@ using UsbDotNet.Core;
 using UsbDotNet.Descriptor;
 using UsbDotNet.Internal;
 using UsbDotNet.Internal.Transfer;
+using UsbDotNet.LibUsbNative;
 using UsbDotNet.LibUsbNative.Enums;
 using UsbDotNet.LibUsbNative.Extensions;
 using UsbDotNet.LibUsbNative.SafeHandles;
@@ -252,9 +253,20 @@ public sealed class UsbDevice : IUsbDevice
                 throw new InvalidOperationException($"Interface {existing} already claimed.");
             }
 
-            // TODO: libusb_set_auto_detach_kernel_driver on Linux?
-            var claimedInterface = Handle.ClaimInterface(descriptor.InterfaceNumber);
-
+            ISafeDeviceInterface claimedInterface;
+            try
+            {
+                // TODO: libusb_set_auto_detach_kernel_driver on Linux?
+                claimedInterface = Handle.ClaimInterface(descriptor.InterfaceNumber);
+            }
+            catch (LibUsbException ex)
+            {
+                throw new UsbException(
+                    ex.Code,
+                    "Failed to claim interface {InterfaceNumber} on device {DeviceKey}.",
+                    ex
+                );
+            }
             var usbInterface = new UsbInterface(
                 LoggerFactory.CreateLogger<UsbInterface>(),
                 this,
