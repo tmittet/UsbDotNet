@@ -270,13 +270,35 @@ public sealed class Usb : IUsb, IUsbInternal
     {
         using var deviceList = context.GetDeviceList();
         var (safeDevice, descriptor) = deviceList.GetListDevice(_logger, deviceKey);
+        IUsbConfigDescriptor configDescriptor;
+        try
+        {
+            configDescriptor = safeDevice.GetActiveConfigDescriptor().ToUsbConfigDescriptor();
+        }
+        catch (LibUsbException ex)
+        {
+            throw new UsbException(
+                ex.Code,
+                $"Failed to get active config descriptor for device '{deviceKey}'.",
+                ex
+            );
+        }
+        ISafeDeviceHandle safeDeviceHandle;
+        try
+        {
+            safeDeviceHandle = safeDevice.Open();
+        }
+        catch (LibUsbException ex)
+        {
+            throw new UsbException(ex.Code, $"Failed to open device '{deviceKey}'.", ex);
+        }
         var device = new UsbDevice(
             _loggerFactory,
             this,
             context,
-            safeDevice.Open(),
+            safeDeviceHandle,
             descriptor,
-            safeDevice.GetActiveConfigDescriptor().ToUsbConfigDescriptor()
+            configDescriptor
         );
         if (!_openDevices.TryAdd(deviceKey, device))
         {

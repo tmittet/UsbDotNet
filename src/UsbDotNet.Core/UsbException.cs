@@ -1,4 +1,4 @@
-﻿namespace UsbDotNet.Core;
+namespace UsbDotNet.Core;
 
 public class UsbException : Exception
 {
@@ -6,6 +6,12 @@ public class UsbException : Exception
 
     public UsbException(UsbResult code, string message)
         : base(message)
+    {
+        Code = code;
+    }
+
+    public UsbException(UsbResult code, string message, Exception? innerException)
+        : base(message, innerException)
     {
         Code = code;
     }
