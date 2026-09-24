@@ -1,6 +1,8 @@
 using UsbDotNet.Core;
 using UsbDotNet.Descriptor;
 using UsbDotNet.LibUsbNative;
+using UsbDotNet.LibUsbNative.Enums;
+using UsbDotNet.LibUsbNative.Extensions;
 using UsbDotNet.Transfer;
 
 namespace UsbDotNet.Tests.UsbDevice;
@@ -90,6 +92,49 @@ public sealed class Given_a_vendor_class_USB_device : IDisposable
         var endpointFound = usbInterface.TryGetOutputEndpoint(out var endpoint);
         endpointFound.Should().BeTrue();
         endpoint!.MaxPacketSize.Should().BePositive();
+    }
+
+    [SkippableFact]
+    public void Device_is_able_to_claim_interface_while_another_libusb_context_holds_the_device_open()
+    {
+        // Reproduces https://github.com/libusb/libusb/issues/1177
+        // On Windows, libusb_open() creates a file handle for every WinUSB interface of a
+        // composite device, not just the one the caller is about to claim. WinUSB grants
+        // exclusive access per interface (child device), so a second libusb_open() of the
+        // same device from another context fails with LIBUSB_ERROR_ACCESS, even though the
+        // first context never claimed any interface.
+
+        // Locate a suitable test device using the regular device source, then release it
+        string deviceKey;
+        byte busNumber;
+        byte busAddress;
+        using (var probeDevice = _deviceSource.OpenUsbDeviceOrSkip())
+        {
+            deviceKey = probeDevice.Descriptor.DeviceKey;
+            busNumber = probeDevice.Descriptor.BusNumber;
+            busAddress = probeDevice.Descriptor.BusAddress;
+        }
+
+        // Open the device without claiming any interfaces, directly through LibUsbNative in a
+        // separate libusb context (as another application would)
+        using var nativeContext = _libusb.CreateContext();
+        nativeContext.RegisterLogCallback(
+            (level, message) =>
+                _logger.LogInformation("[libusb-native][{Level}] {Message}", level, message)
+        );
+        nativeContext.SetOption(libusb_log_level.LIBUSB_LOG_LEVEL_INFO);
+        using var nativeDeviceList = nativeContext.GetDeviceList();
+        var nativeDevice = nativeDeviceList.Single(d =>
+            d.GetBusNumber() == busNumber && d.GetDeviceAddress() == busAddress
+        );
+        using var nativeDeviceHandle = nativeDevice.Open();
+
+        // Open the device and claim the vendor interface through UsbDotNet. Open directly
+        // rather than through the device source, which would otherwise swallow the access
+        // error and skip the test.
+        using var device = _usb.OpenDevice(deviceKey);
+        using var usbInterface = device.ClaimInterface(UsbClass.VendorSpecific);
+        usbInterface.TryGetInputEndpoint(out _).Should().BeTrue();
     }
 
     [SkippableFact]
