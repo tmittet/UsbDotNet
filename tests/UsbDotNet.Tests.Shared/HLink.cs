@@ -46,12 +46,12 @@ internal sealed class HLink(IUsbInterface usb, ILogger<HLink>? logger = null)
         if (saluteWriteResult != UsbResult.Success)
             throw new IOException($"HLink salute write failed: {saluteWriteResult}.");
 
-        // Expect "HLink v0" response
-        var response = new byte[8];
-        var saluteReadResult = usb.BulkRead(response, out var bytesRead, readTimeout);
+        // Expect "HLink v0" response. The flush buffer is reused, since the buffer length
+        // must be a multiple of the endpoint max packet size.
+        var saluteReadResult = usb.BulkRead(flushBuf, out var bytesRead, readTimeout);
         if (saluteReadResult != UsbResult.Success)
             throw new IOException($"HLink salute read failed: {saluteReadResult}.");
-        var saluteResponse = Encoding.UTF8.GetString(response, 0, bytesRead);
+        var saluteResponse = Encoding.UTF8.GetString(flushBuf, 0, bytesRead);
         if (saluteResponse != "HLink v0")
             throw new IOException($"Unexpected HLink salute response '{saluteResponse}'.");
     }

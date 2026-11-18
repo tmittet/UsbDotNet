@@ -18,6 +18,72 @@ public sealed class Given_a_claimed_USB_interface : IDisposable
 
     public void Dispose() => _usb.Dispose();
 
+    [Theory]
+    [InlineData(0)]
+    [InlineData(1)]
+    [InlineData(8)]
+    [InlineData(511)]
+    [InlineData(513)]
+    [InlineData(1000)]
+    public void BulkRead_throws_when_buffer_length_is_not_a_non_zero_multiple_of_the_max_packet_size(
+        int length
+    )
+    {
+        using var device = CreateFakeDevice(out var handle);
+        using var usbInterface = ClaimFakeInterface(device, handle, inputMaxPacketSize: 512);
+        var buffer = new byte[length];
+
+        var act = () => usbInterface.BulkRead(buffer, out _, 100);
+
+        act.Should().Throw<ArgumentException>().WithMessage("*multiple of the endpoint*(512)*");
+    }
+
+    [Theory]
+    [InlineData(512)]
+    [InlineData(1024)]
+    [InlineData(32 * 1024)]
+    [InlineData(64 * 1024)]
+    public void BulkRead_does_not_throw_when_buffer_length_is_a_multiple_of_the_max_packet_size(
+        int length
+    )
+    {
+        using var device = CreateFakeDevice(out var handle);
+        using var usbInterface = ClaimFakeInterface(device, handle, inputMaxPacketSize: 512);
+        var buffer = new byte[length];
+
+        var act = () => usbInterface.BulkRead(buffer, out _, 100);
+
+        act.Should().NotThrow();
+    }
+
+    private UsbDotNet.UsbDevice CreateFakeDevice(out ISafeDeviceHandle handle)
+    {
+        handle = A.Fake<ISafeDeviceHandle>();
+        return new UsbDotNet.UsbDevice(
+            NullLoggerFactory.Instance,
+            _usb,
+            A.Fake<ISafeContext>(),
+            handle,
+            new UsbDeviceDescriptor { DeviceKey = "FAKE_0000_0_0" },
+            A.Fake<IUsbConfigDescriptor>()
+        );
+    }
+
+    private static IUsbInterface ClaimFakeInterface(
+        UsbDotNet.UsbDevice device,
+        ISafeDeviceHandle handle,
+        ushort inputMaxPacketSize
+    )
+    {
+        A.CallTo(() => handle.ClaimInterface(A<byte>._)).Returns(A.Fake<ISafeDeviceInterface>());
+        var inputEndpoint = A.Fake<IUsbEndpointDescriptor>();
+        A.CallTo(() => inputEndpoint.EndpointAddress).Returns(new UsbEndpointAddress(0x81));
+        A.CallTo(() => inputEndpoint.MaxPacketSize).Returns(inputMaxPacketSize);
+        var descriptor = A.Fake<IUsbInterfaceDescriptor>();
+        A.CallTo(() => descriptor.Endpoints).Returns([inputEndpoint]);
+        return device.ClaimInterface(descriptor);
+    }
+
     [Fact]
     public void Dispose_does_not_throw_when_BulkReads_race_an_in_progress_dispose()
     {

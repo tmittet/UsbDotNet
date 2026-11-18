@@ -47,10 +47,11 @@ public interface IUsbInterface : IDisposable
     /// that occurs at the same moment as data arrives, may return both Timeout and the data.
     /// </para>
     /// <para>
-    /// The length of <paramref name="destination"/> should be a multiple of the endpoint max
-    /// packet size, see <see cref="TryGetInputEndpoint"/>. If it is not, and the device sends
-    /// more data than requested, the read may fail with Overflow and data may be lost. At most
-    /// 32 KB is read in a single call; a longer <paramref name="destination"/> is not filled.
+    /// The length of <paramref name="destination"/> must be a non-zero multiple of the endpoint
+    /// max packet size, see <see cref="TryGetInputEndpoint"/>. A read of any other length works
+    /// on some operating systems, but on others it fails with Overflow and loses data when the
+    /// device sends more than requested; it is rejected on all of them. At most 32 KB is read
+    /// in a single call; a longer <paramref name="destination"/> is not filled.
     /// </para>
     /// </remarks>
     /// <param name="destination">
@@ -60,7 +61,10 @@ public interface IUsbInterface : IDisposable
     /// The number of bytes read. May be greater than zero when the result is not Success.
     /// </param>
     /// <param name="timeout">An optional timeout for the read operation</param>
-    /// <exception cref="ArgumentException">Thrown when timeout is invalid.</exception>
+    /// <exception cref="ArgumentException">
+    /// Thrown when timeout is invalid, or when the length of <paramref name="destination"/> is not
+    /// a non-zero multiple of the endpoint max packet size.
+    /// </exception>
     /// <exception cref="ObjectDisposedException">Thrown when UsbInterface is disposed.</exception>
     /// <exception cref="InvalidOperationException">
     /// Thrown when no input endpoint is found for this interface.

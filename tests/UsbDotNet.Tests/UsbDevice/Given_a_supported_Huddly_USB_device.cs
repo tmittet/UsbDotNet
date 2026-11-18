@@ -162,7 +162,9 @@ public sealed class Given_a_supported_Huddly_USB_device : IDisposable
         // Wait for salute response
         const string expectedSaluteResponse = "HLink v0";
         var expectedSaluteBytes = Encoding.UTF8.GetBytes(expectedSaluteResponse);
-        var buffer = new byte[8];
+        // The buffer length must be a multiple of the endpoint max packet size
+        usbInterface.TryGetInputEndpoint(out var endpoint).Should().BeTrue();
+        var buffer = new byte[endpoint!.MaxPacketSize];
         var readError = usbInterface.BulkRead(buffer, out var readLength, 1000);
         readError.Should().Be(UsbResult.Success, "salute response read should not fail");
         readLength
@@ -171,7 +173,7 @@ public sealed class Given_a_supported_Huddly_USB_device : IDisposable
                 expectedSaluteBytes.Length,
                 $"salute response '{expectedSaluteResponse}' is expected"
             );
-        buffer
+        buffer[..readLength]
             .Should()
             .BeEquivalentTo(
                 expectedSaluteBytes,
