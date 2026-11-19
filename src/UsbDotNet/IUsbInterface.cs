@@ -15,16 +15,36 @@ public interface IUsbInterface : IDisposable
     byte Number { get; }
 
     /// <summary>
-    /// Get an input endpoint, if one exists. If more than one is found, the first is returned.
+    /// Get an input endpoint of the given transfer type, if one exists. If more than one is found,
+    /// the first is returned. The default, bulk, returns the endpoint used by
+    /// <see cref="BulkRead"/>.
     /// </summary>
+    /// <param name="endpoint">The endpoint descriptor, when one is found.</param>
+    /// <param name="transferType">
+    /// The transfer type of the endpoint: bulk, interrupt or isochronous. Control endpoints are
+    /// not part of an interface, so no endpoint is found for the control transfer type.
+    /// </param>
     /// <exception cref="ObjectDisposedException">Thrown when UsbInterface is disposed</exception>
-    bool TryGetInputEndpoint([NotNullWhen(true)] out IUsbEndpointDescriptor? endpoint);
+    bool TryGetInputEndpoint(
+        [NotNullWhen(true)] out IUsbEndpointDescriptor? endpoint,
+        UsbEndpointTransferType transferType = UsbEndpointTransferType.Bulk
+    );
 
     /// <summary>
-    /// Get an output endpoint, if one exists. If more than one is found, the first is returned.
+    /// Get an output endpoint of the given transfer type, if one exists. If more than one is
+    /// found, the first is returned. The default, bulk, returns the endpoint used by
+    /// <see cref="BulkWrite"/>.
     /// </summary>
+    /// <param name="endpoint">The endpoint descriptor, when one is found.</param>
+    /// <param name="transferType">
+    /// The transfer type of the endpoint: bulk, interrupt or isochronous. Control endpoints are
+    /// not part of an interface, so no endpoint is found for the control transfer type.
+    /// </param>
     /// <exception cref="ObjectDisposedException">Thrown when UsbInterface is disposed</exception>
-    bool TryGetOutputEndpoint([NotNullWhen(true)] out IUsbEndpointDescriptor? endpoint);
+    bool TryGetOutputEndpoint(
+        [NotNullWhen(true)] out IUsbEndpointDescriptor? endpoint,
+        UsbEndpointTransferType transferType = UsbEndpointTransferType.Bulk
+    );
 
     /// <summary>
     /// Bulk read data from the USB device interface. This method blocks until a chunk of data is
@@ -67,7 +87,7 @@ public interface IUsbInterface : IDisposable
     /// </exception>
     /// <exception cref="ObjectDisposedException">Thrown when UsbInterface is disposed.</exception>
     /// <exception cref="InvalidOperationException">
-    /// Thrown when no input endpoint is found for this interface.
+    /// Thrown when no bulk input endpoint is found for this interface.
     /// </exception>
     /// <returns>
     /// <list>
@@ -111,7 +131,7 @@ public interface IUsbInterface : IDisposable
     /// <exception cref="ArgumentException">Thrown when the timeout is invalid.</exception>
     /// <exception cref="ObjectDisposedException">Thrown when the UsbInterface is disposed</exception>
     /// <exception cref="InvalidOperationException">
-    /// Thrown when no output endpoint is found for this interface.
+    /// Thrown when no bulk output endpoint is found for this interface.
     /// </exception>
     /// <returns>
     /// <list>

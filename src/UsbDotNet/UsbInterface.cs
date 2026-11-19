@@ -53,13 +53,17 @@ public sealed class UsbInterface : IUsbInterface
     /// <param name="descriptor">The USB interface descriptor.</param>
     /// <param name="claimedInterface">A claimed USB device interface.</param>
     /// <param name="readEndpoint">
-    /// Optional read endpoint. When nothing is specified and a read operation is attempted,
-    /// an attempt is made to pick the first available "input" endpoint for this interface.
+    /// Optional bulk input endpoint. When nothing is specified and a read operation is attempted,
+    /// an attempt is made to pick the first available bulk input endpoint for this interface.
     /// </param>
     /// <param name="writeEndpoint">
-    /// Optional write endpoint. When nothing is specified and a write operation is attempted,
-    /// an attempt is made to pick the first available "output" endpoint for this interface.
+    /// Optional bulk output endpoint. When nothing is specified and a write operation is attempted,
+    /// an attempt is made to pick the first available bulk output endpoint for this interface.
     /// </param>
+    /// <exception cref="ArgumentException">
+    /// Thrown when <paramref name="readEndpoint"/> is not a bulk input endpoint, or when
+    /// <paramref name="writeEndpoint"/> is not a bulk output endpoint.
+    /// </exception>
     public UsbInterface(
         ILogger<UsbInterface> logger,
         UsbDevice device,
@@ -69,6 +73,9 @@ public sealed class UsbInterface : IUsbInterface
         IUsbEndpointDescriptor? writeEndpoint = default
     )
     {
+        // Validate before any buffer is pinned, so a rejected endpoint does not leak a handle
+        CheckBulkEndpoint(readEndpoint, UsbEndpointDirection.Input, nameof(readEndpoint));
+        CheckBulkEndpoint(writeEndpoint, UsbEndpointDirection.Output, nameof(writeEndpoint));
         _logger = logger;
         _device = device;
         _descriptor = descriptor;
@@ -91,11 +98,33 @@ public sealed class UsbInterface : IUsbInterface
     }
 
     /// <inheritdoc/>
-    public bool TryGetInputEndpoint([NotNullWhen(true)] out IUsbEndpointDescriptor? endpoint)
+    public bool TryGetInputEndpoint(
+        [NotNullWhen(true)] out IUsbEndpointDescriptor? endpoint,
+        UsbEndpointTransferType transferType = UsbEndpointTransferType.Bulk
+    ) => TryGetEndpoint(_readEndpoint, UsbEndpointDirection.Input, transferType, out endpoint);
+
+    /// <inheritdoc/>
+    public bool TryGetOutputEndpoint(
+        [NotNullWhen(true)] out IUsbEndpointDescriptor? endpoint,
+        UsbEndpointTransferType transferType = UsbEndpointTransferType.Bulk
+    ) => TryGetEndpoint(_writeEndpoint, UsbEndpointDirection.Output, transferType, out endpoint);
+
+    private bool TryGetEndpoint(
+        Lazy<IUsbEndpointDescriptor> bulkEndpoint,
+        UsbEndpointDirection direction,
+        UsbEndpointTransferType transferType,
+        [NotNullWhen(true)] out IUsbEndpointDescriptor? endpoint
+    )
     {
+        if (transferType is not UsbEndpointTransferType.Bulk)
+        {
+            endpoint = FindEndpoints(_descriptor, direction, transferType).FirstOrDefault();
+            return endpoint is not null;
+        }
+        // Return the endpoint that BulkRead/BulkWrite use
         try
         {
-            endpoint = _readEndpoint.Value;
+            endpoint = bulkEndpoint.Value;
             return true;
         }
         catch (InvalidOperationException)
@@ -105,20 +134,14 @@ public sealed class UsbInterface : IUsbInterface
         }
     }
 
-    /// <inheritdoc/>
-    public bool TryGetOutputEndpoint([NotNullWhen(true)] out IUsbEndpointDescriptor? endpoint)
-    {
-        try
-        {
-            endpoint = _writeEndpoint.Value;
-            return true;
-        }
-        catch (InvalidOperationException)
-        {
-            endpoint = null;
-            return false;
-        }
-    }
+    private static IEnumerable<IUsbEndpointDescriptor> FindEndpoints(
+        IUsbInterfaceDescriptor descriptor,
+        UsbEndpointDirection direction,
+        UsbEndpointTransferType transferType
+    ) =>
+        descriptor.Endpoints.Where(e =>
+            e.EndpointAddress.Direction == direction && e.Attributes.TransferType == transferType
+        );
 
     /// <inheritdoc/>
     public UsbResult BulkRead(Span<byte> destination, out int bytesRead, int timeout)
@@ -251,18 +274,52 @@ public sealed class UsbInterface : IUsbInterface
         UsbEndpointDirection direction
     )
     {
-        var endpoint = descriptor.GetEndpoint(direction, out var count);
-        if (count > 1)
+        // Only bulk endpoints are candidates; BulkRead and BulkWrite submit bulk transfers,
+        // which must not be sent to an interrupt or isochronous endpoint.
+        var endpoints = FindEndpoints(descriptor, direction, UsbEndpointTransferType.Bulk).ToList();
+        if (endpoints.Count == 0)
+        {
+            throw new InvalidOperationException(
+                $"Interface #{descriptor.InterfaceNumber} has no bulk {direction} endpoint."
+            );
+        }
+        if (endpoints.Count > 1)
         {
             _logger.LogWarning(
-                "Interface #{InterfaceNumber} has {EndpointCount} {EndpointDirection} endpoints. "
-                    + "The first endpoint was selected.",
+                "Interface #{InterfaceNumber} has {EndpointCount} bulk {EndpointDirection} "
+                    + "endpoints. The first endpoint was selected.",
                 descriptor.InterfaceNumber,
-                count,
+                endpoints.Count,
                 direction
             );
         }
-        return endpoint;
+        return endpoints[0];
+    }
+
+    /// <summary>
+    /// Throw ArgumentException when an explicitly provided endpoint is not a bulk endpoint with
+    /// the expected direction. BulkRead and BulkWrite submit bulk transfers to these endpoints.
+    /// </summary>
+    private static void CheckBulkEndpoint(
+        IUsbEndpointDescriptor? endpoint,
+        UsbEndpointDirection direction,
+        string paramName
+    )
+    {
+        if (
+            endpoint is not null
+            && (
+                endpoint.EndpointAddress.Direction != direction
+                || endpoint.Attributes.TransferType != UsbEndpointTransferType.Bulk
+            )
+        )
+        {
+            throw new ArgumentException(
+                $"Invalid endpoint {endpoint.EndpointAddress} with transfer type "
+                    + $"{endpoint.Attributes.TransferType}; must be a bulk {direction} endpoint.",
+                paramName
+            );
+        }
     }
 
     /// <summary>
