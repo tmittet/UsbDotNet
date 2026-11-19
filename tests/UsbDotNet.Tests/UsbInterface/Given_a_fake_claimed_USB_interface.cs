@@ -487,6 +487,45 @@ public sealed class Given_a_fake_claimed_USB_interface : IDisposable
         act.Should().Throw<ArgumentException>().WithMessage("*multiple of the endpoint*(64)*");
     }
 
+    [Theory]
+    // wMaxPacketSize 0x1400: 1024 byte packets, with 2 additional transactions per microframe
+    [InlineData(0x1400, 1024)]
+    [InlineData(0x1400, 3072)]
+    [InlineData(0x1400, 5120)]
+    // wMaxPacketSize 0x0C00: 1024 byte packets, with 1 additional transaction per microframe
+    [InlineData(0x0C00, 2048)]
+    public void Read_ignores_the_additional_transaction_bits_of_a_high_bandwidth_max_packet_size(
+        ushort maxPacketSize,
+        int length
+    )
+    {
+        using var device = CreateFakeDevice(out var handle);
+        var endpoint = FakeEndpoint(0x81, UsbEndpointTransferType.Interrupt);
+        A.CallTo(() => endpoint.MaxPacketSize).Returns(maxPacketSize);
+        using var usbInterface = ClaimFakeInterface(device, handle, endpoint);
+
+        var transfer = CaptureSubmittedTransfer(
+            handle,
+            () => usbInterface.Read(endpoint, new byte[length], out _, 100)
+        );
+
+        transfer.Should().NotBeNull();
+        transfer!.Value.length.Should().Be(length);
+    }
+
+    [Fact]
+    public void Read_checks_the_buffer_length_against_the_packet_size_of_a_high_bandwidth_endpoint()
+    {
+        using var device = CreateFakeDevice(out var handle);
+        var endpoint = FakeEndpoint(0x81, UsbEndpointTransferType.Interrupt);
+        A.CallTo(() => endpoint.MaxPacketSize).Returns((ushort)0x1400);
+        using var usbInterface = ClaimFakeInterface(device, handle, endpoint);
+
+        var act = () => usbInterface.Read(endpoint, new byte[1000], out _, 100);
+
+        act.Should().Throw<ArgumentException>().WithMessage("*multiple of the endpoint*(1024)*");
+    }
+
     [Fact]
     public void Read_and_Write_return_Interrupted_when_the_interface_is_disposed()
     {
