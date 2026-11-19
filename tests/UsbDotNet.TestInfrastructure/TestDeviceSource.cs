@@ -133,8 +133,14 @@ public sealed class TestDeviceSource(ILogger _logger, IUsb _usb)
                 if (!requiresRead && !requiresWrite)
                     return true;
                 using var usbInterface = device.ClaimInterface(interfaceClass);
-                return (!requiresRead || usbInterface.TryGetInputEndpoint(out _))
-                    && (!requiresWrite || usbInterface.TryGetOutputEndpoint(out _));
+                return (
+                        !requiresRead
+                        || usbInterface.TryGetInputEndpoint(out _, UsbEndpointTransferType.Bulk)
+                    )
+                    && (
+                        !requiresWrite
+                        || usbInterface.TryGetOutputEndpoint(out _, UsbEndpointTransferType.Bulk)
+                    );
             }
             catch
             {

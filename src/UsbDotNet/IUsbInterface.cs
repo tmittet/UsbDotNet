@@ -16,7 +16,7 @@ public interface IUsbInterface : IDisposable
 
     /// <summary>
     /// Get an input endpoint of the given transfer type, if one exists. If more than one is found,
-    /// the first is returned. The default, bulk, returns the endpoint used by
+    /// the first is returned. For the bulk transfer type, this is the endpoint used by
     /// <see cref="BulkRead"/>.
     /// </summary>
     /// <param name="endpoint">The endpoint descriptor, when one is found.</param>
@@ -27,12 +27,12 @@ public interface IUsbInterface : IDisposable
     /// <exception cref="ObjectDisposedException">Thrown when UsbInterface is disposed</exception>
     bool TryGetInputEndpoint(
         [NotNullWhen(true)] out IUsbEndpointDescriptor? endpoint,
-        UsbEndpointTransferType transferType = UsbEndpointTransferType.Bulk
+        UsbEndpointTransferType transferType
     );
 
     /// <summary>
     /// Get an output endpoint of the given transfer type, if one exists. If more than one is
-    /// found, the first is returned. The default, bulk, returns the endpoint used by
+    /// found, the first is returned. For the bulk transfer type, this is the endpoint used by
     /// <see cref="BulkWrite"/>.
     /// </summary>
     /// <param name="endpoint">The endpoint descriptor, when one is found.</param>
@@ -43,7 +43,121 @@ public interface IUsbInterface : IDisposable
     /// <exception cref="ObjectDisposedException">Thrown when UsbInterface is disposed</exception>
     bool TryGetOutputEndpoint(
         [NotNullWhen(true)] out IUsbEndpointDescriptor? endpoint,
-        UsbEndpointTransferType transferType = UsbEndpointTransferType.Bulk
+        UsbEndpointTransferType transferType
+    );
+
+    /// <summary>
+    /// Read data from a bulk or interrupt input endpoint of this interface. This method blocks
+    /// until a chunk of data is received or the optional timeout is reached.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// Use this method to read from an interrupt endpoint, or from a specific endpoint when the
+    /// interface has more than one input endpoint. <see cref="BulkRead"/> is a shorthand for a
+    /// read from the first bulk input endpoint. The remarks on <see cref="BulkRead"/> about
+    /// transfer completion, data received with a non Success result, the required length of
+    /// <paramref name="destination"/> and the 32 KB limit also apply to this method.
+    /// </para>
+    /// <para>
+    /// One transfer at a time is in progress on an endpoint; a concurrent read from the same
+    /// endpoint waits for it to complete. Transfers on different endpoints run concurrently.
+    /// </para>
+    /// </remarks>
+    /// <param name="endpoint">
+    /// A bulk or interrupt input endpoint of this interface, from the descriptor of the interface
+    /// or from <see cref="TryGetInputEndpoint"/>. The endpoint is identified by its address.
+    /// </param>
+    /// <param name="destination">
+    /// A destination data span for read bytes. The length is the max number of bytes to read.
+    /// </param>
+    /// <param name="bytesRead">
+    /// The number of bytes read. May be greater than zero when the result is not Success.
+    /// </param>
+    /// <param name="timeout">An optional timeout for the read operation</param>
+    /// <exception cref="ArgumentNullException">Thrown when the endpoint is null.</exception>
+    /// <exception cref="ArgumentException">
+    /// Thrown when the endpoint is not an input endpoint of this interface, when timeout is
+    /// invalid, or when the length of <paramref name="destination"/> is not a non-zero multiple
+    /// of the endpoint max packet size.
+    /// </exception>
+    /// <exception cref="NotSupportedException">
+    /// Thrown when the endpoint is an isochronous endpoint.
+    /// </exception>
+    /// <returns>
+    /// <list>
+    /// <item>Success = The read operation completed successfully.</item>
+    /// <item>IO = The read operation failed.</item>
+    /// <item>InvalidParameter = Transfer size is larger than OS or hardware can support.</item>
+    /// <item>NoDevice = The device has been disconnected.</item>
+    /// <item>PipeError = Halt condition detected (endpoint stalled).</item>
+    /// <item>Timeout = The read operation timed out. Data may still have been received.</item>
+    /// <item>Overflow = The device sent more data than expected.</item>
+    /// <item>
+    /// Interrupted = The read operation was canceled, or the interface is disposed. Data may
+    /// still have been received.
+    /// </item>
+    /// <item>NotSupported = The transfer flags are not supported by the operating system.</item>
+    /// </list>
+    /// </returns>
+    UsbResult Read(
+        IUsbEndpointDescriptor endpoint,
+        Span<byte> destination,
+        out int bytesRead,
+        int timeout = Timeout.Infinite
+    );
+
+    /// <summary>
+    /// Write data to a bulk or interrupt output endpoint of this interface. This method blocks
+    /// until a chunk of data has been written or the optional timeout is reached.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// Use this method to write to an interrupt endpoint, or to a specific endpoint when the
+    /// interface has more than one output endpoint. <see cref="BulkWrite"/> is a shorthand for a
+    /// write to the first bulk output endpoint. The remarks on <see cref="BulkWrite"/> about
+    /// the 32 KB limit, partially written data and zero length packets also apply to this method.
+    /// </para>
+    /// <para>
+    /// One transfer at a time is in progress on an endpoint; a concurrent write to the same
+    /// endpoint waits for it to complete. Transfers on different endpoints run concurrently.
+    /// </para>
+    /// </remarks>
+    /// <param name="endpoint">
+    /// A bulk or interrupt output endpoint of this interface, from the descriptor of the
+    /// interface or from <see cref="TryGetOutputEndpoint"/>. The endpoint is identified by its
+    /// address.
+    /// </param>
+    /// <param name="source">A source span of data to write</param>
+    /// <param name="bytesWritten">
+    /// The number of bytes written. May be less than the length of <paramref name="source"/>.
+    /// </param>
+    /// <param name="timeout">An optional timeout for the write operation</param>
+    /// <exception cref="ArgumentNullException">Thrown when the endpoint is null.</exception>
+    /// <exception cref="ArgumentException">
+    /// Thrown when the endpoint is not an output endpoint of this interface, or when timeout is
+    /// invalid.
+    /// </exception>
+    /// <exception cref="NotSupportedException">
+    /// Thrown when the endpoint is an isochronous endpoint.
+    /// </exception>
+    /// <returns>
+    /// <list>
+    /// <item>Success = The write operation completed successfully.</item>
+    /// <item>IO = The write operation failed.</item>
+    /// <item>InvalidParameter = Transfer size is larger than OS or hardware can support.</item>
+    /// <item>NoDevice = The device has been disconnected.</item>
+    /// <item>PipeError = Halt condition detected (endpoint stalled).</item>
+    /// <item>Timeout = The write operation timed out.</item>
+    /// <item>Overflow = The host sent more data than expected.</item>
+    /// <item>Interrupted = The write operation was canceled, or the interface is disposed.</item>
+    /// <item>NotSupported = The transfer flags are not supported by the operating system.</item>
+    /// </list>
+    /// </returns>
+    UsbResult Write(
+        IUsbEndpointDescriptor endpoint,
+        ReadOnlySpan<byte> source,
+        out int bytesWritten,
+        int timeout = Timeout.Infinite
     );
 
     /// <summary>
