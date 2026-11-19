@@ -124,9 +124,6 @@ public sealed class UsbInterface : IUsbInterface
     public UsbResult BulkRead(Span<byte> destination, out int bytesRead, int timeout)
     {
         CheckTransferTimeout(timeout);
-        // The endpoint is resolved from the cached descriptor; no lock or open device is needed
-        var maxPacketSize = _readEndpoint.Value.MaxPacketSize;
-        CheckDestinationSpanLength(destination, maxPacketSize);
         try
         {
             lock (_disposeLockSync)
@@ -143,6 +140,8 @@ public sealed class UsbInterface : IUsbInterface
             }
             try
             {
+                var maxPacketSize = _readEndpoint.Value.MaxPacketSize;
+                CheckDestinationSpanLength(destination, maxPacketSize);
                 var bufferLength = Math.Min(destination.Length, ReadBufferSize);
                 if (maxPacketSize > 0)
                 {
