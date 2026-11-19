@@ -1,13 +1,16 @@
+using System.Runtime.InteropServices;
 using FakeItEasy;
 using Microsoft.Extensions.Logging.Abstractions;
 using UsbDotNet.Core;
 using UsbDotNet.Descriptor;
 using UsbDotNet.LibUsbNative;
+using UsbDotNet.LibUsbNative.Enums;
 using UsbDotNet.LibUsbNative.SafeHandles;
+using UsbDotNet.LibUsbNative.Structs;
 
 namespace UsbDotNet.Tests.UsbInterface;
 
-public sealed class Given_a_claimed_USB_interface : IDisposable
+public sealed class Given_a_fake_claimed_USB_interface : IDisposable
 {
     private const int ReaderCount = 8;
     private const int Iterations = 20;
@@ -17,6 +20,138 @@ public sealed class Given_a_claimed_USB_interface : IDisposable
     private readonly UsbDotNet.Usb _usb = new(A.Fake<ILibUsb>());
 
     public void Dispose() => _usb.Dispose();
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(1)]
+    [InlineData(8)]
+    [InlineData(511)]
+    [InlineData(513)]
+    [InlineData(1000)]
+    public void BulkRead_throws_when_buffer_length_is_not_a_non_zero_multiple_of_the_max_packet_size(
+        int length
+    )
+    {
+        using var device = CreateFakeDevice(out var handle);
+        using var usbInterface = ClaimFakeInterface(device, handle, inputMaxPacketSize: 512);
+        var buffer = new byte[length];
+
+        var act = () => usbInterface.BulkRead(buffer, out _, 100);
+
+        act.Should().Throw<ArgumentException>().WithMessage("*multiple of the endpoint*(512)*");
+    }
+
+    [Theory]
+    [InlineData(512)]
+    [InlineData(1024)]
+    [InlineData(32 * 1024)]
+    [InlineData(64 * 1024)]
+    public void BulkRead_does_not_throw_when_buffer_length_is_a_multiple_of_the_max_packet_size(
+        int length
+    )
+    {
+        using var device = CreateFakeDevice(out var handle);
+        using var usbInterface = ClaimFakeInterface(device, handle, inputMaxPacketSize: 512);
+        var buffer = new byte[length];
+
+        var act = () => usbInterface.BulkRead(buffer, out _, 100);
+
+        act.Should().NotThrow();
+    }
+
+    [Theory]
+    [InlineData(512, 512, 512)]
+    [InlineData(512, 32 * 1024, 32 * 1024)]
+    [InlineData(512, 64 * 1024, 32 * 1024)]
+    [InlineData(1000, 3000, 3000)]
+    [InlineData(1000, 32000, 32000)]
+    [InlineData(1000, 33000, 32000)]
+    [InlineData(1000, 64000, 32000)]
+    public void BulkRead_submits_a_transfer_length_that_is_capped_to_a_multiple_of_the_max_packet_size(
+        ushort maxPacketSize,
+        int length,
+        int expectedTransferLength
+    )
+    {
+        var transferLength = BulkReadAndCaptureTransferLength(maxPacketSize, length);
+
+        transferLength.Should().Be(expectedTransferLength);
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(1)]
+    [InlineData(8)]
+    [InlineData(1000)]
+    public void BulkRead_does_not_check_the_buffer_length_when_the_max_packet_size_is_unknown(
+        int length
+    )
+    {
+        var transferLength = BulkReadAndCaptureTransferLength(maxPacketSize: 0, length);
+
+        transferLength.Should().Be(length);
+    }
+
+    /// <summary>
+    /// Do a bulk read on a fake interface and return the length of the transfer that was
+    /// submitted to libusb, or null when no transfer was submitted.
+    /// </summary>
+    private int? BulkReadAndCaptureTransferLength(ushort maxPacketSize, int length)
+    {
+        using var device = CreateFakeDevice(out var handle);
+        using var usbInterface = ClaimFakeInterface(device, handle, maxPacketSize);
+        // BulkRead writes the libusb transfer struct to this memory before it is submitted
+        var transferPtr = Marshal.AllocHGlobal(Marshal.SizeOf<libusb_transfer>());
+        try
+        {
+            int? transferLength = null;
+            var transfer = A.Fake<ISafeTransfer>();
+            A.CallTo(() => handle.AllocateTransfer(A<int>._)).Returns(transfer);
+            A.CallTo(() => transfer.GetBufferPtr()).Returns(transferPtr);
+            // Fail the submit, so that the read returns without waiting for a completion
+            A.CallTo(() => transfer.Submit())
+                .Invokes(() =>
+                    transferLength = Marshal.PtrToStructure<libusb_transfer>(transferPtr).length
+                )
+                .Returns(libusb_error.LIBUSB_ERROR_NO_DEVICE);
+
+            _ = usbInterface.BulkRead(new byte[length], out _, 100);
+
+            return transferLength;
+        }
+        finally
+        {
+            Marshal.FreeHGlobal(transferPtr);
+        }
+    }
+
+    private UsbDotNet.UsbDevice CreateFakeDevice(out ISafeDeviceHandle handle)
+    {
+        handle = A.Fake<ISafeDeviceHandle>();
+        return new UsbDotNet.UsbDevice(
+            NullLoggerFactory.Instance,
+            _usb,
+            A.Fake<ISafeContext>(),
+            handle,
+            new UsbDeviceDescriptor { DeviceKey = "FAKE_0000_0_0" },
+            A.Fake<IUsbConfigDescriptor>()
+        );
+    }
+
+    private static IUsbInterface ClaimFakeInterface(
+        UsbDotNet.UsbDevice device,
+        ISafeDeviceHandle handle,
+        ushort inputMaxPacketSize
+    )
+    {
+        A.CallTo(() => handle.ClaimInterface(A<byte>._)).Returns(A.Fake<ISafeDeviceInterface>());
+        var inputEndpoint = A.Fake<IUsbEndpointDescriptor>();
+        A.CallTo(() => inputEndpoint.EndpointAddress).Returns(new UsbEndpointAddress(0x81));
+        A.CallTo(() => inputEndpoint.MaxPacketSize).Returns(inputMaxPacketSize);
+        var descriptor = A.Fake<IUsbInterfaceDescriptor>();
+        A.CallTo(() => descriptor.Endpoints).Returns([inputEndpoint]);
+        return device.ClaimInterface(descriptor);
+    }
 
     [Fact]
     public void Dispose_does_not_throw_when_BulkReads_race_an_in_progress_dispose()

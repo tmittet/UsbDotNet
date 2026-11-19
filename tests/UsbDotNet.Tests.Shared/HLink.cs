@@ -46,12 +46,12 @@ internal sealed class HLink(IUsbInterface usb, ILogger<HLink>? logger = null)
         if (saluteWriteResult != UsbResult.Success)
             throw new IOException($"HLink salute write failed: {saluteWriteResult}.");
 
-        // Expect "HLink v0" response
-        var response = new byte[8];
-        var saluteReadResult = usb.BulkRead(response, out var bytesRead, readTimeout);
+        // Expect "HLink v0" response. The flush buffer is reused, since the buffer length
+        // must be a multiple of the endpoint max packet size.
+        var saluteReadResult = usb.BulkRead(flushBuf, out var bytesRead, readTimeout);
         if (saluteReadResult != UsbResult.Success)
             throw new IOException($"HLink salute read failed: {saluteReadResult}.");
-        var saluteResponse = Encoding.UTF8.GetString(response, 0, bytesRead);
+        var saluteResponse = Encoding.UTF8.GetString(flushBuf, 0, bytesRead);
         if (saluteResponse != "HLink v0")
             throw new IOException($"Unexpected HLink salute response '{saluteResponse}'.");
     }
@@ -122,25 +122,30 @@ internal sealed class HLink(IUsbInterface usb, ILogger<HLink>? logger = null)
             // USB bulk reads return variable length chunks. A single HLink message may
             // arrive across multiple reads, or one read may contain multiple messages.
             var result = usb.BulkRead(readBuf, out var bytesRead, readTimeout);
-            if (result == UsbResult.Timeout)
-            {
-                logger?.LogDebug(
-                    "HLink receive timed out after {Elapsed} ms, {Buffered} bytes still buffered",
-                    deadline.ElapsedMilliseconds,
-                    _readBuffer.Length
-                );
-                continue;
-            }
-            if (result != UsbResult.Success)
+            if (result is not UsbResult.Success and not UsbResult.Timeout)
                 throw new IOException($"HLink receive failed: {result}.");
 
             // Accumulate received bytes; we may need several reads before a complete
-            // HLink message is available.
+            // HLink message is available. A read that times out may still return data, e.g.
+            // when a message ends exactly on a USB packet boundary; that data must be kept.
             var combined = new byte[_readBuffer.Length + bytesRead];
             _readBuffer.CopyTo(combined, 0);
             Buffer.BlockCopy(readBuf, 0, combined, _readBuffer.Length, bytesRead);
             _readBuffer = combined;
+
+            if (result == UsbResult.Timeout)
+            {
+                logger?.LogDebug(
+                    "HLink receive timed out after {Elapsed} ms, {Buffered} bytes buffered",
+                    deadline.ElapsedMilliseconds,
+                    _readBuffer.Length
+                );
+            }
         }
+
+        // The last read may have completed a message
+        if (TryParseMessage(topic, out var lastPayload))
+            return lastPayload;
 
         throw new TimeoutException($"HLink reply '{topic}' not received within {timeout} ms.");
     }

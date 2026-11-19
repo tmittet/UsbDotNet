@@ -31,10 +31,40 @@ public interface IUsbInterface : IDisposable
     /// received or the optional timeout is reached. Under the hood it submits a libusb transfer,
     /// then waits for a transfer completion, timeout or an error callback to be received.
     /// </summary>
-    /// <param name="destination">A destination data span for read bytes</param>
-    /// <param name="bytesRead">The number of bytes read</param>
+    /// <remarks>
+    /// <para>
+    /// A bulk read completes when the device ends the transfer with a short packet (a packet
+    /// smaller than the endpoint max packet size, including a zero length packet) or when the
+    /// requested number of bytes has been received. When the device sends an exact multiple of
+    /// the max packet size without a terminating zero length packet, and fewer bytes than the
+    /// length of <paramref name="destination"/>, the read does not complete until it times out.
+    /// To avoid waiting for the timeout, request exactly the number of bytes that are expected.
+    /// This is how USB bulk transfers work; it is not specific to libusb or an operating system.
+    /// </para>
+    /// <para>
+    /// A read that returns Timeout, Interrupted or another error may still have received data.
+    /// Always check <paramref name="bytesRead"/>, also when the result is not Success. A timeout
+    /// that occurs at the same moment as data arrives, may return both Timeout and the data.
+    /// </para>
+    /// <para>
+    /// The length of <paramref name="destination"/> must be a non-zero multiple of the endpoint
+    /// max packet size, see <see cref="TryGetInputEndpoint"/>. A read of any other length works
+    /// on some operating systems, but on others it fails with Overflow and loses data when the
+    /// device sends more than requested; it is rejected on all of them. At most 32 KB is read
+    /// in a single call; a longer <paramref name="destination"/> is not filled.
+    /// </para>
+    /// </remarks>
+    /// <param name="destination">
+    /// A destination data span for read bytes. The length is the max number of bytes to read.
+    /// </param>
+    /// <param name="bytesRead">
+    /// The number of bytes read. May be greater than zero when the result is not Success.
+    /// </param>
     /// <param name="timeout">An optional timeout for the read operation</param>
-    /// <exception cref="ArgumentException">Thrown when timeout is invalid.</exception>
+    /// <exception cref="ArgumentException">
+    /// Thrown when timeout is invalid, or when the length of <paramref name="destination"/> is not
+    /// a non-zero multiple of the endpoint max packet size.
+    /// </exception>
     /// <exception cref="ObjectDisposedException">Thrown when UsbInterface is disposed.</exception>
     /// <exception cref="InvalidOperationException">
     /// Thrown when no input endpoint is found for this interface.
@@ -46,9 +76,9 @@ public interface IUsbInterface : IDisposable
     /// <item>InvalidParameter = Transfer size is larger than OS or hardware can support.</item>
     /// <item>NoDevice = The device has been disconnected.</item>
     /// <item>PipeError = Halt condition detected (endpoint stalled).</item>
-    /// <item>Timeout = The read operation timed out.</item>
+    /// <item>Timeout = The read operation timed out. Data may still have been received.</item>
     /// <item>Overflow = The device sent more data than expected.</item>
-    /// <item>Interrupted = The read operation was canceled.</item>
+    /// <item>Interrupted = The read operation was canceled. Data may still have been received.</item>
     /// <item>NotSupported = The transfer flags are not supported by the operating system.</item>
     /// </list>
     /// </returns>
@@ -59,8 +89,24 @@ public interface IUsbInterface : IDisposable
     /// been written or the timeout is reached. Under the hood it submits a libusb transfer, then
     /// waits for the transfer completed, timeout or error callback to be received.
     /// </summary>
+    /// <remarks>
+    /// <para>
+    /// At most 32 KB is written in a single call. When <paramref name="source"/> is longer, the
+    /// result is Success and <paramref name="bytesWritten"/> is less than the source length; call
+    /// again with the remaining data. A write that returns Timeout or another error may also have
+    /// written some of the data, always check <paramref name="bytesWritten"/>.
+    /// </para>
+    /// <para>
+    /// No zero length packet is added when the length of <paramref name="source"/> is a multiple
+    /// of the endpoint max packet size. A device that reads more bytes than it is sent, will not
+    /// see the end of such a transfer. Write an empty <paramref name="source"/> to send a zero
+    /// length packet, if the device protocol requires one.
+    /// </para>
+    /// </remarks>
     /// <param name="source">A source span of data to write</param>
-    /// <param name="bytesWritten">The number of bytes written</param>
+    /// <param name="bytesWritten">
+    /// The number of bytes written. May be less than the length of <paramref name="source"/>.
+    /// </param>
     /// <param name="timeout">A timeout for the write operation</param>
     /// <exception cref="ArgumentException">Thrown when the timeout is invalid.</exception>
     /// <exception cref="ObjectDisposedException">Thrown when the UsbInterface is disposed</exception>

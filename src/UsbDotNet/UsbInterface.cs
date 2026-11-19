@@ -140,7 +140,14 @@ public sealed class UsbInterface : IUsbInterface
             }
             try
             {
+                var maxPacketSize = _readEndpoint.Value.MaxPacketSize;
+                CheckDestinationSpanLength(destination, maxPacketSize);
                 var bufferLength = Math.Min(destination.Length, ReadBufferSize);
+                if (maxPacketSize > 0)
+                {
+                    // Keep the buffer length a multiple of the max packet size when it is capped
+                    bufferLength -= bufferLength % maxPacketSize;
+                }
                 lock (_bulkReadLock)
                 {
                     var result = LibUsbTransfer.ExecuteSync(
@@ -256,6 +263,25 @@ public sealed class UsbInterface : IUsbInterface
             );
         }
         return endpoint;
+    }
+
+    /// <summary>
+    /// Throw ArgumentException when the read buffer length is not a non-zero multiple of the
+    /// endpoint max packet size. Such a read works on some operating systems, but on others it
+    /// fails with an overflow and loses data when the device sends more than the requested length.
+    /// </summary>
+    private static void CheckDestinationSpanLength(Span<byte> destination, ushort maxPacketSize)
+    {
+        // A max packet size of zero means that the size is not known, the length is not checked
+        var length = destination.Length;
+        if (maxPacketSize > 0 && (length == 0 || length % maxPacketSize != 0))
+        {
+            throw new ArgumentException(
+                $"Invalid read buffer length {length}; must be a non-zero multiple of the endpoint "
+                    + $"max packet size ({maxPacketSize}).",
+                nameof(destination)
+            );
+        }
     }
 
     /// <summary>
