@@ -419,6 +419,20 @@ internal sealed class FakeLibusbApi : ILibUsbApi
         return err;
     }
 
+    public libusb_error libusb_set_interface_alt_setting(
+        IntPtr handle,
+        byte interface_number,
+        byte alternate_setting
+    )
+    {
+        var err = MaybeFail(nameof(libusb_set_interface_alt_setting));
+        if (err != libusb_error.LIBUSB_SUCCESS)
+            return err;
+        return _claimed.Contains((handle, interface_number))
+            ? libusb_error.LIBUSB_SUCCESS
+            : libusb_error.LIBUSB_ERROR_NOT_FOUND;
+    }
+
     // ------------- Strings -------------
     public libusb_error libusb_get_device_string(
         IntPtr dev,

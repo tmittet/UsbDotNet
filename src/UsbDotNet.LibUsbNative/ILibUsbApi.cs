@@ -240,6 +240,21 @@ public interface ILibUsbApi
     libusb_error libusb_release_interface(IntPtr handle, byte interface_number);
 
     /// <summary>
+    /// Activate an alternate setting for an interface. The interface must have been previously
+    /// claimed with libusb_claim_interface(). This is a blocking function.
+    /// <para>
+    /// You should always use this function rather than formulating your own SET_INTERFACE control
+    /// request. This is because the underlying operating system needs to know when such changes
+    /// happen.
+    /// </para>
+    /// </summary>
+    libusb_error libusb_set_interface_alt_setting(
+        IntPtr handle,
+        byte interface_number,
+        byte alternate_setting
+    );
+
+    /// <summary>
     /// Wrapper around libusb_get_string_descriptor(). Uses the first language supported by the
     /// device. The function formulates the appropriate control message to retrieve the descriptor,
     /// and converts the Unicode string returned by the device to ASCII.

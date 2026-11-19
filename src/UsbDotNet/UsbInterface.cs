@@ -45,6 +45,9 @@ public sealed class UsbInterface : IUsbInterface
     /// <inheritdoc/>
     public byte Number => _descriptor.InterfaceNumber;
 
+    /// <inheritdoc/>
+    public byte AlternateSetting => _descriptor.AlternateSetting;
+
     /// <summary>
     /// A type representing a claimed USB interface.
     /// </summary>

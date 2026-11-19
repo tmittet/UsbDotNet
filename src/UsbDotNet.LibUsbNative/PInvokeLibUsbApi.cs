@@ -115,6 +115,13 @@ public sealed class PInvokeLibUsbApi : ILibUsbApi
     [DllImport(Lib, CallingConvention = CallingConvention.Cdecl)]
     private static extern libusb_error libusb_release_interface(IntPtr h, int iface);
 
+    [DllImport(Lib, CallingConvention = CallingConvention.Cdecl)]
+    private static extern libusb_error libusb_set_interface_alt_setting(
+        IntPtr h,
+        int iface,
+        int alt
+    );
+
     #endregion
 
     #region Strings
@@ -281,6 +288,10 @@ public sealed class PInvokeLibUsbApi : ILibUsbApi
     /// <inheritdoc/>
     libusb_error ILibUsbApi.libusb_release_interface(IntPtr h, byte i) =>
         libusb_release_interface(h, i);
+
+    /// <inheritdoc/>
+    libusb_error ILibUsbApi.libusb_set_interface_alt_setting(IntPtr h, byte i, byte alt) =>
+        libusb_set_interface_alt_setting(h, i, alt);
 
     /// <inheritdoc/>
     libusb_error ILibUsbApi.libusb_get_string_descriptor_ascii(

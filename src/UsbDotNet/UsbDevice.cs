@@ -268,6 +268,27 @@ public sealed class UsbDevice : IUsbDevice
                     ex
                 );
             }
+            // A claimed interface is on the default alternate setting (0); releasing an interface
+            // resets it. Only another alternate setting has to be selected, and the default is
+            // not requested explicitly since a device with a single setting may stall on it.
+            if (descriptor.AlternateSetting != 0)
+            {
+                try
+                {
+                    claimedInterface.SetAlternateSetting(descriptor.AlternateSetting);
+                }
+                catch (LibUsbException ex)
+                {
+                    claimedInterface.Dispose();
+                    throw new UsbException(
+                        ex.Code,
+                        $"Failed to select alternate setting {descriptor.AlternateSetting} of "
+                            + $"interface {descriptor.InterfaceNumber} "
+                            + $"on device '{_descriptor.DeviceKey}'.",
+                        ex
+                    );
+                }
+            }
             var usbInterface = new UsbInterface(
                 LoggerFactory.CreateLogger<UsbInterface>(),
                 this,

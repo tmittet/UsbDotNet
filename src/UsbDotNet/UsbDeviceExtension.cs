@@ -20,11 +20,9 @@ public static class UsbDeviceExtension
     /// <param name="interfaceClass">Interface class filter.</param>
     /// <param name="subClass">Optional interface sub-class filter.</param>
     /// <param name="protocol">Optional interface protocol filter.</param>
-    /// <exception cref="ArgumentException">
-    /// Thrown when the USB interface is already claimed.
-    /// </exception>
     /// <exception cref="InvalidOperationException">
-    /// Thrown when a USB interface of the provided class or optional protocol is not found.
+    /// Thrown when a USB interface of the provided class or optional protocol is not found,
+    /// or when the USB interface is already claimed.
     /// </exception>
     /// <exception cref="UsbException">
     /// Thrown when the USB interface claim operation fails.

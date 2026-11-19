@@ -15,6 +15,11 @@ public interface IUsbInterface : IDisposable
     byte Number { get; }
 
     /// <summary>
+    /// The alternate setting that was selected when this interface was claimed.
+    /// </summary>
+    byte AlternateSetting { get; }
+
+    /// <summary>
     /// Get an input endpoint of the given transfer type, if one exists. If more than one is found,
     /// the first is returned. For the bulk transfer type, this is the endpoint used by
     /// <see cref="BulkRead"/>.
