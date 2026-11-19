@@ -100,13 +100,13 @@ public sealed class UsbInterface : IUsbInterface
     /// <inheritdoc/>
     public bool TryGetInputEndpoint(
         [NotNullWhen(true)] out IUsbEndpointDescriptor? endpoint,
-        UsbEndpointTransferType transferType
+        UsbEndpointTransferType transferType = UsbEndpointTransferType.Bulk
     ) => TryGetEndpoint(_readEndpoint, UsbEndpointDirection.Input, transferType, out endpoint);
 
     /// <inheritdoc/>
     public bool TryGetOutputEndpoint(
         [NotNullWhen(true)] out IUsbEndpointDescriptor? endpoint,
-        UsbEndpointTransferType transferType
+        UsbEndpointTransferType transferType = UsbEndpointTransferType.Bulk
     ) => TryGetEndpoint(_writeEndpoint, UsbEndpointDirection.Output, transferType, out endpoint);
 
     private bool TryGetEndpoint(
