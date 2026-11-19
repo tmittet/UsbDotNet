@@ -263,7 +263,8 @@ public sealed class UsbDevice : IUsbDevice
             {
                 throw new UsbException(
                     ex.Code,
-                    "Failed to claim interface {InterfaceNumber} on device {DeviceKey}.",
+                    $"Failed to claim interface {descriptor.InterfaceNumber} "
+                        + $"on device '{_descriptor.DeviceKey}'.",
                     ex
                 );
             }

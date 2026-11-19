@@ -154,6 +154,24 @@ public sealed class Given_a_fake_claimed_USB_interface : IDisposable
     }
 
     [Fact]
+    public void ClaimInterface_failure_message_names_the_interface_and_the_device()
+    {
+        using var device = CreateFakeDevice(out var handle);
+        A.CallTo(() => handle.ClaimInterface(A<byte>._))
+            .Throws(new LibUsbException(libusb_error.LIBUSB_ERROR_BUSY, "Native claim failed."));
+        var descriptor = A.Fake<IUsbInterfaceDescriptor>();
+        A.CallTo(() => descriptor.InterfaceNumber).Returns((byte)3);
+
+        var act = () => device.ClaimInterface(descriptor);
+
+        act.Should()
+            .Throw<UsbException>()
+            .WithMessage("Failed to claim interface 3 on device 'FAKE_0000_0_0'.")
+            .Which.Code.Should()
+            .Be(UsbResult.ResourceBusy);
+    }
+
+    [Fact]
     public void Dispose_does_not_throw_when_BulkReads_race_an_in_progress_dispose()
     {
         // Deterministic repro of the race behind the failure in
