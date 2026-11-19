@@ -154,6 +154,9 @@ public interface IUsbDevice : IDisposable
     /// when it is released depends on the operating system.
     /// </para>
     /// </summary>
+    /// <exception cref="ArgumentNullException">
+    /// Thrown when <paramref name="descriptor"/> is null.
+    /// </exception>
     /// <exception cref="InvalidOperationException">
     /// Thrown when the USB interface is already claimed, with any alternate setting.
     /// </exception>

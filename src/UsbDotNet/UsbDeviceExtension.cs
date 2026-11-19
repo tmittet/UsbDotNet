@@ -15,6 +15,11 @@ public static class UsbDeviceExtension
     /// NOTE: When more than one matching interface is found, the first interface found,
     /// ordered by interface number and alternate setting, is selected and claimed.
     /// </para>
+    /// <para>
+    /// The alternate setting of the selected interface descriptor is selected on the device,
+    /// which may send a SET_INTERFACE request to the device; see
+    /// <see cref="IUsbDevice.ClaimInterface(IUsbInterfaceDescriptor)"/>.
+    /// </para>
     /// </summary>
     /// <param name="device">A UsbDevice instance.</param>
     /// <param name="interfaceClass">Interface class filter.</param>
@@ -25,7 +30,8 @@ public static class UsbDeviceExtension
     /// or when the USB interface is already claimed.
     /// </exception>
     /// <exception cref="UsbException">
-    /// Thrown when the USB interface claim operation fails.
+    /// Thrown when the USB interface claim operation fails, or when the alternate setting cannot
+    /// be selected; the interface is then not claimed.
     /// </exception>
     /// <exception cref="ObjectDisposedException">
     /// Thrown when the UsbDevice is disposed.
