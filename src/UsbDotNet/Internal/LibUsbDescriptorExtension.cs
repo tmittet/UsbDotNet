@@ -53,7 +53,7 @@ internal static class LibUsbDescriptorExtension
         new UsbEndpointDescriptor(
             EndpointAddress: new UsbEndpointAddress(descriptor.bEndpointAddress.RawValue),
             Attributes: new UsbEndpointAttributes(descriptor.bmAttributes.RawValue),
-            MaxPacketSize: descriptor.wMaxPacketSize,
+            MaxPacketSizeRawValue: descriptor.wMaxPacketSize,
             Interval: descriptor.bInterval,
             Refresh: descriptor.bRefresh,
             SynchAddress: descriptor.bSynchAddress,

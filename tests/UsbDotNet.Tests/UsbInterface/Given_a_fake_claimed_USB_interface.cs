@@ -500,8 +500,7 @@ public sealed class Given_a_fake_claimed_USB_interface : IDisposable
     )
     {
         using var device = CreateFakeDevice(out var handle);
-        var endpoint = FakeEndpoint(0x81, UsbEndpointTransferType.Interrupt);
-        A.CallTo(() => endpoint.MaxPacketSize).Returns(maxPacketSize);
+        var endpoint = HighBandwidthInterruptInputEndpoint(maxPacketSize);
         using var usbInterface = ClaimFakeInterface(device, handle, endpoint);
 
         var transfer = CaptureSubmittedTransfer(
@@ -517,14 +516,29 @@ public sealed class Given_a_fake_claimed_USB_interface : IDisposable
     public void Read_checks_the_buffer_length_against_the_packet_size_of_a_high_bandwidth_endpoint()
     {
         using var device = CreateFakeDevice(out var handle);
-        var endpoint = FakeEndpoint(0x81, UsbEndpointTransferType.Interrupt);
-        A.CallTo(() => endpoint.MaxPacketSize).Returns((ushort)0x1400);
+        var endpoint = HighBandwidthInterruptInputEndpoint(0x1400);
         using var usbInterface = ClaimFakeInterface(device, handle, endpoint);
 
         var act = () => usbInterface.Read(endpoint, new byte[1000], out _, 100);
 
         act.Should().Throw<ArgumentException>().WithMessage("*multiple of the endpoint*(1024)*");
     }
+
+    /// <summary>
+    /// A real endpoint descriptor, with the raw wMaxPacketSize value of the USB descriptor.
+    /// </summary>
+    private static IUsbEndpointDescriptor HighBandwidthInterruptInputEndpoint(
+        ushort maxPacketSizeRawValue
+    ) =>
+        new UsbEndpointDescriptor(
+            new UsbEndpointAddress(0x81),
+            new UsbEndpointAttributes((byte)UsbEndpointTransferType.Interrupt),
+            maxPacketSizeRawValue,
+            Interval: 1,
+            Refresh: 0,
+            SynchAddress: 0,
+            ExtraBytes: []
+        );
 
     [Fact]
     public void Read_and_Write_return_Interrupted_when_the_interface_is_disposed()

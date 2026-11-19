@@ -17,11 +17,6 @@ public sealed class UsbInterface : IUsbInterface
     // Typical MaxPacketSize values for USB 2.0 and 3.0 are 512 and 1024.
     private const int TransferBufferSize = 32 * 1024;
 
-    // Bits 0-10 of wMaxPacketSize are the max packet size. For high-speed, high-bandwidth
-    // interrupt and isochronous endpoints, bits 11-12 are the number of additional transactions
-    // per microframe; they are not part of the packet size. Bits 13-15 are reserved.
-    private const int MaxPacketSizeMask = 0x07FF;
-
     private readonly ILogger<UsbInterface> _logger;
     private readonly UsbDevice _device;
     private readonly IUsbInterfaceDescriptor _descriptor;
@@ -199,7 +194,7 @@ public sealed class UsbInterface : IUsbInterface
             EnterTransferLock();
             try
             {
-                var maxPacketSize = (ushort)(endpoint.MaxPacketSize & MaxPacketSizeMask);
+                var maxPacketSize = endpoint.MaxPacketSize;
                 CheckDestinationSpanLength(destination, maxPacketSize);
                 var bufferLength = Math.Min(destination.Length, TransferBufferSize);
                 if (maxPacketSize > 0)

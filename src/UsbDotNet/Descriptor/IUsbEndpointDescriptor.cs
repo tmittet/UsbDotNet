@@ -25,9 +25,25 @@ public interface IUsbEndpointDescriptor
     UsbEndpointAttributes Attributes { get; }
 
     /// <summary>
-    /// Maximum packet size this endpoint is capable of sending/receiving.
+    /// Maximum packet size, in bytes, this endpoint is capable of sending/receiving.
+    /// <para>
+    /// This is the packet size only, bits 0-10 of the wMaxPacketSize descriptor field. The
+    /// additional transaction bits of the field are not included, see
+    /// <see cref="AdditionalTransactions"/>.
+    /// </para>
     /// </summary>
     ushort MaxPacketSize { get; }
+
+    /// <summary>
+    /// The number of additional transaction opportunities per microframe, bits 11-12 of the
+    /// wMaxPacketSize descriptor field: 0, 1 or 2 (3 is reserved).
+    /// <para>
+    /// Only used by high-speed, high-bandwidth interrupt and isochronous endpoints, which can
+    /// transfer up to (1 + AdditionalTransactions) packets of <see cref="MaxPacketSize"/> bytes
+    /// per microframe. It is 0 for all other endpoints.
+    /// </para>
+    /// </summary>
+    byte AdditionalTransactions { get; }
 
     /// <summary>
     /// Interval for polling endpoint for data transfers.
