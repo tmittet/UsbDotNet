@@ -130,17 +130,6 @@ public sealed class Usb : IUsb, IUsbInternal
         }
     }
 
-    /// <inheritdoc/>
-    [Obsolete(
-        "Configure native LogLevel via UsbDotNetOptions when using constructor or DI, and "
-            + "call parameterless Initialize(). This overload will be removed in a future version."
-    )]
-    public void Initialize(LogLevel nativeLibraryLogLevel)
-    {
-        _options.NativeLibraryLogLevel = nativeLibraryLogLevel;
-        Initialize();
-    }
-
     private void InitializeLibUsbLogHandler(ISafeContext context, LogLevel logLevel)
     {
         if (logLevel == LogLevel.None)
@@ -168,22 +157,6 @@ public sealed class Usb : IUsb, IUsbInternal
             _logger.LogWarning("Failed to set LIBUSB_OPTION_LOG_LEVEL: {ErrorMessage}", ex.Message);
         }
     }
-
-    /// <inheritdoc/>
-    [Obsolete(
-        "Use UsbDotNet.Hotplug package instead. This method will be removed in a future version."
-    )]
-    public bool RegisterHotplug(
-        UsbClass? deviceClass = default,
-        ushort? vendorId = default,
-        ushort? productId = default
-    ) =>
-        _hotplug.RegisterHotplugWithoutListener(deviceClass, vendorId, productId) switch
-        {
-            HotplugRegistrationResult.Success => true,
-            HotplugRegistrationResult.NotSupported => false,
-            HotplugRegistrationResult.AlreadyRegistered => true,
-        };
 
     /// <inheritdoc/>
     public IReadOnlyCollection<IUsbDeviceDescriptor> GetDeviceList(IUsbDeviceFilter? filter = null)

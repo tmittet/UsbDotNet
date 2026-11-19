@@ -23,10 +23,14 @@ public sealed class Given_a_video_class_USB_device_with_UVC : IDisposable
         _libusb = new LibUsb();
         _loggerFactory = new TestLoggerFactory(output);
         _logger = _loggerFactory.CreateLogger<Given_a_video_class_USB_device_with_UVC>();
-        _usb = new Usb(_libusb, _loggerFactory);
+        _usb = new Usb(
+            _libusb,
+            _loggerFactory,
+            new UsbDotNetOptions { NativeLibraryLogLevel = LogLevel.Information }
+        );
         try
         {
-            _usb.Initialize(LogLevel.Information);
+            _usb.Initialize();
             _deviceSource = new TestDeviceSource(_logger, _usb);
             _deviceSource.SetPreferredVendorId(HuddlyVendorId);
             _deviceSource.SetRequiredInterfaceClass(UsbClass.Video, TestDeviceAccess.Control);

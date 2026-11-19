@@ -90,15 +90,12 @@ internal sealed class HotplugProvider : IHotplugProvider
                 return HotplugRegistrationResult.AlreadyRegistered;
             }
             // Attach before registering: the enumeration replay must reach the listener.
-            // The rollback below covers the registration outcomes: AlreadyRegistered from a
-            // listenerless legacy hotplug registration, NotSupported, and throws for
-            // uninitialized and disposed.
+            // The rollback below covers the registration outcomes: NotSupported, and throws
+            // for uninitialized and disposed.
             _listener = listener;
             try
             {
-                var result = _usb.WithInitializedContext(context =>
-                    RegisterUnlocked(context, deviceClass: null, vendorId: null, productId: null)
-                );
+                var result = _usb.WithInitializedContext(RegisterUnlocked);
                 if (result is not HotplugRegistrationResult.Success)
                 {
                     _listener = null;
@@ -136,25 +133,6 @@ internal sealed class HotplugProvider : IHotplugProvider
             var handle = Interlocked.Exchange(ref _callbackHandle, null);
             handle?.Dispose();
             ReleaseDeviceCache();
-        }
-    }
-
-    /// <summary>
-    /// Registers the native callback without attaching a listener; backs the legacy
-    /// <see cref="Usb.RegisterHotplug"/> API and is removed with it.
-    /// </summary>
-    [Obsolete("This method will be removed in a future version.")]
-    internal HotplugRegistrationResult RegisterHotplugWithoutListener(
-        UsbClass? deviceClass,
-        ushort? vendorId,
-        ushort? productId
-    )
-    {
-        lock (_dispatchLock)
-        {
-            return _usb.WithInitializedContext(context =>
-                RegisterUnlocked(context, deviceClass, vendorId, productId)
-            );
         }
     }
 
@@ -215,22 +193,19 @@ internal sealed class HotplugProvider : IHotplugProvider
         }
     }
 
-    // Runs under _dispatchLock and the usb's lifetime lock (via WithInitializedContext).
-    private HotplugRegistrationResult RegisterUnlocked(
-        ISafeContext context,
-        UsbClass? deviceClass,
-        ushort? vendorId,
-        ushort? productId
-    )
+    /// <summary>
+    /// Registers the native hotplug callback for all devices and stores its handle. The caller
+    /// must hold <see cref="_dispatchLock"/> and the usb lifetime lock (see
+    /// <see cref="IUsbInternal.WithInitializedContext{T}"/>), and must have verified that no
+    /// listener is attached. With no listener attached there is no callback handle either, since
+    /// the handle is only set here and is cleared together with the listener.
+    /// </summary>
+    private HotplugRegistrationResult RegisterUnlocked(ISafeContext context)
     {
         if (!_usb.IsHotplugSupported)
         {
             _logger.LogDebug("Hotplug not supported or unimplemented on this platform.");
             return HotplugRegistrationResult.NotSupported;
-        }
-        if (_callbackHandle is not null)
-        {
-            return HotplugRegistrationResult.AlreadyRegistered;
         }
         // We do not follow the recommended libusb init pattern: hotplug first then event
         // loop. See:
@@ -244,10 +219,7 @@ internal sealed class HotplugProvider : IHotplugProvider
             // Set flag LibUsbHotplugFlag.Enumerate to immediately invoke the
             // HotplugEventCallback method for currently attached devices on register
             libusb_hotplug_flag.LIBUSB_HOTPLUG_ENUMERATE,
-            HotplugEventCallback,
-            deviceClass is null ? null : (libusb_class_code)deviceClass,
-            vendorId,
-            productId
+            HotplugEventCallback
         );
         return HotplugRegistrationResult.Success;
     }
