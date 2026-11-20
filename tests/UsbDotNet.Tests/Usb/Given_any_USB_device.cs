@@ -64,7 +64,7 @@ public sealed class Given_any_USB_device : IDisposable
     }
 
     [SkippableFact]
-    public void GetDeviceList_returns_a_known_speed_for_at_least_one_USB_device()
+    public void GetDeviceList_returns_a_defined_speed_for_every_USB_device()
     {
         var descriptors = _usb.GetDeviceList();
         Skip.If(descriptors.Count == 0, "No USB device available.");
@@ -78,7 +78,11 @@ public sealed class Given_any_USB_device : IDisposable
             );
             descriptor.Speed.Should().BeDefined();
         }
-        descriptors.Should().Contain(d => d.Speed != UsbSpeed.Unknown);
+        // Not every operating system reports the speed; all Unknown is then a valid result
+        Skip.IfNot(
+            descriptors.Any(d => d.Speed != UsbSpeed.Unknown),
+            "The operating system does not report the speed of any connected USB device."
+        );
     }
 
     [SkippableFact]
