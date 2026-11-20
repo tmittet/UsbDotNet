@@ -20,6 +20,13 @@ public interface IUsb : IDisposable
     void Initialize();
 
     /// <summary>
+    /// The low level hotplug API of this instance: registers the listener that is notified when
+    /// a USB device is connected or disconnected. The UsbDotNet.Hotplug package builds device
+    /// tracking, filtering and any number of subscribers on top of it.
+    /// </summary>
+    IUsbHotplugProvider Hotplug { get; }
+
+    /// <summary>
     /// Returns a list of device descriptors for connected USB devices.
     /// It does not involve any requests being sent to the devices.
     /// </summary>

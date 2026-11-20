@@ -3,12 +3,11 @@ using System.Threading.Channels;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using UsbDotNet.Descriptor;
-using UsbDotNet.Internal;
 
 namespace UsbDotNet.Hotplug;
 
 /// <inheritdoc/>
-public sealed class UsbHotplugMonitor : IUsbHotplugMonitor, IHotplugListener
+public sealed class UsbHotplugMonitor : IUsbHotplugMonitor, IUsbHotplugListener
 {
     private const string AlreadyRegisteredMessage =
         "Hotplug is already registered on this IUsb. Only one UsbHotplugMonitor may "
@@ -34,7 +33,7 @@ public sealed class UsbHotplugMonitor : IUsbHotplugMonitor, IHotplugListener
     /// </summary>
     private readonly object _lock = new();
 
-    private readonly IHotplugProvider _provider;
+    private readonly IUsbHotplugProvider _provider;
     private readonly ILogger<UsbHotplugMonitor> _logger;
 
     // Devices currently connected, keyed by DeviceKey. Mutated only under _lock, from the
@@ -66,23 +65,14 @@ public sealed class UsbHotplugMonitor : IUsbHotplugMonitor, IHotplugListener
     /// Creates a new <see cref="UsbHotplugMonitor"/> over the given <see cref="IUsb"/> instance.
     /// </summary>
     /// <param name="usb">
-    /// The IUsb instance to monitor for hotplug events (must be of type <see cref="Usb"/>).
+    /// The IUsb instance to monitor for hotplug events. The monitor owns the hotplug registration
+    /// of the instance; see <see cref="IUsb.Hotplug"/>.
     /// </param>
     /// <param name="loggerFactory">A <see cref="ILoggerFactory"/> to create loggers.</param>
-    /// <exception cref="ArgumentException">
-    /// Thrown if <paramref name="usb"/> is not of type <see cref="Usb"/>,
-    /// which is required to support hotplug registration.
-    /// </exception>
     public static UsbHotplugMonitor Create(IUsb usb, ILoggerFactory? loggerFactory = null)
     {
         ArgumentNullException.ThrowIfNull(usb);
-        var usbWithProvider =
-            usb as Usb
-            ?? throw new ArgumentException(
-                "The IUsb implementation must be of type Usb to support hotplug registration.",
-                nameof(usb)
-            );
-        return new UsbHotplugMonitor(usbWithProvider.HotplugProvider, loggerFactory);
+        return new UsbHotplugMonitor(usb.Hotplug, loggerFactory);
     }
 
     /// <summary>Live subscriptions.</summary>
@@ -109,7 +99,7 @@ public sealed class UsbHotplugMonitor : IUsbHotplugMonitor, IHotplugListener
         }
     }
 
-    internal UsbHotplugMonitor(IHotplugProvider provider, ILoggerFactory? loggerFactory = null)
+    internal UsbHotplugMonitor(IUsbHotplugProvider provider, ILoggerFactory? loggerFactory = null)
     {
         _provider = provider ?? throw new ArgumentNullException(nameof(provider));
         _logger = loggerFactory is null
@@ -221,11 +211,11 @@ public sealed class UsbHotplugMonitor : IUsbHotplugMonitor, IHotplugListener
             {
                 _registered = _provider.RegisterHotplug(this) switch
                 {
-                    HotplugRegistrationResult.Success => true,
-                    HotplugRegistrationResult.NotSupported => throw new NotSupportedException(
+                    UsbHotplugRegistrationResult.Success => true,
+                    UsbHotplugRegistrationResult.NotSupported => throw new NotSupportedException(
                         "Hotplug is not supported on this platform."
                     ),
-                    HotplugRegistrationResult.AlreadyRegistered =>
+                    UsbHotplugRegistrationResult.AlreadyRegistered =>
                         throw new InvalidOperationException(AlreadyRegisteredMessage),
                 };
             }
@@ -243,10 +233,10 @@ public sealed class UsbHotplugMonitor : IUsbHotplugMonitor, IHotplugListener
         }
     }
 
-    void IHotplugListener.OnDeviceArrived(IUsbDeviceDescriptor descriptor) =>
+    void IUsbHotplugListener.OnDeviceArrived(IUsbDeviceDescriptor descriptor) =>
         Dispatch(UsbHotplugEventType.Connected, descriptor);
 
-    void IHotplugListener.OnDeviceLeft(IUsbDeviceDescriptor descriptor) =>
+    void IUsbHotplugListener.OnDeviceLeft(IUsbDeviceDescriptor descriptor) =>
         Dispatch(UsbHotplugEventType.Disconnected, descriptor);
 
     /// <summary>
@@ -263,7 +253,7 @@ public sealed class UsbHotplugMonitor : IUsbHotplugMonitor, IHotplugListener
     {
         // Filter out devices with a synthesized descriptor (BcdUsb == 0), typically root hubs and
         // devices with an unreadable descriptor. Aligns with Usb.GetDeviceList implementation.
-        if (!descriptor.HasValidBcdUsb())
+        if (descriptor.BcdUsb == 0)
         {
             return;
         }
@@ -299,7 +289,7 @@ public sealed class UsbHotplugMonitor : IUsbHotplugMonitor, IHotplugListener
     /// can no longer reach make no sense to deliver), and let a starting subscription throw
     /// instead of replaying stale devices.
     /// </summary>
-    void IHotplugListener.OnProviderDisposed()
+    void IUsbHotplugListener.OnProviderDisposed()
     {
         List<Channel<UsbHotplugEvent>> channels;
         lock (_lock)

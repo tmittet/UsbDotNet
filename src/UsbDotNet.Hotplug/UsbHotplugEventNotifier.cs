@@ -1,7 +1,6 @@
 using System.Runtime.ExceptionServices;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
-using UsbDotNet.Internal;
 
 namespace UsbDotNet.Hotplug;
 
@@ -321,7 +320,7 @@ public sealed class UsbHotplugEventNotifier : IDisposable, IAsyncDisposable
             _dispatchThreadId = Environment.CurrentManagedThreadId;
             try
             {
-                EventDispatch.RaiseSafely(
+                HotplugEventDispatch.RaiseSafely(
                     handler,
                     _logger,
                     this,

@@ -10,7 +10,7 @@ namespace UsbDotNet.Internal;
 
 /// <summary>
 /// Owns the hotplug registration state and event dispatch for a <see cref="Usb"/> instance: the
-/// native callback handle, the attached <see cref="IHotplugListener"/> and the arrived-device
+/// native callback handle, the attached <see cref="IUsbHotplugListener"/> and the arrived-device
 /// cache. Context access and disposal checks go through <see cref="IUsbInternal"/>; teardown is
 /// orchestrated by <see cref="Usb.Dispose"/> via <see cref="Shutdown"/> and
 /// <see cref="NotifyProviderDisposed"/>.
@@ -19,15 +19,15 @@ namespace UsbDotNet.Internal;
 // CA1001: teardown is owned by Usb.Dispose (Shutdown -> NotifyProviderDisposed).
 // Implementing IDisposable would make the DI container, which tracks
 // every IDisposable it resolves, dispose the provider a second time behind Usb's back.
-internal sealed class HotplugProvider : IHotplugProvider
+internal sealed class HotplugProvider : IUsbHotplugProvider
 #pragma warning restore CA1001 // Types that own disposable fields should be disposable
 {
     private readonly IUsbInternal _usb;
     private readonly ILogger _logger;
 
-    private IHotplugListener? _listener;
+    private IUsbHotplugListener? _listener;
 
-    // Serializes IHotplugListener invocations across their two dispatch sources: the enumeration
+    // Serializes IUsbHotplugListener invocations across their two dispatch sources: the enumeration
     // replay libusb runs synchronously inside libusb_hotplug_register_callback (on the registering
     // thread) and live events from libusb_handle_events (on the event loop thread). Registration
     // and deregistration acquire it BEFORE the usb's lifetime lock (entered via
@@ -64,6 +64,18 @@ internal sealed class HotplugProvider : IHotplugProvider
 #pragma warning restore CA2213 // Disposable fields should be disposed
     private readonly RundownGuard _callbackRundown = new();
 
+    // The managed thread that is inside a listener notification, or 0. Written under
+    // _dispatchLock, read without it by IsDispatchingOnCurrentThread.
+    private int _dispatchThreadId;
+
+    /// <summary>
+    /// True when the calling thread is inside an <see cref="IUsbHotplugListener.OnDeviceArrived"/>
+    /// or <see cref="IUsbHotplugListener.OnDeviceLeft"/> notification of this provider. Covers
+    /// both dispatch sources: live events and the enumeration replay.
+    /// </summary>
+    internal bool IsDispatchingOnCurrentThread =>
+        Volatile.Read(ref _dispatchThreadId) == Environment.CurrentManagedThreadId;
+
     internal HotplugProvider(IUsbInternal usb, ILogger logger)
     {
         _usb = usb ?? throw new ArgumentNullException(nameof(usb));
@@ -71,10 +83,10 @@ internal sealed class HotplugProvider : IHotplugProvider
     }
 
     /// <inheritdoc/>
-    bool IHotplugProvider.IsHotplugSupported => _usb.IsHotplugSupported;
+    bool IUsbHotplugProvider.IsHotplugSupported => _usb.IsHotplugSupported;
 
     /// <inheritdoc/>
-    HotplugRegistrationResult IHotplugProvider.RegisterHotplug(IHotplugListener listener)
+    UsbHotplugRegistrationResult IUsbHotplugProvider.RegisterHotplug(IUsbHotplugListener listener)
     {
         ArgumentNullException.ThrowIfNull(listener);
         // Taken before the usb lifetime lock; all registration paths preserve the
@@ -87,7 +99,7 @@ internal sealed class HotplugProvider : IHotplugProvider
             // listener can never be handed an event that belongs to the current owner.
             if (_listener is not null)
             {
-                return HotplugRegistrationResult.AlreadyRegistered;
+                return UsbHotplugRegistrationResult.AlreadyRegistered;
             }
             // Attach before registering: the enumeration replay must reach the listener.
             // The rollback below covers the registration outcomes: NotSupported, and throws
@@ -96,7 +108,7 @@ internal sealed class HotplugProvider : IHotplugProvider
             try
             {
                 var result = _usb.WithInitializedContext(RegisterUnlocked);
-                if (result is not HotplugRegistrationResult.Success)
+                if (result is not UsbHotplugRegistrationResult.Success)
                 {
                     _listener = null;
                 }
@@ -111,7 +123,7 @@ internal sealed class HotplugProvider : IHotplugProvider
     }
 
     /// <inheritdoc/>
-    void IHotplugProvider.DeregisterHotplug(IHotplugListener listener)
+    void IUsbHotplugProvider.DeregisterHotplug(IUsbHotplugListener listener)
     {
         // Deliberately runs without a disposed check: the cleanup path (typically
         // UsbHotplugMonitor.Dispose) may race Usb.Dispose; when Shutdown already took the callback
@@ -175,14 +187,14 @@ internal sealed class HotplugProvider : IHotplugProvider
     }
 
     /// <summary>
-    /// Raises <see cref="IHotplugListener.OnProviderDisposed"/> on the attached listener, if any.
+    /// Raises <see cref="IUsbHotplugListener.OnProviderDisposed"/> on the attached listener, if any.
     /// Called at the end of <see cref="Usb.Dispose"/>, after teardown completed. The listener read
     /// is serialized with DeregisterHotplug via the dispatch lock; the callback is raised outside
     /// the lock.
     /// </summary>
     internal void NotifyProviderDisposed()
     {
-        IHotplugListener? listener;
+        IUsbHotplugListener? listener;
         lock (_dispatchLock)
         {
             listener = _listener;
@@ -200,12 +212,12 @@ internal sealed class HotplugProvider : IHotplugProvider
     /// listener is attached. With no listener attached there is no callback handle either, since
     /// the handle is only set here and is cleared together with the listener.
     /// </summary>
-    private HotplugRegistrationResult RegisterUnlocked(ISafeContext context)
+    private UsbHotplugRegistrationResult RegisterUnlocked(ISafeContext context)
     {
         if (!_usb.IsHotplugSupported)
         {
             _logger.LogDebug("Hotplug not supported or unimplemented on this platform.");
-            return HotplugRegistrationResult.NotSupported;
+            return UsbHotplugRegistrationResult.NotSupported;
         }
         // We do not follow the recommended libusb init pattern: hotplug first then event
         // loop. See:
@@ -221,7 +233,7 @@ internal sealed class HotplugProvider : IHotplugProvider
             libusb_hotplug_flag.LIBUSB_HOTPLUG_ENUMERATE,
             HotplugEventCallback
         );
-        return HotplugRegistrationResult.Success;
+        return UsbHotplugRegistrationResult.Success;
     }
 
     /// <summary>
@@ -254,7 +266,7 @@ internal sealed class HotplugProvider : IHotplugProvider
         {
             using var token = _callbackRundown.AcquireSharedToken();
             // Serialize the two dispatch sources (enumeration replay on the registering thread,
-            // live events on the event loop thread) so the IHotplugListener is never invoked
+            // live events on the event loop thread) so the IUsbHotplugListener is never invoked
             // concurrently. Reentrant for the replay, whose registering thread already holds it.
             lock (_dispatchLock)
             {
@@ -346,6 +358,16 @@ internal sealed class HotplugProvider : IHotplugProvider
             eventType == libusb_hotplug_event.LIBUSB_HOTPLUG_EVENT_DEVICE_ARRIVED
                 ? listener.OnDeviceArrived
                 : listener.OnDeviceLeft;
-        EventDispatch.RaiseSafely(callback, _logger, descriptor, descriptor.DeviceKey);
+        // Always called under _dispatchLock, so only the owning thread can nest
+        var previousDispatchThreadId = _dispatchThreadId;
+        Volatile.Write(ref _dispatchThreadId, Environment.CurrentManagedThreadId);
+        try
+        {
+            EventDispatch.RaiseSafely(callback, _logger, descriptor, descriptor.DeviceKey);
+        }
+        finally
+        {
+            Volatile.Write(ref _dispatchThreadId, previousDispatchThreadId);
+        }
     }
 }

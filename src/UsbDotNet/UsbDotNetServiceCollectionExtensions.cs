@@ -48,7 +48,6 @@ public static class UsbDotNetServiceCollectionExtensions
             return new Usb(libUsb, loggerFactory, options);
         });
         services.TryAddSingleton<IUsb>(sp => sp.GetRequiredService<Usb>());
-        services.TryAddSingleton(sp => sp.GetRequiredService<Usb>().HotplugProvider);
         return services;
     }
 }

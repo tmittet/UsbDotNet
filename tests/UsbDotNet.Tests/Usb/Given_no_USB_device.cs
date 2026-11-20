@@ -1,4 +1,3 @@
-using UsbDotNet.Internal;
 using UsbDotNet.LibUsbNative;
 using UsbDotNet.Tests.Fakes;
 
@@ -95,7 +94,7 @@ public sealed class Given_no_USB_device : IDisposable
     public void RegisterHotplug_throws_when_called_without_Initialize()
     {
         using var usb = CreateUsb();
-        var provider = usb.HotplugProvider;
+        var provider = usb.Hotplug;
         var act = () => provider.RegisterHotplug(new TestHotplugListener());
         act.Should().Throw<InvalidOperationException>();
     }
@@ -105,11 +104,11 @@ public sealed class Given_no_USB_device : IDisposable
     {
         using var usb = CreateUsb();
         usb.Initialize();
-        var provider = usb.HotplugProvider;
+        var provider = usb.Hotplug;
         provider
             .RegisterHotplug(new TestHotplugListener())
             .Should()
-            .Be(HotplugRegistrationResult.Success);
+            .Be(UsbHotplugRegistrationResult.Success);
     }
 
     [SkippableFact]
@@ -117,10 +116,10 @@ public sealed class Given_no_USB_device : IDisposable
     {
         using var usb = CreateUsb();
         usb.Initialize();
-        var provider = usb.HotplugProvider;
+        var provider = usb.Hotplug;
         Skip.IfNot(
             provider.RegisterHotplug(new TestHotplugListener())
-                == HotplugRegistrationResult.Success,
+                == UsbHotplugRegistrationResult.Success,
             "Hotplug is not supported on this platform."
         );
 
@@ -128,7 +127,7 @@ public sealed class Given_no_USB_device : IDisposable
         provider
             .RegisterHotplug(new TestHotplugListener())
             .Should()
-            .Be(HotplugRegistrationResult.AlreadyRegistered);
+            .Be(UsbHotplugRegistrationResult.AlreadyRegistered);
     }
 
     [SkippableFact]
@@ -136,10 +135,10 @@ public sealed class Given_no_USB_device : IDisposable
     {
         using var usb = CreateUsb();
         usb.Initialize();
-        var provider = usb.HotplugProvider;
+        var provider = usb.Hotplug;
         var owner = new TestHotplugListener();
         Skip.IfNot(
-            provider.RegisterHotplug(owner) == HotplugRegistrationResult.Success,
+            provider.RegisterHotplug(owner) == UsbHotplugRegistrationResult.Success,
             "Hotplug is not supported on this platform."
         );
 
@@ -148,7 +147,7 @@ public sealed class Given_no_USB_device : IDisposable
         provider
             .RegisterHotplug(new TestHotplugListener())
             .Should()
-            .Be(HotplugRegistrationResult.Success);
+            .Be(UsbHotplugRegistrationResult.Success);
     }
 
     [SkippableFact]
@@ -156,10 +155,10 @@ public sealed class Given_no_USB_device : IDisposable
     {
         using var usb = CreateUsb();
         usb.Initialize();
-        var provider = usb.HotplugProvider;
+        var provider = usb.Hotplug;
         Skip.IfNot(
             provider.RegisterHotplug(new TestHotplugListener())
-                == HotplugRegistrationResult.Success,
+                == UsbHotplugRegistrationResult.Success,
             "Hotplug is not supported on this platform."
         );
 
@@ -168,7 +167,7 @@ public sealed class Given_no_USB_device : IDisposable
         provider
             .RegisterHotplug(new TestHotplugListener())
             .Should()
-            .Be(HotplugRegistrationResult.AlreadyRegistered);
+            .Be(UsbHotplugRegistrationResult.AlreadyRegistered);
     }
 
     public void Dispose()

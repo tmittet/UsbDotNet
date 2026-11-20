@@ -1,7 +1,6 @@
 using System.Collections.Concurrent;
 using UsbDotNet.Core;
 using UsbDotNet.Descriptor;
-using UsbDotNet.Internal;
 using UsbDotNet.LibUsbNative;
 using UsbDotNet.Tests.Fakes;
 
@@ -272,7 +271,7 @@ public sealed class Given_any_USB_device : IDisposable
             "No USB device available to emit a hotplug arrived event."
         );
 
-        var provider = _usb.HotplugProvider;
+        var provider = _usb.Hotplug;
         var arrived = new ConcurrentQueue<IUsbDeviceDescriptor>();
         using var reachedExpected = new ManualResetEventSlim(false);
         var listener = new TestHotplugListener
@@ -289,7 +288,7 @@ public sealed class Given_any_USB_device : IDisposable
         // Registration with LIBUSB_HOTPLUG_ENUMERATE replays the connected devices as
         // DeviceArrived events, delivered on the libusb event loop thread.
         Skip.IfNot(
-            provider.RegisterHotplug(listener) == HotplugRegistrationResult.Success,
+            provider.RegisterHotplug(listener) == UsbHotplugRegistrationResult.Success,
             "Hotplug is not supported on this platform."
         );
         reachedExpected.Wait(EventTimeout);
@@ -327,7 +326,7 @@ public sealed class Given_any_USB_device : IDisposable
         var expected = _usb.GetDeviceList().FirstOrDefault();
         Skip.If(expected is null, "No USB device available to emit a hotplug arrived event.");
 
-        var provider = _usb.HotplugProvider;
+        var provider = _usb.Hotplug;
         var arrived = new ConcurrentDictionary<string, IUsbDeviceDescriptor>();
         using var matched = new ManualResetEventSlim(false);
         var listener = new TestHotplugListener
@@ -341,7 +340,7 @@ public sealed class Given_any_USB_device : IDisposable
         };
 
         Skip.IfNot(
-            provider.RegisterHotplug(listener) == HotplugRegistrationResult.Success,
+            provider.RegisterHotplug(listener) == UsbHotplugRegistrationResult.Success,
             "Hotplug is not supported on this platform."
         );
         matched.Wait(EventTimeout);
@@ -365,7 +364,7 @@ public sealed class Given_any_USB_device : IDisposable
     {
         // With enumeration enabled the callback runs for connected devices; delivering them to a
         // listener whose callbacks do nothing must be safe.
-        var provider = _usb.HotplugProvider;
+        var provider = _usb.Hotplug;
         var act = () => provider.RegisterHotplug(new TestHotplugListener());
         act.Should().NotThrow();
     }
@@ -378,7 +377,7 @@ public sealed class Given_any_USB_device : IDisposable
             "No USB device available to emit a hotplug arrived event."
         );
 
-        var provider = _usb.HotplugProvider;
+        var provider = _usb.Hotplug;
         using var callbackInvoked = new ManualResetEventSlim(false);
         var listener = new TestHotplugListener
         {
@@ -390,7 +389,7 @@ public sealed class Given_any_USB_device : IDisposable
         };
 
         Skip.IfNot(
-            provider.RegisterHotplug(listener) == HotplugRegistrationResult.Success,
+            provider.RegisterHotplug(listener) == UsbHotplugRegistrationResult.Success,
             "Hotplug is not supported on this platform."
         );
 

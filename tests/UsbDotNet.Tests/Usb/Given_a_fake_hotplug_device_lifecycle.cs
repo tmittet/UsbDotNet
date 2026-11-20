@@ -1,5 +1,4 @@
 using UsbDotNet.Descriptor;
-using UsbDotNet.Internal;
 using UsbDotNet.LibUsbNative;
 using UsbDotNet.LibUsbNative.Enums;
 using UsbDotNet.Tests.Fakes;
@@ -46,7 +45,7 @@ public sealed class Given_a_fake_hotplug_device_lifecycle : IDisposable
     [Fact]
     public void A_duplicate_arrival_of_the_same_device_is_ignored()
     {
-        var provider = _usb.HotplugProvider;
+        var provider = _usb.Hotplug;
         var arrivals = 0;
         string? leftKey = null;
         var listener = new TestHotplugListener
@@ -54,7 +53,7 @@ public sealed class Given_a_fake_hotplug_device_lifecycle : IDisposable
             DeviceArrived = _ => arrivals++,
             DeviceLeft = d => leftKey = d.DeviceKey,
         };
-        provider.RegisterHotplug(listener).Should().Be(HotplugRegistrationResult.Success);
+        provider.RegisterHotplug(listener).Should().Be(UsbHotplugRegistrationResult.Success);
 
         // With LIBUSB_HOTPLUG_ENUMERATE libusb may notify the arrival of the same device twice
         // (once from registration enumeration, once from the live event loop).
@@ -73,7 +72,7 @@ public sealed class Given_a_fake_hotplug_device_lifecycle : IDisposable
     [Fact]
     public void DeviceLeft_reports_the_key_captured_on_arrival_even_when_bus_address_change()
     {
-        var provider = _usb.HotplugProvider;
+        var provider = _usb.Hotplug;
         string? arrivedKey = null;
         string? leftKey = null;
         var listener = new TestHotplugListener
@@ -81,7 +80,7 @@ public sealed class Given_a_fake_hotplug_device_lifecycle : IDisposable
             DeviceArrived = d => arrivedKey = d.DeviceKey,
             DeviceLeft = d => leftKey = d.DeviceKey,
         };
-        provider.RegisterHotplug(listener).Should().Be(HotplugRegistrationResult.Success);
+        provider.RegisterHotplug(listener).Should().Be(UsbHotplugRegistrationResult.Success);
 
         // Arrival while the device is present: bus 3, address 17.
         Raise(libusb_hotplug_event.LIBUSB_HOTPLUG_EVENT_DEVICE_ARRIVED);
@@ -105,10 +104,10 @@ public sealed class Given_a_fake_hotplug_device_lifecycle : IDisposable
     [Fact]
     public void DeviceLeft_without_a_prior_arrival_is_dropped()
     {
-        var provider = _usb.HotplugProvider;
+        var provider = _usb.Hotplug;
         string? leftKey = null;
         var listener = new TestHotplugListener { DeviceLeft = d => leftKey = d.DeviceKey };
-        provider.RegisterHotplug(listener).Should().Be(HotplugRegistrationResult.Success);
+        provider.RegisterHotplug(listener).Should().Be(UsbHotplugRegistrationResult.Success);
 
         // No arrival was cached for this device, so no DeviceArrived was ever emitted. A DeviceKey
         // built now would carry unreliable bus number/address, so the event must be dropped.
@@ -125,11 +124,11 @@ public sealed class Given_a_fake_hotplug_device_lifecycle : IDisposable
     public async Task Dispose_does_not_hold_the_instance_lock_while_waiting_for_the_event_loop()
     {
         var timeout = TimeSpan.FromSeconds(5);
-        var provider = _usb.HotplugProvider;
+        var provider = _usb.Hotplug;
         provider
             .RegisterHotplug(new TestHotplugListener())
             .Should()
-            .Be(HotplugRegistrationResult.Success);
+            .Be(UsbHotplugRegistrationResult.Success);
 
         // Hold the event-loop thread inside libusb_handle_events_completed, simulating a thread
         // that cannot exit yet (in the real deadlock: blocked dispatching a hotplug event to a
@@ -173,7 +172,7 @@ public sealed class Given_a_fake_hotplug_device_lifecycle : IDisposable
     public async Task DeregisterHotplug_waits_for_an_in_flight_event()
     {
         var timeout = TimeSpan.FromSeconds(5);
-        var provider = _usb.HotplugProvider;
+        var provider = _usb.Hotplug;
         using var handlerEntered = new ManualResetEventSlim(false);
         using var handlerRelease = new ManualResetEventSlim(false);
         var listener = new TestHotplugListener
@@ -184,7 +183,7 @@ public sealed class Given_a_fake_hotplug_device_lifecycle : IDisposable
                 handlerRelease.Wait();
             },
         };
-        provider.RegisterHotplug(listener).Should().Be(HotplugRegistrationResult.Success);
+        provider.RegisterHotplug(listener).Should().Be(UsbHotplugRegistrationResult.Success);
 
         // Have the event-loop thread dispatch an arrival that blocks inside the listener.
         _api.RunOnNextHandleEventsCompleted(() =>
@@ -218,6 +217,72 @@ public sealed class Given_a_fake_hotplug_device_lifecycle : IDisposable
             // Release the gate so a failed assertion cannot hang the event loop and teardown.
             handlerRelease.Set();
         }
+    }
+
+    [Fact]
+    public void Dispose_throws_when_called_from_a_listener_callback()
+    {
+        // The callback runs on the calling thread, like the replay of connected devices does on
+        // the thread that registers
+        Exception? thrown = null;
+        var listener = new TestHotplugListener
+        {
+            DeviceArrived = _ => thrown = Record.Exception(_usb.Dispose),
+        };
+        _usb.Hotplug.RegisterHotplug(listener).Should().Be(UsbHotplugRegistrationResult.Success);
+
+        Raise(libusb_hotplug_event.LIBUSB_HOTPLUG_EVENT_DEVICE_ARRIVED);
+
+        thrown.Should().BeOfType<InvalidOperationException>();
+        // The instance is not disposed: the hotplug callback is still registered
+        _api.LastCallback.Should().NotBeNull();
+        _usb.Invoking(usb => usb.Dispose()).Should().NotThrow();
+    }
+
+    [Fact]
+    public async Task Dispose_throws_when_called_from_a_listener_callback_on_the_event_loop_thread()
+    {
+        var thrown = new TaskCompletionSource<Exception?>(
+            TaskCreationOptions.RunContinuationsAsynchronously
+        );
+        var listener = new TestHotplugListener
+        {
+            DeviceLeft = _ => thrown.TrySetResult(Record.Exception(_usb.Dispose)),
+        };
+        _usb.Hotplug.RegisterHotplug(listener).Should().Be(UsbHotplugRegistrationResult.Success);
+        Raise(libusb_hotplug_event.LIBUSB_HOTPLUG_EVENT_DEVICE_ARRIVED);
+
+        // A live event is delivered on the event loop thread, which Dispose joins
+        _api.RunOnNextHandleEventsCompleted(() =>
+            Raise(libusb_hotplug_event.LIBUSB_HOTPLUG_EVENT_DEVICE_LEFT)
+        );
+
+        (await thrown.Task.WaitAsync(TimeSpan.FromSeconds(10)))
+            .Should()
+            .BeOfType<InvalidOperationException>();
+        _usb.Invoking(usb => usb.Dispose()).Should().NotThrow();
+    }
+
+    [Fact]
+    public void Dispose_does_not_throw_from_the_provider_disposed_notification()
+    {
+        // The notification is raised after the teardown; a dispose from it is a no-op
+        Exception? thrown = null;
+        var notified = false;
+        var listener = new TestHotplugListener
+        {
+            ProviderDisposed = () =>
+            {
+                notified = true;
+                thrown = Record.Exception(_usb.Dispose);
+            },
+        };
+        _usb.Hotplug.RegisterHotplug(listener).Should().Be(UsbHotplugRegistrationResult.Success);
+
+        _usb.Dispose();
+
+        notified.Should().BeTrue();
+        thrown.Should().BeNull();
     }
 
     private void Raise(libusb_hotplug_event eventType)

@@ -1,6 +1,5 @@
 using FakeItEasy;
 using UsbDotNet.Descriptor;
-using UsbDotNet.Internal;
 
 namespace UsbDotNet.Hotplug.Tests;
 
@@ -146,12 +145,12 @@ public sealed class Given_a_hotplug_event_notifier
         _ = await awaiting.Should().ThrowAsync<OperationCanceledException>();
     }
 
-    private static IHotplugProvider CreateFakeProvider()
+    private static IUsbHotplugProvider CreateFakeProvider()
     {
-        var provider = A.Fake<IHotplugProvider>();
+        var provider = A.Fake<IUsbHotplugProvider>();
         A.CallTo(() => provider.IsHotplugSupported).Returns(true);
-        A.CallTo(() => provider.RegisterHotplug(A<IHotplugListener>._))
-            .Returns(HotplugRegistrationResult.Success);
+        A.CallTo(() => provider.RegisterHotplug(A<IUsbHotplugListener>._))
+            .Returns(UsbHotplugRegistrationResult.Success);
         return provider;
     }
 
@@ -164,8 +163,8 @@ public sealed class Given_a_hotplug_event_notifier
         };
 
     private static void RaiseArrived(UsbHotplugMonitor monitor, UsbDeviceDescriptor descriptor) =>
-        ((IHotplugListener)monitor).OnDeviceArrived(descriptor);
+        ((IUsbHotplugListener)monitor).OnDeviceArrived(descriptor);
 
     private static void RaiseLeft(UsbHotplugMonitor monitor, UsbDeviceDescriptor descriptor) =>
-        ((IHotplugListener)monitor).OnDeviceLeft(descriptor);
+        ((IUsbHotplugListener)monitor).OnDeviceLeft(descriptor);
 }
