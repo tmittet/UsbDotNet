@@ -45,7 +45,8 @@ public sealed class UsbDevice : IUsbDevice
 
     /// <summary>
     /// The numbers of the interfaces that may be on another alternate setting than the default,
-    /// because one was selected through this device handle. Releasing an interface does not
+    /// because a selection of one was attempted through this device handle; a failed selection
+    /// may still have changed the alternate setting of the device. Releasing an interface does not
     /// reliably reset its alternate setting; libusb leaves that to the operating system. The
     /// default alternate setting is therefore selected explicitly when one of these interfaces
     /// is claimed again. Guarded by _interfaceLock.
@@ -286,6 +287,13 @@ public sealed class UsbDevice : IUsbDevice
                 || _nonDefaultAlternateSettings.Contains(descriptor.InterfaceNumber)
             )
             {
+                if (alternateSetting != 0)
+                {
+                    // Marked before the attempt: a selection that fails may still have changed
+                    // the alternate setting on the device. Only a successful selection of the
+                    // default, below, makes the interface known to be on the default again.
+                    _ = _nonDefaultAlternateSettings.Add(descriptor.InterfaceNumber);
+                }
                 try
                 {
                     claimedInterface.SetAlternateSetting(alternateSetting);
@@ -307,11 +315,10 @@ public sealed class UsbDevice : IUsbDevice
                     claimedInterface.Dispose();
                     throw;
                 }
-                // Not updated on failure; the alternate setting of the interface is then unknown
-                _ =
-                    alternateSetting != 0
-                        ? _nonDefaultAlternateSettings.Add(descriptor.InterfaceNumber)
-                        : _nonDefaultAlternateSettings.Remove(descriptor.InterfaceNumber);
+                if (alternateSetting == 0)
+                {
+                    _ = _nonDefaultAlternateSettings.Remove(descriptor.InterfaceNumber);
+                }
             }
             var usbInterface = new UsbInterface(
                 LoggerFactory.CreateLogger<UsbInterface>(),

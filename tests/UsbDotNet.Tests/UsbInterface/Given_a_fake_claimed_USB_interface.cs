@@ -732,6 +732,64 @@ public sealed class Given_a_fake_claimed_USB_interface : IDisposable
     }
 
     [Fact]
+    public void ClaimInterface_requests_the_default_alternate_setting_after_a_failed_selection()
+    {
+        using var device = CreateFakeDevice(out var handle);
+        var failedClaim = A.Fake<ISafeDeviceInterface>();
+        var secondClaim = A.Fake<ISafeDeviceInterface>();
+        var thirdClaim = A.Fake<ISafeDeviceInterface>();
+        A.CallTo(() => failedClaim.SetAlternateSetting(1))
+            .Throws(new LibUsbException(libusb_error.LIBUSB_ERROR_IO, "Native failure."));
+        A.CallTo(() => handle.ClaimInterface(2))
+            .Returns(failedClaim)
+            .Once()
+            .Then.Returns(secondClaim)
+            .Once()
+            .Then.Returns(thirdClaim);
+        var claimAlternateSetting = () =>
+            device.ClaimInterface(FakeInterfaceDescriptor(interfaceNumber: 2, alternateSetting: 1));
+
+        claimAlternateSetting.Should().Throw<UsbException>();
+        device
+            .ClaimInterface(FakeInterfaceDescriptor(interfaceNumber: 2, alternateSetting: 0))
+            .Dispose();
+        device
+            .ClaimInterface(FakeInterfaceDescriptor(interfaceNumber: 2, alternateSetting: 0))
+            .Dispose();
+
+        // The failed selection may have changed the alternate setting on the device
+        A.CallTo(() => secondClaim.SetAlternateSetting(0)).MustHaveHappenedOnceExactly();
+        // The interface is known to be back on the default alternate setting
+        A.CallTo(() => thirdClaim.SetAlternateSetting(A<byte>._)).MustNotHaveHappened();
+    }
+
+    [Fact]
+    public void ClaimInterface_keeps_requesting_the_default_alternate_setting_until_it_is_selected()
+    {
+        using var device = CreateFakeDevice(out var handle);
+        var failedReset = A.Fake<ISafeDeviceInterface>();
+        var retriedReset = A.Fake<ISafeDeviceInterface>();
+        A.CallTo(() => failedReset.SetAlternateSetting(0))
+            .Throws(new LibUsbException(libusb_error.LIBUSB_ERROR_IO, "Native failure."));
+        A.CallTo(() => handle.ClaimInterface(2))
+            .Returns(A.Fake<ISafeDeviceInterface>())
+            .Once()
+            .Then.Returns(failedReset)
+            .Once()
+            .Then.Returns(retriedReset);
+        var claimDefault = () =>
+            device.ClaimInterface(FakeInterfaceDescriptor(interfaceNumber: 2, alternateSetting: 0));
+
+        device
+            .ClaimInterface(FakeInterfaceDescriptor(interfaceNumber: 2, alternateSetting: 1))
+            .Dispose();
+        claimDefault.Should().Throw<UsbException>();
+        claimDefault().Dispose();
+
+        A.CallTo(() => retriedReset.SetAlternateSetting(0)).MustHaveHappenedOnceExactly();
+    }
+
+    [Fact]
     public void ClaimInterface_requests_the_default_alternate_setting_per_interface()
     {
         using var device = CreateFakeDevice(out var handle);
