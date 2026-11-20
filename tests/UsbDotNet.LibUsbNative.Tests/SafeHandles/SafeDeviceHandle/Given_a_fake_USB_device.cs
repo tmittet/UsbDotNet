@@ -40,6 +40,32 @@ public sealed class Given_a_fake_USB_device : IDisposable
     }
 
     [Fact]
+    public void GetStringDescriptor_returns_a_string_of_the_maximum_length()
+    {
+        // A string descriptor is at most 255 bytes: a 2 byte header and 126 UTF-16 characters
+        var product = new string('x', 125) + "å";
+        _api.ProductUtf16 = FakeLibusbApi.MakeUtf16String(product);
+        _api.ProductUtf16.Should().HaveCount(254);
+
+        _handle.GetStringDescriptor(ProductIndex).Should().Be(product);
+    }
+
+    [Theory]
+    // An odd length; the trailing byte is not a character
+    [InlineData(new byte[] { 5, 3, (byte)'A', 0, (byte)'B' }, "A")]
+    // More bytes received than the length of the descriptor; the excess is not part of the string
+    [InlineData(new byte[] { 4, 3, (byte)'A', 0, (byte)'B', 0 }, "A")]
+    public void GetStringDescriptor_returns_the_characters_within_the_descriptor_length(
+        byte[] descriptor,
+        string expected
+    )
+    {
+        _api.ProductUtf16 = descriptor;
+
+        _handle.GetStringDescriptor(ProductIndex).Should().Be(expected);
+    }
+
+    [Fact]
     public void GetStringDescriptor_returns_an_empty_string_for_a_descriptor_without_characters()
     {
         _api.ProductUtf16 = FakeLibusbApi.MakeUtf16String(string.Empty);
@@ -113,6 +139,9 @@ public sealed class Given_a_fake_USB_device : IDisposable
     [InlineData(new byte[] { 1 })]
     // A length beyond what was received
     [InlineData(new byte[] { 8, 3, (byte)'A', 0 })]
+    // A length shorter than a descriptor header
+    [InlineData(new byte[] { 1, 3, (byte)'A', 0 })]
+    [InlineData(new byte[] { 0, 3, (byte)'A', 0 })]
     // Not a string descriptor
     [InlineData(new byte[] { 4, 2, (byte)'A', 0 })]
     public void TryGetStringDescriptor_fails_for_an_invalid_string_descriptor(byte[] descriptor)
