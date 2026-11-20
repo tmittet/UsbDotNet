@@ -394,6 +394,16 @@ public sealed class Given_fake_LibUsb_devices
         copy.MaxPower.Should().Be(200);
     }
 
+    [Fact]
+    public void MaxPower_is_in_units_of_2_mA_when_the_multiplier_is_not_set()
+    {
+        var initialized = new UsbConfigDescriptor { MaxPowerRawValue = 50 };
+        var copiedDefault = default(UsbConfigDescriptor) with { MaxPowerRawValue = 50 };
+
+        initialized.MaxPower.Should().Be(100);
+        copiedDefault.MaxPower.Should().Be(100);
+    }
+
     /// <summary>
     /// Make the fake device return the given value for every operating system device string.
     /// </summary>
