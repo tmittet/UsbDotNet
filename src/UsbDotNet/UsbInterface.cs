@@ -191,7 +191,7 @@ public sealed class UsbInterface : IUsbInterface
         int timeout
     )
     {
-        CheckTransferTimeout(timeout);
+        TransferTimeout.ThrowIfInvalid(timeout);
         try
         {
             EnterTransferLock();
@@ -254,7 +254,7 @@ public sealed class UsbInterface : IUsbInterface
         int timeout
     )
     {
-        CheckTransferTimeout(timeout);
+        TransferTimeout.ThrowIfInvalid(timeout);
         try
         {
             EnterTransferLock();
@@ -468,21 +468,6 @@ public sealed class UsbInterface : IUsbInterface
                 $"Invalid read buffer length {length}; must be a non-zero multiple of the endpoint "
                     + $"max packet size ({maxPacketSize}).",
                 nameof(destination)
-            );
-        }
-    }
-
-    /// <summary>
-    /// Throw ArgumentOutOfRangeException when timeout is 0 or less than -1.
-    /// </summary>
-    private static void CheckTransferTimeout(int timeout)
-    {
-        if (timeout is 0 or < -1)
-        {
-            throw new ArgumentOutOfRangeException(
-                nameof(timeout),
-                timeout,
-                "Invalid timeout; must be greater than 0 or -1 (infinite)."
             );
         }
     }

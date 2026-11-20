@@ -89,9 +89,12 @@ public interface IUsbDevice : IDisposable
     /// <param name="request">The USB standard spec, class spec or vendor defined request</param>
     /// <param name="value">The value field for the setup packet</param>
     /// <param name="index">The index field for the setup packet</param>
-    /// <param name="timeout">Timeout before giving up due to no response being received</param>
+    /// <param name="timeout">
+    /// Timeout in milliseconds before giving up due to no response being received; greater than
+    /// 0, or -1 (<see cref="Timeout.Infinite"/>) for no timeout.
+    /// </param>
     /// <exception cref="ArgumentOutOfRangeException">
-    /// Thrown when the destination buffer is too large.
+    /// Thrown when the destination buffer is too large, or when timeout is 0 or less than -1.
     /// </exception>
     /// <returns>
     /// <list>
@@ -129,9 +132,12 @@ public interface IUsbDevice : IDisposable
     /// <param name="request">The USB standard spec, class spec or vendor defined request</param>
     /// <param name="value">The value field for the setup packet</param>
     /// <param name="index">The index field for the setup packet</param>
-    /// <param name="timeout">Timeout before giving up due to no response being received</param>
+    /// <param name="timeout">
+    /// Timeout in milliseconds before giving up due to no response being received; greater than
+    /// 0, or -1 (<see cref="Timeout.Infinite"/>) for no timeout.
+    /// </param>
     /// <exception cref="ArgumentOutOfRangeException">
-    /// Thrown when the source payload is too large.
+    /// Thrown when the source payload is too large, or when timeout is 0 or less than -1.
     /// </exception>
     /// <returns>
     /// <list>

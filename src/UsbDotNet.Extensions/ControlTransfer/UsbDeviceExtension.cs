@@ -15,8 +15,13 @@ public static class UsbDeviceExtension
     /// <param name="request">The USB standard control request type</param>
     /// <param name="value">The value field for the setup packet</param>
     /// <param name="index">The index field for the setup packet</param>
-    /// <param name="timeout">Timeout before giving up due to no response being received</param>
-    /// <exception cref="ArgumentException">Thrown when the destination buffer is too large.</exception>
+    /// <param name="timeout">
+    /// Timeout in milliseconds before giving up due to no response being received; greater than
+    /// 0, or -1 (<see cref="Timeout.Infinite"/>) for no timeout.
+    /// </param>
+    /// <exception cref="ArgumentException">
+    /// Thrown when the destination buffer is too large, or when timeout is 0 or less than -1.
+    /// </exception>
     /// <returns>
     /// <list>
     /// <item>Success = The read operation completed successfully.</item>
@@ -63,8 +68,13 @@ public static class UsbDeviceExtension
     /// <param name="request">The USB standard control request type</param>
     /// <param name="value">The value field for the setup packet</param>
     /// <param name="index">The index field for the setup packet</param>
-    /// <param name="timeout">Timeout before giving up due to no response being received</param>
-    /// <exception cref="ArgumentException">Thrown when the source payload is too large.</exception>
+    /// <param name="timeout">
+    /// Timeout in milliseconds before giving up due to no response being received; greater than
+    /// 0, or -1 (<see cref="Timeout.Infinite"/>) for no timeout.
+    /// </param>
+    /// <exception cref="ArgumentException">
+    /// Thrown when the source payload is too large, or when timeout is 0 or less than -1.
+    /// </exception>
     /// <returns>
     /// <list>
     /// <item>Success = The write operation completed successfully.</item>
