@@ -18,6 +18,12 @@ public sealed class UsbDevice : IUsbDevice
 {
     private const byte ControlRequestEndpointAddress = 0x00;
 
+    /// <summary>
+    /// A string descriptor index of zero, in a device, configuration or interface descriptor,
+    /// means that the device does not have the string.
+    /// </summary>
+    internal const byte NoStringDescriptorIndex = 0;
+
     private readonly Usb _usb;
     private readonly ISafeContext _context;
     private readonly UsbDeviceDescriptor _descriptor;
@@ -103,6 +109,11 @@ public sealed class UsbDevice : IUsbDevice
     {
         using var token = _rundownGuard.AcquireSharedToken();
 
+        if (descriptorIndex == NoStringDescriptorIndex)
+        {
+            return string.Empty;
+        }
+
         if (_descriptorCache.TryGetValue(descriptorIndex, out var cachedValue1))
         {
             return cachedValue1;
@@ -128,7 +139,10 @@ public sealed class UsbDevice : IUsbDevice
     public string ReadStringDescriptor(byte descriptorIndex)
     {
         using var token = _rundownGuard.AcquireSharedToken();
-        return Handle.GetStringDescriptorAscii(descriptorIndex);
+        // Index zero is not a string; it holds the language IDs and libusb rejects a read of it
+        return descriptorIndex == NoStringDescriptorIndex
+            ? string.Empty
+            : Handle.GetStringDescriptorAscii(descriptorIndex);
     }
 
     /// <inheritdoc/>

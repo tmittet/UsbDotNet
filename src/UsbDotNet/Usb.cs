@@ -183,6 +183,7 @@ public sealed class Usb : IUsb, IUsbInternal
         GetDeviceString(
             deviceKey,
             libusb_device_string_type.LIBUSB_DEVICE_STRING_MANUFACTURER,
+            descriptor => descriptor.ManufacturerIndex,
             device => device.GetManufacturer()
         );
 
@@ -191,6 +192,7 @@ public sealed class Usb : IUsb, IUsbInternal
         GetDeviceString(
             deviceKey,
             libusb_device_string_type.LIBUSB_DEVICE_STRING_PRODUCT,
+            descriptor => descriptor.ProductIndex,
             device => device.GetProduct()
         );
 
@@ -199,12 +201,14 @@ public sealed class Usb : IUsb, IUsbInternal
         GetDeviceString(
             deviceKey,
             libusb_device_string_type.LIBUSB_DEVICE_STRING_SERIAL_NUMBER,
+            descriptor => descriptor.SerialNumberIndex,
             device => device.GetSerialNumber()
         );
 
     private string GetDeviceString(
         string deviceKey,
         libusb_device_string_type stringType,
+        Func<IUsbDeviceDescriptor, byte> getDescriptorIndex,
         Func<UsbDevice, string> readFromDevice
     )
     {
@@ -212,9 +216,18 @@ public sealed class Usb : IUsb, IUsbInternal
         {
             CheckDisposed();
             var context = GetInitializedContextOrThrow();
-            // Attempt to read the value from the operating system
-            if (context.GetOsDeviceString(_logger, deviceKey, stringType, out var value))
-                return value;
+            using (var deviceList = context.GetDeviceList())
+            {
+                var (listDevice, descriptor) = deviceList.GetListDevice(_logger, deviceKey);
+                // A device without the string has nothing to read. Neither ask the operating
+                // system, which reports a missing string as a failure, nor open the device,
+                // which fails for a device that is inaccessible.
+                if (getDescriptorIndex(descriptor) == UsbDevice.NoStringDescriptorIndex)
+                    return string.Empty;
+                // Attempt to read the value from the operating system
+                if (listDevice.GetOsDeviceString(_logger, deviceKey, stringType, out var value))
+                    return value;
+            }
             // If the device is already open; read from the open device
             if (_openDevices.TryGetValue(deviceKey, out var openDevice))
                 return readFromDevice(openDevice);

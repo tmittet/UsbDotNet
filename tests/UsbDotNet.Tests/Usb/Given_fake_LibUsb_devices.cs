@@ -1,5 +1,8 @@
+using FakeItEasy;
 using UsbDotNet.Descriptor;
+using UsbDotNet.LibUsbNative.Enums;
 using UsbDotNet.LibUsbNative.SafeHandles;
+using UsbDotNet.LibUsbNative.Structs;
 using UsbDotNet.Tests.Fakes;
 
 namespace UsbDotNet.Tests.Usb;
@@ -252,6 +255,86 @@ public sealed class Given_fake_LibUsb_devices
         var act = () => usb.GetDeviceList();
 
         act.Should().Throw<ObjectDisposedException>();
+    }
+
+    [Fact]
+    public void Device_strings_are_empty_without_asking_the_OS_or_the_device_when_it_has_no_strings()
+    {
+        var device = FakeHelper.CreateFakeDevice(
+            VendorA,
+            ProductA1,
+            BusNumber,
+            busAddress: 1,
+            manufacturerIndex: 0,
+            productIndex: 0,
+            serialNumberIndex: 0
+        );
+        using var usb = CreateInitializedUsb(device);
+        var deviceKey = usb.GetDeviceList().Single().DeviceKey;
+
+        using var scope = new AssertionScope();
+        usb.GetDeviceManufacturer(deviceKey).Should().BeEmpty();
+        usb.GetDeviceProduct(deviceKey).Should().BeEmpty();
+        usb.GetDeviceSerial(deviceKey).Should().BeEmpty();
+        string? ignoredValue;
+        libusb_error? ignoredError;
+        A.CallTo(() =>
+                device.TryGetDeviceString(
+                    A<libusb_device_string_type>._,
+                    out ignoredValue,
+                    out ignoredError
+                )
+            )
+            .MustNotHaveHappened();
+        A.CallTo(() => device.Open()).MustNotHaveHappened();
+    }
+
+    [Fact]
+    public void Device_strings_are_read_from_the_device_when_the_operating_system_has_no_value()
+    {
+        var device = FakeHelper.CreateFakeDevice(VendorA, ProductA1, BusNumber, busAddress: 1);
+        FakeOsDeviceString(device, string.Empty);
+        // The device is opened to read the string, which requires a config descriptor
+        A.CallTo(() => device.GetActiveConfigDescriptor())
+            .Returns(
+                new libusb_config_descriptor(
+                    bLength: 9,
+                    libusb_descriptor_type.LIBUSB_DT_CONFIG,
+                    wTotalLength: 9,
+                    bNumInterfaces: 0,
+                    bConfigurationValue: 1,
+                    iConfiguration: 0,
+                    libusb_config_desc_attributes.NONE,
+                    bMaxPower: 50,
+                    interfaces: [],
+                    extra: []
+                )
+            );
+        var handle = A.Fake<ISafeDeviceHandle>();
+        A.CallTo(() => device.Open()).Returns(handle);
+        A.CallTo(() => handle.GetStringDescriptorAscii(3)).Returns("SERIAL");
+        using var usb = CreateInitializedUsb(device);
+        var deviceKey = usb.GetDeviceList().Single().DeviceKey;
+
+        usb.GetDeviceSerial(deviceKey).Should().Be("SERIAL");
+    }
+
+    /// <summary>
+    /// Make the fake device return the given value for every operating system device string.
+    /// </summary>
+    private static void FakeOsDeviceString(ISafeDevice device, string value)
+    {
+        string? ignoredValue;
+        libusb_error? ignoredError;
+        A.CallTo(() =>
+                device.TryGetDeviceString(
+                    A<libusb_device_string_type>._,
+                    out ignoredValue,
+                    out ignoredError
+                )
+            )
+            .Returns(true)
+            .AssignsOutAndRefParameters(value, null);
     }
 
     private static UsbDotNet.Usb CreateInitializedUsb(params ISafeDevice[] devices)

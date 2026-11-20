@@ -20,7 +20,10 @@ internal static class FakeHelper
         byte busNumber,
         byte busAddress,
         byte portNumber = 1,
-        ushort bcdUsb = 0x0200
+        ushort bcdUsb = 0x0200,
+        byte manufacturerIndex = 1,
+        byte productIndex = 2,
+        byte serialNumberIndex = 3
     )
     {
         var device = A.Fake<ISafeDevice>();
@@ -37,9 +40,9 @@ internal static class FakeHelper
                     vendorId,
                     productId,
                     bcdDevice: 0x0100,
-                    iManufacturer: 1,
-                    iProduct: 2,
-                    iSerialNumber: 3,
+                    iManufacturer: manufacturerIndex,
+                    iProduct: productIndex,
+                    iSerialNumber: serialNumberIndex,
                     bNumConfigurations: 1
                 )
             );

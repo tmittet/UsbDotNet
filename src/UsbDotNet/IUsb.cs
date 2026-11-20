@@ -42,6 +42,9 @@ public interface IUsb : IDisposable
     /// </exception>
     /// <exception cref="InvalidOperationException">Thrown when the Usb type is not initialized.</exception>
     /// <exception cref="ObjectDisposedException">Thrown when the Usb type is disposed.</exception>
+    /// <returns>
+    /// The manufacturer, or an empty string when the device has no manufacturer string.
+    /// </returns>
     string GetDeviceManufacturer(string deviceKey);
 
     /// <summary>
@@ -57,6 +60,9 @@ public interface IUsb : IDisposable
     /// </exception>
     /// <exception cref="InvalidOperationException">Thrown when the Usb type is not initialized.</exception>
     /// <exception cref="ObjectDisposedException">Thrown when the Usb type is disposed.</exception>
+    /// <returns>
+    /// The product name, or an empty string when the device has no product name string.
+    /// </returns>
     string GetDeviceProduct(string deviceKey);
 
     /// <summary>
@@ -72,6 +78,9 @@ public interface IUsb : IDisposable
     /// </exception>
     /// <exception cref="InvalidOperationException">Thrown when the Usb type is not initialized.</exception>
     /// <exception cref="ObjectDisposedException">Thrown when the Usb type is disposed.</exception>
+    /// <returns>
+    /// The serial number, or an empty string when the device has no serial number string.
+    /// </returns>
     string GetDeviceSerial(string deviceKey);
 
     /// <summary>

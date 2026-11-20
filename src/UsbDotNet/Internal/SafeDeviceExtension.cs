@@ -64,19 +64,17 @@ internal static class SafeDeviceExtension
     }
 
     /// <summary>
-    /// Get a device string from the operating system for a given device key and string type.
-    /// Falls back to reading the string from the device if the operating system read fails.
+    /// Get a device string from the operating system, for a device from the device list.
+    /// Returns false when the operating system has no value; the reason is logged.
     /// </summary>
     internal static bool GetOsDeviceString(
-        this ISafeContext context,
+        this ISafeDevice listDevice,
         ILogger logger,
         string deviceKey,
         libusb_device_string_type stringType,
         [NotNullWhen(true)] out string? value
     )
     {
-        using var deviceList = context.GetDeviceList();
-        (var listDevice, _) = deviceList.GetListDevice(logger, deviceKey);
         try
         {
             var successful = listDevice.TryGetDeviceString(stringType, out value, out var error);
