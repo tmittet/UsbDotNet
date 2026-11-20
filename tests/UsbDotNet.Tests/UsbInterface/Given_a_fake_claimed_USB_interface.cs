@@ -17,6 +17,11 @@ public sealed class Given_a_fake_claimed_USB_interface : IDisposable
 
     private static readonly TimeSpan WaitTimeout = TimeSpan.FromSeconds(5);
 
+    /// <summary>
+    /// How long a test waits before it checks that an operation is still blocked.
+    /// </summary>
+    private static readonly TimeSpan BlockedDelay = TimeSpan.FromMilliseconds(150);
+
     private readonly UsbDotNet.Usb _usb = new(A.Fake<ILibUsb>());
 
     public void Dispose() => _usb.Dispose();
@@ -649,6 +654,196 @@ public sealed class Given_a_fake_claimed_USB_interface : IDisposable
 
         transfer.Should().NotBeNull();
         transfer!.Value.endpoint.Should().Be(endpoint!.EndpointAddress.RawValue);
+    }
+
+    [Fact]
+    public async Task ClearHalt_waits_for_a_pending_transfer_on_the_endpoint_to_complete()
+    {
+        using var device = CreateFakeDevice(out var handle);
+        using var usbInterface = ClaimFakeInterfaceWithSeveralEndpoints(device, handle);
+        usbInterface.TryGetInputEndpoint(out var endpoint, UsbEndpointTransferType.Bulk);
+        using var pendingTransfer = new FakeTransfers(handle, libusb_error.LIBUSB_SUCCESS);
+
+        var read = Task.Run(() => usbInterface.Read(endpoint!, new byte[64], out _));
+        try
+        {
+            pendingTransfer.Submitted.Wait(WaitTimeout).Should().BeTrue();
+
+            var clearHalt = Task.Run(() => usbInterface.ClearHalt(endpoint!));
+            // Give ClearHalt time to reach the endpoint, where it has to wait
+            await Task.Delay(BlockedDelay);
+            clearHalt.IsCompleted.Should().BeFalse();
+            A.CallTo(() => handle.ClearHalt(A<byte>._)).MustNotHaveHappened();
+
+            // The completion callback of the transfer lets the read return, and then ClearHalt
+            pendingTransfer.Complete();
+            await clearHalt.WaitAsync(WaitTimeout);
+        }
+        finally
+        {
+            pendingTransfer.Complete();
+        }
+
+        (await read.WaitAsync(WaitTimeout)).Should().Be(UsbResult.Success);
+        A.CallTo(() => handle.ClearHalt(endpoint!.EndpointAddress.RawValue))
+            .MustHaveHappenedOnceExactly();
+    }
+
+    [Fact]
+    public async Task ClearHalt_in_progress_blocks_a_transfer_on_that_endpoint_but_not_on_another()
+    {
+        using var device = CreateFakeDevice(out var handle);
+        using var usbInterface = ClaimFakeInterfaceWithSeveralEndpoints(device, handle);
+        // The bulk input endpoints of the fake interface
+        var endpoint = FakeEndpoint(0x81, UsbEndpointTransferType.Bulk);
+        var otherEndpoint = FakeEndpoint(0x85, UsbEndpointTransferType.Bulk);
+        // A submit fails, so that a transfer returns without waiting for a completion
+        using var transfers = new FakeTransfers(handle, libusb_error.LIBUSB_ERROR_NO_DEVICE);
+        using var clearHaltEntered = new ManualResetEventSlim();
+        using var releaseClearHalt = new ManualResetEventSlim();
+        A.CallTo(() => handle.ClearHalt(A<byte>._))
+            .Invokes(() =>
+            {
+                clearHaltEntered.Set();
+                releaseClearHalt.Wait(WaitTimeout);
+            });
+
+        var clearHalt = Task.Run(() => usbInterface.ClearHalt(endpoint));
+        Task<UsbResult> read;
+        try
+        {
+            clearHaltEntered.Wait(WaitTimeout).Should().BeTrue();
+
+            // A transfer on another endpoint is not held up
+            var otherRead = Task.Run(() => usbInterface.Read(otherEndpoint, new byte[64], out _));
+            (await otherRead.WaitAsync(WaitTimeout)).Should().Be(UsbResult.NoDevice);
+            transfers.SubmittedEndpoints.Should().Equal(0x85);
+
+            // A transfer on the endpoint that is being cleared is
+            read = Task.Run(() => usbInterface.Read(endpoint, new byte[64], out _));
+            await Task.Delay(BlockedDelay);
+            read.IsCompleted.Should().BeFalse();
+            transfers.SubmittedEndpoints.Should().Equal(0x85);
+        }
+        finally
+        {
+            releaseClearHalt.Set();
+        }
+
+        await clearHalt.WaitAsync(WaitTimeout);
+        (await read.WaitAsync(WaitTimeout)).Should().Be(UsbResult.NoDevice);
+        transfers.SubmittedEndpoints.Should().Equal(0x85, 0x81);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Dispose_waits_for_ClearHalt_before_the_interface_is_released(
+        bool disposeDevice
+    )
+    {
+#pragma warning disable CA2000 // Dispose objects before losing scope; disposed below
+        var device = CreateFakeDevice(out var handle);
+#pragma warning restore CA2000
+        var usbInterface = ClaimFakeInterfaceWithSeveralEndpoints(device, handle);
+        // The fake returns the same claimed interface for every claim
+        var claimedInterface = handle.ClaimInterface(0);
+        usbInterface.TryGetInputEndpoint(out var endpoint, UsbEndpointTransferType.Bulk);
+        using var clearHaltEntered = new ManualResetEventSlim();
+        using var releaseClearHalt = new ManualResetEventSlim();
+        var events = new System.Collections.Concurrent.ConcurrentQueue<string>();
+        A.CallTo(() => handle.ClearHalt(A<byte>._))
+            .Invokes(() =>
+            {
+                clearHaltEntered.Set();
+                releaseClearHalt.Wait(WaitTimeout);
+                events.Enqueue("halt cleared");
+            });
+        A.CallTo(() => claimedInterface.Dispose())
+            .Invokes(() => events.Enqueue("interface released"));
+
+        var clearHalt = Task.Run(() => usbInterface.ClearHalt(endpoint!));
+        Task dispose;
+        try
+        {
+            clearHaltEntered.Wait(WaitTimeout).Should().BeTrue();
+
+            // Disposing the device disposes its claimed interfaces before it closes the handle
+            dispose = Task.Run(disposeDevice ? device.Dispose : usbInterface.Dispose);
+            await Task.Delay(BlockedDelay);
+            dispose.IsCompleted.Should().BeFalse();
+            events.Should().BeEmpty();
+        }
+        finally
+        {
+            releaseClearHalt.Set();
+        }
+
+        await clearHalt.WaitAsync(WaitTimeout);
+        await dispose.WaitAsync(WaitTimeout);
+        events.Should().Equal("halt cleared", "interface released");
+        if (!disposeDevice)
+        {
+            device.Dispose();
+        }
+    }
+
+    /// <summary>
+    /// Fake libusb transfers of a device handle. A submit returns the given result; when that is
+    /// LIBUSB_SUCCESS the transfer is pending until <see cref="Complete"/> invokes its completion
+    /// callback, like libusb does on the event loop thread.
+    /// </summary>
+    private sealed class FakeTransfers : IDisposable
+    {
+        // The libusb transfer struct is written to this memory before it is submitted
+        private readonly IntPtr _transferPtr = Marshal.AllocHGlobal(
+            Marshal.SizeOf<libusb_transfer>()
+        );
+        private int _completed;
+
+        /// <summary>Set when a transfer is submitted.</summary>
+        public ManualResetEventSlim Submitted { get; } = new();
+
+        /// <summary>The endpoint address of each submitted transfer, in submit order.</summary>
+        public System.Collections.Concurrent.ConcurrentQueue<byte> SubmittedEndpoints { get; } =
+            new();
+
+        public FakeTransfers(ISafeDeviceHandle handle, libusb_error submitResult)
+        {
+            var transfer = A.Fake<ISafeTransfer>();
+            A.CallTo(() => handle.AllocateTransfer(A<int>._)).Returns(transfer);
+            A.CallTo(() => transfer.GetBufferPtr()).Returns(_transferPtr);
+            // libusb does not find a transfer that has completed
+            A.CallTo(() => transfer.Cancel()).Returns(libusb_error.LIBUSB_ERROR_NOT_FOUND);
+            A.CallTo(() => transfer.Submit())
+                .Invokes(() =>
+                {
+                    SubmittedEndpoints.Enqueue(
+                        Marshal.PtrToStructure<libusb_transfer>(_transferPtr).endpoint
+                    );
+                    Submitted.Set();
+                })
+                .Returns(submitResult);
+        }
+
+        /// <summary>
+        /// Invoke the completion callback of the submitted transfer, once. The transfer completes
+        /// with the status and length that were submitted: completed, with no data.
+        /// </summary>
+        public void Complete()
+        {
+            if (!Submitted.IsSet || Interlocked.Exchange(ref _completed, 1) != 0)
+            {
+                return;
+            }
+            Marshal.PtrToStructure<libusb_transfer>(_transferPtr).callback(_transferPtr);
+        }
+
+        public void Dispose()
+        {
+            Submitted.Dispose();
+            Marshal.FreeHGlobal(_transferPtr);
+        }
     }
 
     /// <summary>
