@@ -11,6 +11,10 @@ internal sealed class SafeDeviceInterface : SafeHandle, ISafeDeviceInterface
 
     public override bool IsInvalid => handle == IntPtr.Zero;
 
+    /// <summary>
+    /// The caller must have incremented the ref counter of the device handle; it is decremented
+    /// when the interface is released.
+    /// </summary>
     public SafeDeviceInterface(SafeDeviceHandle deviceHandle, byte interfaceNumber)
         : base(IntPtr.Zero, true)
     {
@@ -30,10 +34,7 @@ internal sealed class SafeDeviceInterface : SafeHandle, ISafeDeviceInterface
     /// <inheritdoc/>
     public void SetAlternateSetting(byte alternateSetting)
     {
-        // The native call is made on the device handle, which this interface does not keep alive.
-        // The device handle reference is acquired first, and so released last: when both are
-        // disposed during the call, the interface must be released before the device is closed.
-        using var deviceHandleReference = SafeHelper.AcquireReference(_deviceHandle);
+        // The native call is made on the device handle, which this interface keeps alive
         using var reference = SafeHelper.AcquireReference(this);
         var result = _deviceHandle.Api.libusb_set_interface_alt_setting(
             _deviceHandle.DangerousGetHandle(),
@@ -52,6 +53,20 @@ internal sealed class SafeDeviceInterface : SafeHandle, ISafeDeviceInterface
     internal void Log(libusb_log_level level, string message) => _deviceHandle.Log(level, message);
 
     protected override bool ReleaseHandle()
+    {
+        try
+        {
+            return ReleaseInterface();
+        }
+        finally
+        {
+            // Decrement the device handle ref counter, incremented when the interface was claimed.
+            // The device is closed here when it is disposed and this was its last interface.
+            _deviceHandle.DangerousRelease();
+        }
+    }
+
+    private bool ReleaseInterface()
     {
         var result = _deviceHandle.Api.libusb_release_interface(
             _deviceHandle.DangerousGetHandle(),

@@ -189,30 +189,6 @@ public class Given_a_native_call_in_progress
     }
 
     [Fact]
-    public async Task SetAlternateSetting_keeps_the_device_handle_open_until_the_call_completes()
-    {
-        // The interface makes its native call on the device handle, which it does not own
-        var api = new FakeLibusbApi();
-        var context = new LibUsb(api).CreateContext();
-        var list = context.GetDeviceList();
-        var handle = list[0].Open();
-        var deviceInterface = handle.ClaimInterface(0);
-        var scenario = new Scenario(
-            nameof(api.libusb_set_interface_alt_setting),
-            () => deviceInterface.SetAlternateSetting(1),
-            () =>
-            {
-                handle.Dispose();
-                list.Dispose();
-                context.Dispose();
-            },
-            () => api.CloseCount
-        );
-
-        await RunAndVerifyDeferredRelease(api, scenario);
-    }
-
-    [Fact]
     public async Task SetAlternateSetting_releases_the_interface_before_the_device_handle_is_closed()
     {
         // Both the interface and the device handle are disposed while the call is in progress

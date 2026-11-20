@@ -101,6 +101,16 @@ internal sealed class SafeDeviceHandle : SafeHandle, ISafeDeviceHandle
             nameof(_context.Api.libusb_claim_interface),
             $"Interface {interfaceNumber}."
         );
+
+        // Increment the device handle ref counter, SafeDeviceInterface will decrement on dispose.
+        // The device is not closed until its interfaces are released.
+        var success = false;
+        DangerousAddRef(ref success);
+        if (!success)
+        {
+            _ = _context.Api.libusb_release_interface(handle, interfaceNumber);
+            throw libusb_error.LIBUSB_ERROR_OTHER.ToLibUsbException("Failed to ref SafeHandle.");
+        }
         return new SafeDeviceInterface(this, interfaceNumber);
     }
 
