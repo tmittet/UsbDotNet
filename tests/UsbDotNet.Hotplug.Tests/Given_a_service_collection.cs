@@ -32,7 +32,25 @@ public sealed class Given_a_service_collection
         using var provider = services.BuildServiceProvider();
         var monitor = provider.GetRequiredService<IUsbHotplugMonitor>();
 
-        monitor.Should().BeOfType<UsbHotplugMonitor>().Which.IsHotplugSupported.Should().BeTrue();
+        monitor.IsHotplugSupported.Should().BeTrue();
+    }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void A_resolved_IUsbHotplugMonitor_tells_whether_hotplug_is_supported(bool supported)
+    {
+        var hotplug = A.Fake<IUsbHotplugProvider>();
+        A.CallTo(() => hotplug.IsHotplugSupported).Returns(supported);
+        var usb = A.Fake<IUsb>();
+        A.CallTo(() => usb.Hotplug).Returns(hotplug);
+        var services = new ServiceCollection();
+        _ = services.AddSingleton(usb).AddUsbHotplug();
+        using var provider = services.BuildServiceProvider();
+
+        var monitor = provider.GetRequiredService<IUsbHotplugMonitor>();
+
+        monitor.IsHotplugSupported.Should().Be(supported);
     }
 
     [Fact]

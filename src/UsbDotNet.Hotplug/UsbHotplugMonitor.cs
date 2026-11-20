@@ -54,11 +54,7 @@ public sealed class UsbHotplugMonitor : IUsbHotplugMonitor, IUsbHotplugListener
     private volatile bool _providerDisposed;
     private volatile bool _disposed;
 
-    /// <summary>
-    /// True when hotplug is supported on this platform. Enumerating
-    /// <see cref="Subscribe(IUsbDeviceFilter?, CancellationToken)"/> throws
-    /// <see cref="NotSupportedException"/> if hotplug is not supported.
-    /// </summary>
+    /// <inheritdoc/>
     public bool IsHotplugSupported { get; }
 
     /// <summary>
