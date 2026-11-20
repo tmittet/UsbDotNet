@@ -68,7 +68,10 @@ public sealed class Given_a_vendor_class_USB_device : IDisposable
     {
         using var device = _deviceSource.OpenUsbDeviceOrSkip();
         using var usbInterface = device.ClaimInterface(UsbClass.VendorSpecific);
-        var endpointFound = usbInterface.TryGetInputEndpoint(out var endpoint);
+        var endpointFound = usbInterface.TryGetInputEndpoint(
+            out var endpoint,
+            UsbEndpointTransferType.Bulk
+        );
         endpointFound.Should().BeTrue();
         endpoint!.MaxPacketSize.Should().BePositive();
     }
@@ -87,7 +90,10 @@ public sealed class Given_a_vendor_class_USB_device : IDisposable
     {
         using var device = _deviceSource.OpenUsbDeviceOrSkip();
         using var usbInterface = device.ClaimInterface(UsbClass.VendorSpecific);
-        var endpointFound = usbInterface.TryGetOutputEndpoint(out var endpoint);
+        var endpointFound = usbInterface.TryGetOutputEndpoint(
+            out var endpoint,
+            UsbEndpointTransferType.Bulk
+        );
         endpointFound.Should().BeTrue();
         endpoint!.MaxPacketSize.Should().BePositive();
     }

@@ -188,8 +188,14 @@ public sealed class Given_a_fake_claimed_USB_interface : IDisposable
             FakeEndpoint(0x04, UsbEndpointTransferType.Bulk)
         );
 
-        usbInterface.TryGetInputEndpoint(out var input).Should().BeTrue();
-        usbInterface.TryGetOutputEndpoint(out var output).Should().BeTrue();
+        usbInterface
+            .TryGetInputEndpoint(out var input, UsbEndpointTransferType.Bulk)
+            .Should()
+            .BeTrue();
+        usbInterface
+            .TryGetOutputEndpoint(out var output, UsbEndpointTransferType.Bulk)
+            .Should()
+            .BeTrue();
 
         input!.EndpointAddress.RawValue.Should().Be(0x83);
         output!.EndpointAddress.RawValue.Should().Be(0x04);
@@ -303,11 +309,297 @@ public sealed class Given_a_fake_claimed_USB_interface : IDisposable
         var read = () => usbInterface.BulkRead(new byte[64], out _, 100);
         var write = () => usbInterface.BulkWrite(new byte[64], out _, 100);
 
-        usbInterface.TryGetInputEndpoint(out _).Should().BeFalse();
-        usbInterface.TryGetOutputEndpoint(out _).Should().BeFalse();
+        usbInterface.TryGetInputEndpoint(out _, UsbEndpointTransferType.Bulk).Should().BeFalse();
+        usbInterface.TryGetOutputEndpoint(out _, UsbEndpointTransferType.Bulk).Should().BeFalse();
         read.Should().Throw<InvalidOperationException>().WithMessage("*no bulk Input endpoint*");
         write.Should().Throw<InvalidOperationException>().WithMessage("*no bulk Output endpoint*");
         A.CallTo(() => handle.AllocateTransfer(A<int>._)).MustNotHaveHappened();
+    }
+
+    [Theory]
+    [InlineData(0x83, libusb_endpoint_transfer_type.LIBUSB_ENDPOINT_TRANSFER_TYPE_INTERRUPT)]
+    // The second bulk input endpoint; not the one that BulkRead selects
+    [InlineData(0x85, libusb_endpoint_transfer_type.LIBUSB_ENDPOINT_TRANSFER_TYPE_BULK)]
+    public void Read_submits_a_transfer_of_the_endpoint_transfer_type_to_the_given_endpoint(
+        byte address,
+        libusb_endpoint_transfer_type expectedType
+    )
+    {
+        using var device = CreateFakeDevice(out var handle);
+        using var usbInterface = ClaimFakeInterfaceWithSeveralEndpoints(device, handle);
+        // The endpoint is identified by its address, it need not be the same descriptor instance
+        var endpoint = FakeEndpoint(address, UsbEndpointTransferType.Control);
+
+        var transfer = CaptureSubmittedTransfer(
+            handle,
+            () => usbInterface.Read(endpoint, new byte[64], out _, 100)
+        );
+
+        transfer.Should().NotBeNull();
+        transfer!.Value.endpoint.Should().Be(address);
+        transfer.Value.type.Should().Be(expectedType);
+        transfer.Value.length.Should().Be(64);
+    }
+
+    [Theory]
+    [InlineData(0x04, libusb_endpoint_transfer_type.LIBUSB_ENDPOINT_TRANSFER_TYPE_INTERRUPT)]
+    // The second bulk output endpoint; not the one that BulkWrite selects
+    [InlineData(0x06, libusb_endpoint_transfer_type.LIBUSB_ENDPOINT_TRANSFER_TYPE_BULK)]
+    public void Write_submits_a_transfer_of_the_endpoint_transfer_type_to_the_given_endpoint(
+        byte address,
+        libusb_endpoint_transfer_type expectedType
+    )
+    {
+        using var device = CreateFakeDevice(out var handle);
+        using var usbInterface = ClaimFakeInterfaceWithSeveralEndpoints(device, handle);
+        // The endpoint is identified by its address, it need not be the same descriptor instance
+        var endpoint = FakeEndpoint(address, UsbEndpointTransferType.Control);
+
+        var transfer = CaptureSubmittedTransfer(
+            handle,
+            () => usbInterface.Write(endpoint, new byte[10], out _, 100)
+        );
+
+        transfer.Should().NotBeNull();
+        transfer!.Value.endpoint.Should().Be(address);
+        transfer.Value.type.Should().Be(expectedType);
+        transfer.Value.length.Should().Be(10);
+    }
+
+    [Fact]
+    public void BulkRead_and_BulkWrite_submit_to_the_first_bulk_endpoints()
+    {
+        using var device = CreateFakeDevice(out var handle);
+        using var usbInterface = ClaimFakeInterfaceWithSeveralEndpoints(device, handle);
+
+        var read = CaptureSubmittedTransfer(
+            handle,
+            () => usbInterface.BulkRead(new byte[64], out _, 100)
+        );
+        var write = CaptureSubmittedTransfer(
+            handle,
+            () => usbInterface.BulkWrite(new byte[10], out _, 100)
+        );
+
+        read!.Value.endpoint.Should().Be(0x81);
+        write!.Value.endpoint.Should().Be(0x02);
+    }
+
+    [Theory]
+    // An output endpoint of the interface
+    [InlineData(0x02, "*must be an Input endpoint*")]
+    // An input endpoint that the interface does not have
+    [InlineData(0x8F, "*not an endpoint of interface*")]
+    public void Read_throws_when_the_endpoint_is_not_an_input_endpoint_of_the_interface(
+        byte address,
+        string expectedMessage
+    )
+    {
+        using var device = CreateFakeDevice(out var handle);
+        using var usbInterface = ClaimFakeInterfaceWithSeveralEndpoints(device, handle);
+        var endpoint = FakeEndpoint(address, UsbEndpointTransferType.Bulk);
+
+        var act = () => usbInterface.Read(endpoint, new byte[64], out _, 100);
+
+        act.Should()
+            .Throw<ArgumentException>()
+            .WithMessage(expectedMessage)
+            .WithParameterName("endpoint");
+        A.CallTo(() => handle.AllocateTransfer(A<int>._)).MustNotHaveHappened();
+    }
+
+    [Theory]
+    // An input endpoint of the interface
+    [InlineData(0x81, "*must be an Output endpoint*")]
+    // An output endpoint that the interface does not have
+    [InlineData(0x0F, "*not an endpoint of interface*")]
+    public void Write_throws_when_the_endpoint_is_not_an_output_endpoint_of_the_interface(
+        byte address,
+        string expectedMessage
+    )
+    {
+        using var device = CreateFakeDevice(out var handle);
+        using var usbInterface = ClaimFakeInterfaceWithSeveralEndpoints(device, handle);
+        var endpoint = FakeEndpoint(address, UsbEndpointTransferType.Bulk);
+
+        var act = () => usbInterface.Write(endpoint, new byte[10], out _, 100);
+
+        act.Should()
+            .Throw<ArgumentException>()
+            .WithMessage(expectedMessage)
+            .WithParameterName("endpoint");
+        A.CallTo(() => handle.AllocateTransfer(A<int>._)).MustNotHaveHappened();
+    }
+
+    [Fact]
+    public void Read_and_Write_throw_when_the_endpoint_is_isochronous()
+    {
+        using var device = CreateFakeDevice(out var handle);
+        using var usbInterface = ClaimFakeInterfaceWithSeveralEndpoints(device, handle);
+
+        var read = () =>
+            usbInterface.Read(
+                FakeEndpoint(0x87, UsbEndpointTransferType.Isochronous),
+                new byte[64],
+                out _,
+                100
+            );
+        var write = () =>
+            usbInterface.Write(
+                FakeEndpoint(0x08, UsbEndpointTransferType.Isochronous),
+                new byte[10],
+                out _,
+                100
+            );
+
+        read.Should().Throw<NotSupportedException>().WithMessage("Isochronous*");
+        write.Should().Throw<NotSupportedException>().WithMessage("Isochronous*");
+        A.CallTo(() => handle.AllocateTransfer(A<int>._)).MustNotHaveHappened();
+    }
+
+    [Fact]
+    public void Read_and_Write_throw_when_the_endpoint_is_null()
+    {
+        using var device = CreateFakeDevice(out var handle);
+        using var usbInterface = ClaimFakeInterfaceWithSeveralEndpoints(device, handle);
+
+        var read = () => usbInterface.Read(null!, new byte[64], out _, 100);
+        var write = () => usbInterface.Write(null!, new byte[10], out _, 100);
+
+        read.Should().Throw<ArgumentNullException>().WithParameterName("endpoint");
+        write.Should().Throw<ArgumentNullException>().WithParameterName("endpoint");
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(63)]
+    [InlineData(100)]
+    public void Read_throws_when_buffer_length_is_not_a_non_zero_multiple_of_the_max_packet_size(
+        int length
+    )
+    {
+        using var device = CreateFakeDevice(out var handle);
+        using var usbInterface = ClaimFakeInterfaceWithSeveralEndpoints(device, handle);
+        usbInterface.TryGetInputEndpoint(out var endpoint, UsbEndpointTransferType.Interrupt);
+
+        var act = () => usbInterface.Read(endpoint!, new byte[length], out _, 100);
+
+        act.Should().Throw<ArgumentException>().WithMessage("*multiple of the endpoint*(64)*");
+    }
+
+    [Theory]
+    // wMaxPacketSize 0x1400: 1024 byte packets, with 2 additional transactions per microframe
+    [InlineData(0x1400, 1024)]
+    [InlineData(0x1400, 3072)]
+    [InlineData(0x1400, 5120)]
+    // wMaxPacketSize 0x0C00: 1024 byte packets, with 1 additional transaction per microframe
+    [InlineData(0x0C00, 2048)]
+    public void Read_ignores_the_additional_transaction_bits_of_a_high_bandwidth_max_packet_size(
+        ushort maxPacketSize,
+        int length
+    )
+    {
+        using var device = CreateFakeDevice(out var handle);
+        var endpoint = FakeEndpoint(0x81, UsbEndpointTransferType.Interrupt);
+        A.CallTo(() => endpoint.MaxPacketSize).Returns(maxPacketSize);
+        using var usbInterface = ClaimFakeInterface(device, handle, endpoint);
+
+        var transfer = CaptureSubmittedTransfer(
+            handle,
+            () => usbInterface.Read(endpoint, new byte[length], out _, 100)
+        );
+
+        transfer.Should().NotBeNull();
+        transfer!.Value.length.Should().Be(length);
+    }
+
+    [Fact]
+    public void Read_checks_the_buffer_length_against_the_packet_size_of_a_high_bandwidth_endpoint()
+    {
+        using var device = CreateFakeDevice(out var handle);
+        var endpoint = FakeEndpoint(0x81, UsbEndpointTransferType.Interrupt);
+        A.CallTo(() => endpoint.MaxPacketSize).Returns((ushort)0x1400);
+        using var usbInterface = ClaimFakeInterface(device, handle, endpoint);
+
+        var act = () => usbInterface.Read(endpoint, new byte[1000], out _, 100);
+
+        act.Should().Throw<ArgumentException>().WithMessage("*multiple of the endpoint*(1024)*");
+    }
+
+    [Fact]
+    public void Read_and_Write_return_Interrupted_when_the_interface_is_disposed()
+    {
+        using var device = CreateFakeDevice(out var handle);
+        var usbInterface = ClaimFakeInterfaceWithSeveralEndpoints(device, handle);
+        usbInterface.TryGetInputEndpoint(out var input, UsbEndpointTransferType.Interrupt);
+        usbInterface.TryGetOutputEndpoint(out var output, UsbEndpointTransferType.Interrupt);
+        usbInterface.Dispose();
+
+        var readResult = usbInterface.Read(input!, new byte[64], out var bytesRead, 100);
+        var writeResult = usbInterface.Write(output!, new byte[10], out var bytesWritten, 100);
+
+        readResult.Should().Be(UsbResult.Interrupted);
+        writeResult.Should().Be(UsbResult.Interrupted);
+        bytesRead.Should().Be(0);
+        bytesWritten.Should().Be(0);
+    }
+
+    /// <summary>
+    /// Claim a fake interface with two bulk, one interrupt and one isochronous endpoint in each
+    /// direction; all with a max packet size of 64 bytes.
+    /// </summary>
+    private static IUsbInterface ClaimFakeInterfaceWithSeveralEndpoints(
+        UsbDotNet.UsbDevice device,
+        ISafeDeviceHandle handle
+    )
+    {
+        IUsbEndpointDescriptor[] endpoints =
+        [
+            FakeEndpoint(0x81, UsbEndpointTransferType.Bulk),
+            FakeEndpoint(0x02, UsbEndpointTransferType.Bulk),
+            FakeEndpoint(0x83, UsbEndpointTransferType.Interrupt),
+            FakeEndpoint(0x04, UsbEndpointTransferType.Interrupt),
+            FakeEndpoint(0x85, UsbEndpointTransferType.Bulk),
+            FakeEndpoint(0x06, UsbEndpointTransferType.Bulk),
+            FakeEndpoint(0x87, UsbEndpointTransferType.Isochronous),
+            FakeEndpoint(0x08, UsbEndpointTransferType.Isochronous),
+        ];
+        foreach (var endpoint in endpoints)
+        {
+            A.CallTo(() => endpoint.MaxPacketSize).Returns((ushort)64);
+        }
+        return ClaimFakeInterface(device, handle, endpoints);
+    }
+
+    /// <summary>
+    /// Run a transfer on a fake interface and return the libusb transfer that was submitted,
+    /// or null when no transfer was submitted. The submit fails, so the transfer does not wait.
+    /// </summary>
+    private static libusb_transfer? CaptureSubmittedTransfer(
+        ISafeDeviceHandle handle,
+        Func<UsbResult> transfer
+    )
+    {
+        // The libusb transfer struct is written to this memory before it is submitted
+        var transferPtr = Marshal.AllocHGlobal(Marshal.SizeOf<libusb_transfer>());
+        try
+        {
+            libusb_transfer? submitted = null;
+            var safeTransfer = A.Fake<ISafeTransfer>();
+            A.CallTo(() => handle.AllocateTransfer(A<int>._)).Returns(safeTransfer);
+            A.CallTo(() => safeTransfer.GetBufferPtr()).Returns(transferPtr);
+            A.CallTo(() => safeTransfer.Submit())
+                .Invokes(() => submitted = Marshal.PtrToStructure<libusb_transfer>(transferPtr))
+                .Returns(libusb_error.LIBUSB_ERROR_NO_DEVICE);
+
+            transfer().Should().Be(UsbResult.NoDevice);
+
+            return submitted;
+        }
+        finally
+        {
+            Marshal.FreeHGlobal(transferPtr);
+        }
     }
 
     [Fact]
@@ -346,7 +638,10 @@ public sealed class Given_a_fake_claimed_USB_interface : IDisposable
             new UsbDeviceDescriptor { DeviceKey = "FAKE_0000_0_0" },
             A.Fake<IUsbConfigDescriptor>()
         );
+        // BulkRead resolves the bulk input endpoint before it checks for an in-progress dispose
         var descriptor = A.Fake<IUsbInterfaceDescriptor>();
+        A.CallTo(() => descriptor.Endpoints)
+            .Returns([FakeEndpoint(0x81, UsbEndpointTransferType.Bulk)]);
         for (var iteration = 1; iteration <= Iterations; iteration++)
         {
             var claimedInterface = A.Fake<ISafeDeviceInterface>();
@@ -434,19 +729,20 @@ public sealed class Given_a_fake_claimed_USB_interface : IDisposable
 
         var inputEndpoint = FakeEndpoint(0x81, UsbEndpointTransferType.Bulk);
 
-        // BulkRead resolves its endpoint lazily inside the dispose read lock. Park the
-        // reader there, so the interface dispose stays in EnterWriteLock, holding its
+        // BulkRead reads the endpoint max packet size inside the dispose read lock. Park
+        // the reader there, so the interface dispose stays in EnterWriteLock, holding its
         // dispose monitor, until the reader is released.
         using var readerInsideDisposeLock = new ManualResetEventSlim();
         using var releaseReader = new ManualResetEventSlim();
-        var descriptor = A.Fake<IUsbInterfaceDescriptor>();
-        A.CallTo(() => descriptor.Endpoints)
+        A.CallTo(() => inputEndpoint.MaxPacketSize)
             .ReturnsLazily(() =>
             {
                 readerInsideDisposeLock.Set();
                 releaseReader.Wait(WaitTimeout);
-                return [inputEndpoint];
+                return (ushort)0;
             });
+        var descriptor = A.Fake<IUsbInterfaceDescriptor>();
+        A.CallTo(() => descriptor.Endpoints).Returns([inputEndpoint]);
         var usbInterface = device.ClaimInterface(descriptor);
 
         var readResult = UsbResult.UnknownError;

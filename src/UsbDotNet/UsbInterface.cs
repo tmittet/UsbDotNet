@@ -13,23 +13,28 @@ namespace UsbDotNet;
 /// <inheritdoc/>
 public sealed class UsbInterface : IUsbInterface
 {
-    // These buffers should be a multiple of the USB endpoint MaxPacketSize.
+    // The transfer buffer size should be a multiple of the USB endpoint MaxPacketSize.
     // Typical MaxPacketSize values for USB 2.0 and 3.0 are 512 and 1024.
-    private const int ReadBufferSize = 32 * 1024;
-    private const int WriteBufferSize = 32 * 1024;
+    private const int TransferBufferSize = 32 * 1024;
+
+    // Bits 0-10 of wMaxPacketSize are the max packet size. For high-speed, high-bandwidth
+    // interrupt and isochronous endpoints, bits 11-12 are the number of additional transactions
+    // per microframe; they are not part of the packet size. Bits 13-15 are reserved.
+    private const int MaxPacketSizeMask = 0x07FF;
 
     private readonly ILogger<UsbInterface> _logger;
     private readonly UsbDevice _device;
     private readonly IUsbInterfaceDescriptor _descriptor;
     private readonly ISafeDeviceInterface _claimedInterface;
-    private readonly byte[] _bulkReadBuffer;
-    private readonly GCHandle _bulkReadBufferHandle;
-    private readonly Lazy<IUsbEndpointDescriptor> _readEndpoint;
-    private readonly object _bulkReadLock = new();
-    private readonly byte[] _bulkWriteBuffer;
-    private readonly GCHandle _bulkWriteBufferHandle;
-    private readonly Lazy<IUsbEndpointDescriptor> _writeEndpoint;
-    private readonly object _bulkWriteLock = new();
+    private readonly Lazy<IUsbEndpointDescriptor> _bulkReadEndpoint;
+    private readonly Lazy<IUsbEndpointDescriptor> _bulkWriteEndpoint;
+
+    /// <summary>
+    /// Pinned transfer buffers keyed by endpoint address, allocated on the first transfer to an
+    /// endpoint. Lock the dictionary to access it. The buffers are only used and freed while
+    /// _disposeLock is held; by transfers as readers and by Dispose as the writer.
+    /// </summary>
+    private readonly Dictionary<byte, EndpointBuffer> _endpointBuffers = [];
 
     /// <summary>
     /// Guards entry into and teardown of _disposeLock. This is a separate lock from _disposeLock
@@ -73,25 +78,20 @@ public sealed class UsbInterface : IUsbInterface
         IUsbEndpointDescriptor? writeEndpoint = default
     )
     {
-        // Validate before any buffer is pinned, so a rejected endpoint does not leak a handle
         CheckBulkEndpoint(readEndpoint, UsbEndpointDirection.Input, nameof(readEndpoint));
         CheckBulkEndpoint(writeEndpoint, UsbEndpointDirection.Output, nameof(writeEndpoint));
         _logger = logger;
         _device = device;
         _descriptor = descriptor;
         _claimedInterface = claimedInterface;
-        _bulkReadBuffer = new byte[ReadBufferSize];
-        _bulkReadBufferHandle = GCHandle.Alloc(_bulkReadBuffer, GCHandleType.Pinned);
-        _readEndpoint = readEndpoint is null
+        _bulkReadEndpoint = readEndpoint is null
             ? new Lazy<IUsbEndpointDescriptor>(() =>
-                GetEndpoint(descriptor, UsbEndpointDirection.Input)
+                GetBulkEndpoint(descriptor, UsbEndpointDirection.Input)
             )
             : new Lazy<IUsbEndpointDescriptor>(readEndpoint);
-        _bulkWriteBuffer = new byte[WriteBufferSize];
-        _bulkWriteBufferHandle = GCHandle.Alloc(_bulkWriteBuffer, GCHandleType.Pinned);
-        _writeEndpoint = writeEndpoint is null
+        _bulkWriteEndpoint = writeEndpoint is null
             ? new Lazy<IUsbEndpointDescriptor>(() =>
-                GetEndpoint(descriptor, UsbEndpointDirection.Output)
+                GetBulkEndpoint(descriptor, UsbEndpointDirection.Output)
             )
             : new Lazy<IUsbEndpointDescriptor>(writeEndpoint);
         _disposeCts = new CancellationTokenSource();
@@ -100,17 +100,16 @@ public sealed class UsbInterface : IUsbInterface
     /// <inheritdoc/>
     public bool TryGetInputEndpoint(
         [NotNullWhen(true)] out IUsbEndpointDescriptor? endpoint,
-        UsbEndpointTransferType transferType = UsbEndpointTransferType.Bulk
-    ) => TryGetEndpoint(_readEndpoint, UsbEndpointDirection.Input, transferType, out endpoint);
+        UsbEndpointTransferType transferType
+    ) => TryGetEndpoint(UsbEndpointDirection.Input, transferType, out endpoint);
 
     /// <inheritdoc/>
     public bool TryGetOutputEndpoint(
         [NotNullWhen(true)] out IUsbEndpointDescriptor? endpoint,
-        UsbEndpointTransferType transferType = UsbEndpointTransferType.Bulk
-    ) => TryGetEndpoint(_writeEndpoint, UsbEndpointDirection.Output, transferType, out endpoint);
+        UsbEndpointTransferType transferType
+    ) => TryGetEndpoint(UsbEndpointDirection.Output, transferType, out endpoint);
 
     private bool TryGetEndpoint(
-        Lazy<IUsbEndpointDescriptor> bulkEndpoint,
         UsbEndpointDirection direction,
         UsbEndpointTransferType transferType,
         [NotNullWhen(true)] out IUsbEndpointDescriptor? endpoint
@@ -124,7 +123,10 @@ public sealed class UsbInterface : IUsbInterface
         // Return the endpoint that BulkRead/BulkWrite use
         try
         {
-            endpoint = bulkEndpoint.Value;
+            endpoint =
+                direction is UsbEndpointDirection.Input
+                    ? _bulkReadEndpoint.Value
+                    : _bulkWriteEndpoint.Value;
             return true;
         }
         catch (InvalidOperationException)
@@ -144,41 +146,77 @@ public sealed class UsbInterface : IUsbInterface
         );
 
     /// <inheritdoc/>
-    public UsbResult BulkRead(Span<byte> destination, out int bytesRead, int timeout)
+    public UsbResult Read(
+        IUsbEndpointDescriptor endpoint,
+        Span<byte> destination,
+        out int bytesRead,
+        int timeout
+    ) =>
+        ExecuteRead(
+            GetInterfaceEndpoint(endpoint, UsbEndpointDirection.Input),
+            destination,
+            out bytesRead,
+            timeout
+        );
+
+    /// <inheritdoc/>
+    public UsbResult Write(
+        IUsbEndpointDescriptor endpoint,
+        ReadOnlySpan<byte> source,
+        out int bytesWritten,
+        int timeout
+    ) =>
+        ExecuteWrite(
+            GetInterfaceEndpoint(endpoint, UsbEndpointDirection.Output),
+            source,
+            out bytesWritten,
+            timeout
+        );
+
+    /// <inheritdoc/>
+    public UsbResult BulkRead(Span<byte> destination, out int bytesRead, int timeout) =>
+        // The default bulk input endpoint is resolved lazily, on the first read
+        ExecuteRead(_bulkReadEndpoint.Value, destination, out bytesRead, timeout);
+
+    /// <inheritdoc/>
+    public UsbResult BulkWrite(ReadOnlySpan<byte> source, out int bytesWritten, int timeout) =>
+        // The default bulk output endpoint is resolved lazily, on the first write
+        ExecuteWrite(_bulkWriteEndpoint.Value, source, out bytesWritten, timeout);
+
+    /// <summary>
+    /// Read from a bulk or interrupt input endpoint of this interface.
+    /// </summary>
+    private UsbResult ExecuteRead(
+        IUsbEndpointDescriptor endpoint,
+        Span<byte> destination,
+        out int bytesRead,
+        int timeout
+    )
     {
         CheckTransferTimeout(timeout);
         try
         {
-            lock (_disposeLockSync)
-            {
-                // Uses a read lock for both reads and writes, to support duplex.
-                //
-                // Try enter the lock with a zero timeout. The write lock is only taken by Dispose,
-                // so failing to enter means dispose has started. Never block on _disposeLock while
-                // holding _disposeLockSync, since Dispose() needs it to exit the write lock.
-                if (_disposed || !_disposeLock.TryEnterReadLock(0))
-                {
-                    throw new ObjectDisposedException(nameof(UsbInterface));
-                }
-            }
+            EnterTransferLock();
             try
             {
-                var maxPacketSize = _readEndpoint.Value.MaxPacketSize;
+                var maxPacketSize = (ushort)(endpoint.MaxPacketSize & MaxPacketSizeMask);
                 CheckDestinationSpanLength(destination, maxPacketSize);
-                var bufferLength = Math.Min(destination.Length, ReadBufferSize);
+                var bufferLength = Math.Min(destination.Length, TransferBufferSize);
                 if (maxPacketSize > 0)
                 {
                     // Keep the buffer length a multiple of the max packet size when it is capped
                     bufferLength -= bufferLength % maxPacketSize;
                 }
-                lock (_bulkReadLock)
+                var buffer = GetEndpointBuffer(endpoint);
+                // One transfer at a time per endpoint; they share the endpoint buffer
+                lock (buffer)
                 {
                     var result = LibUsbTransfer.ExecuteSync(
                         _logger,
                         _device.Handle,
-                        libusb_endpoint_transfer_type.LIBUSB_ENDPOINT_TRANSFER_TYPE_BULK,
-                        _readEndpoint.Value.EndpointAddress.RawValue,
-                        _bulkReadBufferHandle,
+                        ToLibUsbTransferType(endpoint.Attributes.TransferType),
+                        endpoint.EndpointAddress.RawValue,
+                        buffer.Handle,
                         bufferLength,
                         timeout > 0 ? (uint)timeout : 0,
                         out bytesRead,
@@ -186,7 +224,7 @@ public sealed class UsbInterface : IUsbInterface
                     );
                     if (bytesRead > 0)
                     {
-                        _bulkReadBuffer.AsSpan(0, bytesRead).CopyTo(destination);
+                        buffer.Bytes.AsSpan(0, bytesRead).CopyTo(destination);
                     }
                     return result.ToUsbResult();
                 }
@@ -199,7 +237,7 @@ public sealed class UsbInterface : IUsbInterface
         catch (ObjectDisposedException ex)
         {
             _logger.LogWarning(
-                "BulkRead interrupted. {ErrorType}: {ErrorMessage}",
+                "Read interrupted. {ErrorType}: {ErrorMessage}",
                 ex.GetType().Name,
                 ex.Message
             );
@@ -208,37 +246,35 @@ public sealed class UsbInterface : IUsbInterface
         }
     }
 
-    /// <inheritdoc/>
-    public UsbResult BulkWrite(ReadOnlySpan<byte> source, out int bytesWritten, int timeout)
+    /// <summary>
+    /// Write to a bulk or interrupt output endpoint of this interface.
+    /// </summary>
+    private UsbResult ExecuteWrite(
+        IUsbEndpointDescriptor endpoint,
+        ReadOnlySpan<byte> source,
+        out int bytesWritten,
+        int timeout
+    )
     {
         CheckTransferTimeout(timeout);
         try
         {
-            lock (_disposeLockSync)
-            {
-                // Uses a read lock for both reads and writes, to support duplex.
-                //
-                // Try enter the lock with a zero timeout. The write lock is only taken by Dispose,
-                // so failing to enter means dispose has started. Never block on _disposeLock while
-                // holding _disposeLockSync, since Dispose() needs it to exit the write lock.
-                if (_disposed || !_disposeLock.TryEnterReadLock(0))
-                {
-                    throw new ObjectDisposedException(nameof(UsbInterface));
-                }
-            }
+            EnterTransferLock();
             try
             {
-                var bufferLength = Math.Min(source.Length, WriteBufferSize);
-                lock (_bulkWriteLock)
+                var bufferLength = Math.Min(source.Length, TransferBufferSize);
+                var buffer = GetEndpointBuffer(endpoint);
+                // One transfer at a time per endpoint; they share the endpoint buffer
+                lock (buffer)
                 {
-                    source[..bufferLength].CopyTo(_bulkWriteBuffer.AsSpan(0, bufferLength));
+                    source[..bufferLength].CopyTo(buffer.Bytes.AsSpan(0, bufferLength));
                     return LibUsbTransfer
                         .ExecuteSync(
                             _logger,
                             _device.Handle,
-                            libusb_endpoint_transfer_type.LIBUSB_ENDPOINT_TRANSFER_TYPE_BULK,
-                            _writeEndpoint.Value.EndpointAddress.RawValue,
-                            _bulkWriteBufferHandle,
+                            ToLibUsbTransferType(endpoint.Attributes.TransferType),
+                            endpoint.EndpointAddress.RawValue,
+                            buffer.Handle,
                             bufferLength,
                             timeout > 0 ? (uint)timeout : 0,
                             out bytesWritten,
@@ -255,7 +291,7 @@ public sealed class UsbInterface : IUsbInterface
         catch (ObjectDisposedException ex)
         {
             _logger.LogWarning(
-                "BulkWrite interrupted. {ErrorType}: {ErrorMessage}",
+                "Write interrupted. {ErrorType}: {ErrorMessage}",
                 ex.GetType().Name,
                 ex.Message
             );
@@ -264,12 +300,109 @@ public sealed class UsbInterface : IUsbInterface
         }
     }
 
+    /// <summary>
+    /// Enter the dispose lock as a reader; held for the duration of a transfer. A read lock is
+    /// used for both reads and writes, to support duplex. Exit with _disposeLock.ExitReadLock().
+    /// </summary>
+    /// <exception cref="ObjectDisposedException">Thrown when dispose has started.</exception>
+    private void EnterTransferLock()
+    {
+        lock (_disposeLockSync)
+        {
+            // Try enter the lock with a zero timeout. The write lock is only taken by Dispose,
+            // so failing to enter means dispose has started. Never block on _disposeLock while
+            // holding _disposeLockSync, since Dispose() needs it to exit the write lock.
+            if (_disposed || !_disposeLock.TryEnterReadLock(0))
+            {
+                throw new ObjectDisposedException(nameof(UsbInterface));
+            }
+        }
+    }
+
+    /// <summary>
+    /// Get the pinned transfer buffer of an endpoint; allocated on first use, freed by Dispose.
+    /// Only call this while holding the transfer lock, see <see cref="EnterTransferLock"/>.
+    /// </summary>
+    private EndpointBuffer GetEndpointBuffer(IUsbEndpointDescriptor endpoint)
+    {
+        var address = endpoint.EndpointAddress.RawValue;
+        lock (_endpointBuffers)
+        {
+            if (!_endpointBuffers.TryGetValue(address, out var buffer))
+            {
+                buffer = new EndpointBuffer(TransferBufferSize);
+                _endpointBuffers.Add(address, buffer);
+            }
+            return buffer;
+        }
+    }
+
+    /// <summary>
+    /// Find the endpoint of this interface with the same address as the given endpoint, and
+    /// check that it can be used for a transfer in the given direction.
+    /// </summary>
+    /// <exception cref="ArgumentException">
+    /// Thrown when the endpoint is not an endpoint of this interface, or has another direction.
+    /// </exception>
+    /// <exception cref="NotSupportedException">
+    /// Thrown when the transfer type of the endpoint is not supported.
+    /// </exception>
+    private IUsbEndpointDescriptor GetInterfaceEndpoint(
+        IUsbEndpointDescriptor endpoint,
+        UsbEndpointDirection direction
+    )
+    {
+        ArgumentNullException.ThrowIfNull(endpoint);
+        var address = endpoint.EndpointAddress;
+        if (address.Direction != direction)
+        {
+            throw new ArgumentException(
+                $"Invalid endpoint {address}; must be an {direction} endpoint.",
+                nameof(endpoint)
+            );
+        }
+        // Use the descriptor of this interface, not the one provided by the caller
+        var interfaceEndpoint =
+            _descriptor.Endpoints.FirstOrDefault(e =>
+                e.EndpointAddress.RawValue == address.RawValue
+            )
+            ?? throw new ArgumentException(
+                $"Invalid endpoint {address}; not an endpoint of interface {this}.",
+                nameof(endpoint)
+            );
+        _ = ToLibUsbTransferType(interfaceEndpoint.Attributes.TransferType);
+        return interfaceEndpoint;
+    }
+
+    /// <summary>
+    /// Map the transfer type of an endpoint to the libusb transfer type to submit to it.
+    /// </summary>
+    /// <exception cref="NotSupportedException">
+    /// Thrown for control and isochronous endpoints, which IUsbInterface can not transfer to.
+    /// </exception>
+    private static libusb_endpoint_transfer_type ToLibUsbTransferType(
+        UsbEndpointTransferType transferType
+    ) =>
+        transferType switch
+        {
+            UsbEndpointTransferType.Bulk =>
+                libusb_endpoint_transfer_type.LIBUSB_ENDPOINT_TRANSFER_TYPE_BULK,
+            UsbEndpointTransferType.Interrupt =>
+                libusb_endpoint_transfer_type.LIBUSB_ENDPOINT_TRANSFER_TYPE_INTERRUPT,
+            UsbEndpointTransferType.Control => throw new NotSupportedException(
+                "Control transfers are not supported on an interface; use the device."
+            ),
+            UsbEndpointTransferType.Isochronous => throw new NotSupportedException(
+                "Isochronous transfers are not supported."
+            ),
+        };
+
     /// <inheritdoc/>
     public override string ToString() =>
         $"#{_descriptor.InterfaceNumber} "
         + $"({_descriptor.InterfaceClass} subclass {_descriptor.InterfaceSubClass})";
 
-    private IUsbEndpointDescriptor GetEndpoint(
+    private IUsbEndpointDescriptor GetBulkEndpoint(
         IUsbInterfaceDescriptor descriptor,
         UsbEndpointDirection direction
     )
@@ -358,7 +491,7 @@ public sealed class UsbInterface : IUsbInterface
 
     /// <summary>
     /// Disposes this interface and associated resources. Ongoing read and write
-    /// transfers are canceled and allocated read and write memory buffers are freed.
+    /// transfers are canceled and allocated transfer buffers are freed.
     /// </summary>
     public void Dispose()
     {
@@ -377,9 +510,15 @@ public sealed class UsbInterface : IUsbInterface
                 // Ask UsbDevice to remove it from list of open interfaces
                 _device.ReleaseInterface(_descriptor.InterfaceNumber);
                 _claimedInterface.Dispose();
-                // Free read and write buffers
-                _bulkReadBufferHandle.Free();
-                _bulkWriteBufferHandle.Free();
+                // Free the endpoint transfer buffers
+                lock (_endpointBuffers)
+                {
+                    foreach (var buffer in _endpointBuffers.Values)
+                    {
+                        buffer.Handle.Free();
+                    }
+                    _endpointBuffers.Clear();
+                }
                 _disposeCts.Dispose();
                 _disposed = true;
             }
@@ -393,6 +532,23 @@ public sealed class UsbInterface : IUsbInterface
                     _disposeLock.Dispose();
                 }
             }
+        }
+    }
+
+    /// <summary>
+    /// A pinned transfer buffer for one endpoint. Lock the instance for the duration of a
+    /// transfer; libusb reads from or writes to the buffer until the transfer completes.
+    /// </summary>
+    private sealed class EndpointBuffer
+    {
+        public byte[] Bytes { get; }
+
+        public GCHandle Handle { get; }
+
+        public EndpointBuffer(int size)
+        {
+            Bytes = new byte[size];
+            Handle = GCHandle.Alloc(Bytes, GCHandleType.Pinned);
         }
     }
 }

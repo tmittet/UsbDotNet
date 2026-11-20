@@ -96,7 +96,10 @@ public sealed class Given_a_supported_Huddly_USB_device : IDisposable
     {
         using var device = _deviceSource.OpenUsbDeviceOrSkip();
         using var usbInterface = device.ClaimInterface(UsbClass.VendorSpecific, HLinkSubClass);
-        var endpointFound = usbInterface.TryGetInputEndpoint(out var endpoint);
+        var endpointFound = usbInterface.TryGetInputEndpoint(
+            out var endpoint,
+            UsbEndpointTransferType.Bulk
+        );
         endpointFound.Should().BeTrue();
         endpoint!.MaxPacketSize.Should().BePositive();
     }
@@ -106,7 +109,10 @@ public sealed class Given_a_supported_Huddly_USB_device : IDisposable
     {
         using var device = _deviceSource.OpenUsbDeviceOrSkip();
         using var usbInterface = device.ClaimInterface(UsbClass.VendorSpecific, HLinkSubClass);
-        var endpointFound = usbInterface.TryGetOutputEndpoint(out var endpoint);
+        var endpointFound = usbInterface.TryGetOutputEndpoint(
+            out var endpoint,
+            UsbEndpointTransferType.Bulk
+        );
         endpointFound.Should().BeTrue();
         endpoint!.MaxPacketSize.Should().BePositive();
     }
@@ -163,7 +169,10 @@ public sealed class Given_a_supported_Huddly_USB_device : IDisposable
         const string expectedSaluteResponse = "HLink v0";
         var expectedSaluteBytes = Encoding.UTF8.GetBytes(expectedSaluteResponse);
         // The buffer length must be a multiple of the endpoint max packet size
-        usbInterface.TryGetInputEndpoint(out var endpoint).Should().BeTrue();
+        usbInterface
+            .TryGetInputEndpoint(out var endpoint, UsbEndpointTransferType.Bulk)
+            .Should()
+            .BeTrue();
         var buffer = new byte[endpoint!.MaxPacketSize];
         var readError = usbInterface.BulkRead(buffer, out var readLength, 1000);
         readError.Should().Be(UsbResult.Success, "salute response read should not fail");
@@ -173,6 +182,47 @@ public sealed class Given_a_supported_Huddly_USB_device : IDisposable
                 expectedSaluteBytes.Length,
                 $"salute response '{expectedSaluteResponse}' is expected"
             );
+        buffer[..readLength]
+            .Should()
+            .BeEquivalentTo(
+                expectedSaluteBytes,
+                $"salute response '{expectedSaluteResponse}' is expected"
+            );
+    }
+
+    [SkippableFact]
+    public void It_is_able_to_send_salute_and_receive_response_using_endpoint_addressed_Write_and_Read()
+    {
+        using var device = _deviceSource.OpenUsbDeviceOrSkip();
+        using var usbInterface = device.ClaimInterface(UsbClass.VendorSpecific, HLinkSubClass);
+        usbInterface
+            .TryGetOutputEndpoint(out var output, UsbEndpointTransferType.Bulk)
+            .Should()
+            .BeTrue();
+        usbInterface
+            .TryGetInputEndpoint(out var input, UsbEndpointTransferType.Bulk)
+            .Should()
+            .BeTrue();
+        // Send Huddly "reset"
+        usbInterface
+            .Write(output!, [], out _, 200)
+            .Should()
+            .Be(UsbResult.Success, "first reset should not fail");
+        usbInterface
+            .Write(output!, [], out _, 200)
+            .Should()
+            .Be(UsbResult.Success, "second reset should not fail");
+        // Send Huddly "salute"
+        var writeError = usbInterface.Write(output!, [0x00], out var writeLength, 200);
+        writeError.Should().Be(UsbResult.Success, "salute should not fail");
+        writeLength.Should().Be(1, "salute should write 1 byte");
+        // Wait for salute response
+        const string expectedSaluteResponse = "HLink v0";
+        var expectedSaluteBytes = Encoding.UTF8.GetBytes(expectedSaluteResponse);
+        // The buffer length must be a multiple of the endpoint max packet size
+        var buffer = new byte[input!.MaxPacketSize];
+        var readError = usbInterface.Read(input, buffer, out var readLength, 1000);
+        readError.Should().Be(UsbResult.Success, "salute response read should not fail");
         buffer[..readLength]
             .Should()
             .BeEquivalentTo(
