@@ -75,6 +75,9 @@ internal sealed class FakeLibusbApi : ILibUsbApi
     /// <summary>The number of calls to libusb_exit.</summary>
     internal int ExitCount;
 
+    /// <summary>The wIndex of each string descriptor request, in call order.</summary>
+    internal ConcurrentQueue<ushort> ControlTransferLanguageIds { get; } = new();
+
     /// <summary>The number of calls to libusb_close.</summary>
     internal int CloseCount;
 
@@ -551,6 +554,56 @@ internal sealed class FakeLibusbApi : ILibUsbApi
             return (libusb_error)n;
         }
         return libusb_error.LIBUSB_ERROR_NOT_FOUND;
+    }
+
+    /// <summary>
+    /// Serves the string descriptors of the fake device: the language IDs at index 0, and the
+    /// manufacturer, product and serial number at index 1 to 3. Other requests stall.
+    /// </summary>
+    public libusb_error libusb_control_transfer(
+        IntPtr handle,
+        byte bmRequestType,
+        byte bRequest,
+        ushort wValue,
+        ushort wIndex,
+        byte[] data,
+        ushort wLength,
+        uint timeout
+    )
+    {
+        Hook();
+        if (
+            MaybeFail(nameof(libusb_control_transfer), out var error) != libusb_error.LIBUSB_SUCCESS
+        )
+        {
+            return error;
+        }
+
+        const byte getDescriptorFromDevice = 0x80;
+        const byte getDescriptor = 0x06;
+        const byte stringDescriptor = 0x03;
+        if (
+            bmRequestType != getDescriptorFromDevice
+            || bRequest != getDescriptor
+            || wValue >> 8 != stringDescriptor
+        )
+        {
+            return libusb_error.LIBUSB_ERROR_PIPE;
+        }
+        var descriptor = (wValue & 0xFF) switch
+        {
+            0 => LangIdx0,
+            1 => ManufacturerUtf16,
+            2 => ProductUtf16,
+            3 => MakeUtf16String(Encoding.ASCII.GetString(SerialAscii)),
+            _ => null,
+        };
+        if (descriptor is null)
+            return libusb_error.LIBUSB_ERROR_PIPE;
+        ControlTransferLanguageIds.Enqueue(wIndex);
+        var n = Math.Min(wLength, descriptor.Length);
+        Array.Copy(descriptor, data, n);
+        return (libusb_error)n;
     }
 
     // ------------- Halt / Reset -------------

@@ -127,6 +127,12 @@ public class Given_a_native_call_in_progress
                 expectedReleaseCount: 2
             ),
         // ---- SafeDeviceHandle, released with libusb_close
+        ["SafeDeviceHandle.TryGetStringDescriptor"] = api =>
+            DeviceHandleScenario(
+                api,
+                nameof(api.libusb_control_transfer),
+                handle => handle.TryGetStringDescriptor(3, out _, out _)
+            ),
         ["SafeDeviceHandle.TryGetStringDescriptorAscii"] = api =>
             DeviceHandleScenario(
                 api,

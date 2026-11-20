@@ -63,6 +63,7 @@ public interface IUsbDevice : IDisposable
 
     /// <summary>
     /// Reads a string descriptor from the device, using the first language supported by the device.
+    /// The string is returned as sent by the device; characters that are not ASCII are kept.
     /// <para>
     /// NOTE: On some devices it may fail even for basic fields like the serial number.
     /// </para>

@@ -142,7 +142,7 @@ public sealed class UsbDevice : IUsbDevice
         // Index zero is not a string; it holds the language IDs and libusb rejects a read of it
         return descriptorIndex == NoStringDescriptorIndex
             ? string.Empty
-            : Handle.GetStringDescriptorAscii(descriptorIndex);
+            : Handle.GetStringDescriptor(descriptorIndex);
     }
 
     /// <inheritdoc/>

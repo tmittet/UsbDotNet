@@ -13,7 +13,39 @@ public interface ISafeDeviceHandle : IDisposable
     nint DangerousGetHandle();
 
     /// <summary>
+    /// Reads a string descriptor from the device, using the first language supported by the
+    /// device. The string is returned as sent by the device; no character is replaced.
+    /// </summary>
+    /// <param name="index">
+    /// The index of the string descriptor. Index 0 is not a string; it holds the language IDs.
+    /// </param>
+    /// <exception cref="ObjectDisposedException">Thrown when the SafeDeviceHandle is disposed.</exception>
+    /// <exception cref="LibUsbException">Thrown when the descriptor read operation fails.</exception>
+    string GetStringDescriptor(byte index);
+
+    /// <summary>
+    /// Reads a string descriptor from the device, using the first language supported by the
+    /// device. The string is returned as sent by the device; no character is replaced.
+    /// </summary>
+    /// <param name="index">
+    /// The index of the string descriptor. Index 0 is not a string; it holds the language IDs.
+    /// </param>
+    /// <param name="descriptorValue">The string, when the read operation was successful.</param>
+    /// <param name="usbError">The error, when the read operation failed.</param>
+    /// <returns>
+    /// True when the string read operation was successful; otherwise false with a libusb_error output.
+    /// </returns>
+    /// <exception cref="ObjectDisposedException">Thrown when the SafeDeviceHandle is disposed.</exception>
+    bool TryGetStringDescriptor(
+        byte index,
+        [NotNullWhen(returnValue: true)] out string? descriptorValue,
+        [NotNullWhen(returnValue: false)] out libusb_error? usbError
+    );
+
+    /// <summary>
     /// Reads a string descriptor from the device, using the first language supported by the device.
+    /// Characters that are not ASCII are replaced with '?'; use
+    /// <see cref="GetStringDescriptor"/> to read the string as sent by the device.
     /// NOTE: On some devices it may fail even for basic fields like serial number (at index 0).
     /// </summary>
     /// <returns>
@@ -25,6 +57,8 @@ public interface ISafeDeviceHandle : IDisposable
 
     /// <summary>
     /// Reads a string descriptor from the device, using the first language supported by the device.
+    /// Characters that are not ASCII are replaced with '?'; use
+    /// <see cref="TryGetStringDescriptor"/> to read the string as sent by the device.
     /// NOTE: On some devices it may fail even for basic fields like serial number (at index 0).
     /// </summary>
     /// <returns>

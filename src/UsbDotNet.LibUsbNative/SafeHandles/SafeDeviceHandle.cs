@@ -53,6 +53,110 @@ internal sealed class SafeDeviceHandle : SafeHandle, ISafeDeviceHandle
         return true;
     }
 
+    // GET_DESCRIPTOR for a string descriptor; USB 2.0 specification section 9.4.3 and 9.6.7
+    private const byte RequestTypeDeviceToHost = 0x80;
+    private const byte RequestGetDescriptor = 0x06;
+    private const byte DescriptorTypeString = 0x03;
+    private const int DescriptorHeaderLength = 2;
+    private const int StringDescriptorMaxLength = 255;
+    private const int LanguageIdDescriptorLength = 4;
+
+    /// <summary>
+    /// The timeout libusb uses for its own string descriptor reads, in milliseconds.
+    /// </summary>
+    private const uint StringDescriptorTimeout = 1000;
+
+    /// <inheritdoc/>
+    public string GetStringDescriptor(byte index)
+    {
+        return TryGetStringDescriptor(index, out var value, out var error)
+            ? value
+            : throw error.Value.ToLibUsbExceptionForApi(
+                nameof(_context.Api.libusb_control_transfer),
+                $"String descriptor {index}."
+            );
+    }
+
+    /// <inheritdoc/>
+    public bool TryGetStringDescriptor(
+        byte index,
+        [NotNullWhen(true)] out string? descriptorValue,
+        [NotNullWhen(false)] out libusb_error? usbError
+    )
+    {
+        using var reference = SafeHelper.AcquireReference(this);
+
+        // This follows libusb_get_string_descriptor_ascii, except for the conversion to ASCII
+        descriptorValue = null;
+        // Index zero is not a string; it holds the language IDs supported by the device
+        if (index == 0)
+        {
+            usbError = libusb_error.LIBUSB_ERROR_INVALID_PARAM;
+            return false;
+        }
+
+        // Read the first language ID supported by the device
+        var buffer = new byte[StringDescriptorMaxLength];
+        var result = ReadStringDescriptor(0, 0, buffer, LanguageIdDescriptorLength);
+        if (result < 0)
+        {
+            usbError = result;
+            return false;
+        }
+        if (
+            (int)result != LanguageIdDescriptorLength
+            || buffer[0] < LanguageIdDescriptorLength
+            || buffer[1] != DescriptorTypeString
+        )
+        {
+            usbError = libusb_error.LIBUSB_ERROR_IO;
+            return false;
+        }
+        var languageId = (ushort)(buffer[2] | (buffer[3] << 8));
+
+        // Read the string in that language
+        result = ReadStringDescriptor(index, languageId, buffer, StringDescriptorMaxLength);
+        if (result < 0)
+        {
+            usbError = result;
+            return false;
+        }
+        var bytesRead = (int)result;
+        if (
+            bytesRead < DescriptorHeaderLength
+            || buffer[0] > bytesRead
+            || buffer[0] < DescriptorHeaderLength
+            || buffer[1] != DescriptorTypeString
+        )
+        {
+            usbError = libusb_error.LIBUSB_ERROR_IO;
+            return false;
+        }
+
+        // The string is UTF-16LE, without a terminator; an odd trailing byte is ignored
+        var stringLength = (buffer[0] - DescriptorHeaderLength) & ~1;
+        descriptorValue = Encoding.Unicode.GetString(buffer, DescriptorHeaderLength, stringLength);
+        usbError = null;
+        return true;
+    }
+
+    private libusb_error ReadStringDescriptor(
+        byte index,
+        ushort languageId,
+        byte[] buffer,
+        int length
+    ) =>
+        _context.Api.libusb_control_transfer(
+            handle,
+            RequestTypeDeviceToHost,
+            RequestGetDescriptor,
+            (ushort)((DescriptorTypeString << 8) | index),
+            languageId,
+            buffer,
+            (ushort)length,
+            StringDescriptorTimeout
+        );
+
     /// <inheritdoc/>
     public string GetStringDescriptorAscii(byte index)
     {

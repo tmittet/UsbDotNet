@@ -28,7 +28,7 @@ public sealed class Given_a_fake_USB_device : IDisposable
         device.GetManufacturer().Should().BeEmpty();
         device.GetProduct().Should().BeEmpty();
         device.GetSerialNumber().Should().BeEmpty();
-        A.CallTo(() => handle.GetStringDescriptorAscii(A<byte>._)).MustNotHaveHappened();
+        A.CallTo(() => handle.GetStringDescriptor(A<byte>._)).MustNotHaveHappened();
     }
 
     [Fact]
@@ -38,7 +38,7 @@ public sealed class Given_a_fake_USB_device : IDisposable
 
         device.ReadStringDescriptor(0).Should().BeEmpty();
 
-        A.CallTo(() => handle.GetStringDescriptorAscii(A<byte>._)).MustNotHaveHappened();
+        A.CallTo(() => handle.GetStringDescriptor(A<byte>._)).MustNotHaveHappened();
     }
 
     [Fact]
@@ -50,8 +50,8 @@ public sealed class Given_a_fake_USB_device : IDisposable
             productIndex: 0,
             serialNumberIndex: 3
         );
-        A.CallTo(() => handle.GetStringDescriptorAscii(1)).Returns("Manufacturer");
-        A.CallTo(() => handle.GetStringDescriptorAscii(3)).Returns("Serial");
+        A.CallTo(() => handle.GetStringDescriptor(1)).Returns("Manufacturer");
+        A.CallTo(() => handle.GetStringDescriptor(3)).Returns("Serial");
 
         using var scope = new AssertionScope();
         device.GetManufacturer().Should().Be("Manufacturer");

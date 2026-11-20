@@ -54,6 +54,28 @@ public abstract class Given_an_accessible_USB_device(ITestOutputHelper output, I
     }
 
     [SkippableFact]
+    public void GetStringDescriptor_returns_the_serial_that_the_ASCII_read_returns()
+    {
+        EnterReadLock(() =>
+        {
+            using var context = GetContext();
+            using var deviceList = context.GetDeviceList();
+            var device = deviceList.GetAccessibleDeviceOrSkipTest();
+            using var deviceHandle = device.Open();
+            var serialNumberIndex = device.GetDeviceDescriptor().iSerialNumber;
+
+            var serialNumber = deviceHandle.GetStringDescriptor(serialNumberIndex);
+
+            Output.WriteLine($"Serial Number: {serialNumber}");
+            serialNumber.Should().NotBeNullOrEmpty();
+            // The ASCII read replaces any character that is not ASCII with a question mark
+            var ascii = deviceHandle.GetStringDescriptorAscii(serialNumberIndex);
+            Skip.If(ascii.Contains('?', StringComparison.Ordinal), "The serial is not ASCII.");
+            serialNumber.Should().Be(ascii);
+        });
+    }
+
+    [SkippableFact]
     public void TryGetStringDescriptorAscii_successfully_returns_serial()
     {
         EnterReadLock(() =>
