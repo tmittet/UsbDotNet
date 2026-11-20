@@ -1,3 +1,5 @@
+using UsbDotNet.Internal;
+
 namespace UsbDotNet.Descriptor;
 
 /// <inheritdoc/>
@@ -51,6 +53,9 @@ public readonly record struct UsbDeviceDescriptor : IUsbDeviceDescriptor
     /// <inheritdoc/>
     public byte PortNumber { get; init; }
 
+    /// <inheritdoc/>
+    public UsbSpeed Speed { get; init; }
+
     /// <summary>
     /// Create a string device key.
     /// </summary>
@@ -71,14 +76,16 @@ public readonly record struct UsbDeviceDescriptor : IUsbDeviceDescriptor
             device.GetDeviceDescriptor(),
             device.GetBusNumber(),
             device.GetDeviceAddress(),
-            device.GetPortNumber()
+            device.GetPortNumber(),
+            device.GetSpeed().ToUsbSpeed()
         );
 
     private UsbDeviceDescriptor(
         LibUsbNative.Structs.libusb_device_descriptor partialDescriptor,
         byte busNumber,
         byte address,
-        byte portNumber
+        byte portNumber,
+        UsbSpeed speed
     )
     {
         BcdUsb = partialDescriptor.bcdUSB;
@@ -96,6 +103,7 @@ public readonly record struct UsbDeviceDescriptor : IUsbDeviceDescriptor
         BusNumber = busNumber;
         BusAddress = address;
         PortNumber = portNumber;
+        Speed = speed;
 
         DeviceKey = GetKey(VendorId, ProductId, BusNumber, BusAddress);
     }
