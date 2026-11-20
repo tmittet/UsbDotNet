@@ -44,6 +44,16 @@ public sealed class UsbDevice : IUsbDevice
     private readonly object _interfaceLock = new();
 
     /// <summary>
+    /// The numbers of the interfaces that may be on another alternate setting than the default,
+    /// because a selection of one was attempted through this device handle; a failed selection
+    /// may still have changed the alternate setting of the device. Releasing an interface does not
+    /// reliably reset its alternate setting; libusb leaves that to the operating system. The
+    /// default alternate setting is therefore selected explicitly when one of these interfaces
+    /// is claimed again. Guarded by _interfaceLock.
+    /// </summary>
+    private readonly HashSet<byte> _nonDefaultAlternateSettings = [];
+
+    /// <summary>
     /// Cancels any ongoing IO when Dispose is called.
     /// <para>
     /// NOTE: Not used by interface transfers; they do their own cancellation on interface dispose.
@@ -267,6 +277,48 @@ public sealed class UsbDevice : IUsbDevice
                         + $"on device '{_descriptor.DeviceKey}'.",
                     ex
                 );
+            }
+            // An interface is on the default alternate setting (0), until another one is selected.
+            // The default is only requested for an interface that was moved away from it through
+            // this device handle; a device with a single setting may stall on the request.
+            var alternateSetting = descriptor.AlternateSetting;
+            if (
+                alternateSetting != 0
+                || _nonDefaultAlternateSettings.Contains(descriptor.InterfaceNumber)
+            )
+            {
+                if (alternateSetting != 0)
+                {
+                    // Marked before the attempt: a selection that fails may still have changed
+                    // the alternate setting on the device. Only a successful selection of the
+                    // default, below, makes the interface known to be on the default again.
+                    _ = _nonDefaultAlternateSettings.Add(descriptor.InterfaceNumber);
+                }
+                try
+                {
+                    claimedInterface.SetAlternateSetting(alternateSetting);
+                }
+                catch (LibUsbException ex)
+                {
+                    claimedInterface.Dispose();
+                    throw new UsbException(
+                        ex.Code,
+                        $"Failed to select alternate setting {alternateSetting} of "
+                            + $"interface {descriptor.InterfaceNumber} "
+                            + $"on device '{_descriptor.DeviceKey}'.",
+                        ex
+                    );
+                }
+                catch
+                {
+                    // Never leave the interface claimed without a UsbInterface to release it
+                    claimedInterface.Dispose();
+                    throw;
+                }
+                if (alternateSetting == 0)
+                {
+                    _ = _nonDefaultAlternateSettings.Remove(descriptor.InterfaceNumber);
+                }
             }
             var usbInterface = new UsbInterface(
                 LoggerFactory.CreateLogger<UsbInterface>(),

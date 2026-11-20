@@ -27,6 +27,21 @@ internal sealed class SafeDeviceInterface : SafeHandle, ISafeDeviceInterface
         return _interfaceNumber;
     }
 
+    /// <inheritdoc/>
+    public void SetAlternateSetting(byte alternateSetting)
+    {
+        SafeHelper.ThrowIfClosed(this);
+        var result = _deviceHandle.Api.libusb_set_interface_alt_setting(
+            _deviceHandle.DangerousGetHandle(),
+            _interfaceNumber,
+            alternateSetting
+        );
+        result.ThrowLibUsbExceptionForApi(
+            nameof(_deviceHandle.Api.libusb_set_interface_alt_setting),
+            $"Interface {_interfaceNumber}, alternate setting {alternateSetting}."
+        );
+    }
+
     /// <summary>
     /// Attempt to log a message using the registered log handler; if there is one.
     /// </summary>

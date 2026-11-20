@@ -634,6 +634,206 @@ public sealed class Given_a_fake_claimed_USB_interface : IDisposable
             .Be(UsbResult.ResourceBusy);
     }
 
+    [Theory]
+    [InlineData(1)]
+    [InlineData(7)]
+    public void ClaimInterface_selects_the_alternate_setting_of_the_descriptor(
+        byte alternateSetting
+    )
+    {
+        using var device = CreateFakeDevice(out var handle);
+        var claimedInterface = A.Fake<ISafeDeviceInterface>();
+        A.CallTo(() => handle.ClaimInterface(2)).Returns(claimedInterface);
+
+        using var usbInterface = device.ClaimInterface(
+            FakeInterfaceDescriptor(interfaceNumber: 2, alternateSetting)
+        );
+
+        usbInterface.Number.Should().Be(2);
+        usbInterface.AlternateSetting.Should().Be(alternateSetting);
+        A.CallTo(() => claimedInterface.SetAlternateSetting(alternateSetting))
+            .MustHaveHappenedOnceExactly();
+    }
+
+    [Fact]
+    public void ClaimInterface_does_not_request_the_default_alternate_setting()
+    {
+        using var device = CreateFakeDevice(out var handle);
+        var claimedInterface = A.Fake<ISafeDeviceInterface>();
+        A.CallTo(() => handle.ClaimInterface(2)).Returns(claimedInterface);
+
+        using var usbInterface = device.ClaimInterface(
+            FakeInterfaceDescriptor(interfaceNumber: 2, alternateSetting: 0)
+        );
+
+        usbInterface.AlternateSetting.Should().Be(0);
+        A.CallTo(() => claimedInterface.SetAlternateSetting(A<byte>._)).MustNotHaveHappened();
+    }
+
+    [Fact]
+    public void ClaimInterface_releases_the_interface_when_the_alternate_setting_cannot_be_selected()
+    {
+        using var device = CreateFakeDevice(out var handle);
+        var failingInterface = A.Fake<ISafeDeviceInterface>();
+        A.CallTo(() => failingInterface.SetAlternateSetting(A<byte>._))
+            .Throws(new LibUsbException(libusb_error.LIBUSB_ERROR_NOT_FOUND, "Native failure."));
+        A.CallTo(() => handle.ClaimInterface(2))
+            .Returns(failingInterface)
+            .Once()
+            .Then.Returns(A.Fake<ISafeDeviceInterface>());
+
+        var act = () =>
+            device.ClaimInterface(FakeInterfaceDescriptor(interfaceNumber: 2, alternateSetting: 1));
+
+        act.Should()
+            .Throw<UsbException>()
+            .WithMessage(
+                "Failed to select alternate setting 1 of interface 2 on device 'FAKE_0000_0_0'."
+            )
+            .Which.Code.Should()
+            .Be(UsbResult.NotFound);
+        A.CallTo(() => failingInterface.Dispose()).MustHaveHappenedOnceExactly();
+        // The failed claim must not leave the interface registered as claimed
+        using var usbInterface = device.ClaimInterface(
+            FakeInterfaceDescriptor(interfaceNumber: 2, alternateSetting: 0)
+        );
+        usbInterface.Number.Should().Be(2);
+    }
+
+    [Fact]
+    public void ClaimInterface_requests_the_default_alternate_setting_after_another_was_selected()
+    {
+        using var device = CreateFakeDevice(out var handle);
+        var firstClaim = A.Fake<ISafeDeviceInterface>();
+        var secondClaim = A.Fake<ISafeDeviceInterface>();
+        var thirdClaim = A.Fake<ISafeDeviceInterface>();
+        A.CallTo(() => handle.ClaimInterface(2))
+            .Returns(firstClaim)
+            .Once()
+            .Then.Returns(secondClaim)
+            .Once()
+            .Then.Returns(thirdClaim);
+
+        device
+            .ClaimInterface(FakeInterfaceDescriptor(interfaceNumber: 2, alternateSetting: 1))
+            .Dispose();
+        device
+            .ClaimInterface(FakeInterfaceDescriptor(interfaceNumber: 2, alternateSetting: 0))
+            .Dispose();
+        device
+            .ClaimInterface(FakeInterfaceDescriptor(interfaceNumber: 2, alternateSetting: 0))
+            .Dispose();
+
+        A.CallTo(() => firstClaim.SetAlternateSetting(1)).MustHaveHappenedOnceExactly();
+        // The interface may still be on alternate setting 1 after it was released
+        A.CallTo(() => secondClaim.SetAlternateSetting(0)).MustHaveHappenedOnceExactly();
+        // The interface is known to be back on the default alternate setting
+        A.CallTo(() => thirdClaim.SetAlternateSetting(A<byte>._)).MustNotHaveHappened();
+    }
+
+    [Fact]
+    public void ClaimInterface_requests_the_default_alternate_setting_after_a_failed_selection()
+    {
+        using var device = CreateFakeDevice(out var handle);
+        var failedClaim = A.Fake<ISafeDeviceInterface>();
+        var secondClaim = A.Fake<ISafeDeviceInterface>();
+        var thirdClaim = A.Fake<ISafeDeviceInterface>();
+        A.CallTo(() => failedClaim.SetAlternateSetting(1))
+            .Throws(new LibUsbException(libusb_error.LIBUSB_ERROR_IO, "Native failure."));
+        A.CallTo(() => handle.ClaimInterface(2))
+            .Returns(failedClaim)
+            .Once()
+            .Then.Returns(secondClaim)
+            .Once()
+            .Then.Returns(thirdClaim);
+        var claimAlternateSetting = () =>
+            device.ClaimInterface(FakeInterfaceDescriptor(interfaceNumber: 2, alternateSetting: 1));
+
+        claimAlternateSetting.Should().Throw<UsbException>();
+        device
+            .ClaimInterface(FakeInterfaceDescriptor(interfaceNumber: 2, alternateSetting: 0))
+            .Dispose();
+        device
+            .ClaimInterface(FakeInterfaceDescriptor(interfaceNumber: 2, alternateSetting: 0))
+            .Dispose();
+
+        // The failed selection may have changed the alternate setting on the device
+        A.CallTo(() => secondClaim.SetAlternateSetting(0)).MustHaveHappenedOnceExactly();
+        // The interface is known to be back on the default alternate setting
+        A.CallTo(() => thirdClaim.SetAlternateSetting(A<byte>._)).MustNotHaveHappened();
+    }
+
+    [Fact]
+    public void ClaimInterface_keeps_requesting_the_default_alternate_setting_until_it_is_selected()
+    {
+        using var device = CreateFakeDevice(out var handle);
+        var failedReset = A.Fake<ISafeDeviceInterface>();
+        var retriedReset = A.Fake<ISafeDeviceInterface>();
+        A.CallTo(() => failedReset.SetAlternateSetting(0))
+            .Throws(new LibUsbException(libusb_error.LIBUSB_ERROR_IO, "Native failure."));
+        A.CallTo(() => handle.ClaimInterface(2))
+            .Returns(A.Fake<ISafeDeviceInterface>())
+            .Once()
+            .Then.Returns(failedReset)
+            .Once()
+            .Then.Returns(retriedReset);
+        var claimDefault = () =>
+            device.ClaimInterface(FakeInterfaceDescriptor(interfaceNumber: 2, alternateSetting: 0));
+
+        device
+            .ClaimInterface(FakeInterfaceDescriptor(interfaceNumber: 2, alternateSetting: 1))
+            .Dispose();
+        claimDefault.Should().Throw<UsbException>();
+        claimDefault().Dispose();
+
+        A.CallTo(() => retriedReset.SetAlternateSetting(0)).MustHaveHappenedOnceExactly();
+    }
+
+    [Fact]
+    public void ClaimInterface_requests_the_default_alternate_setting_per_interface()
+    {
+        using var device = CreateFakeDevice(out var handle);
+        var otherInterface = A.Fake<ISafeDeviceInterface>();
+        A.CallTo(() => handle.ClaimInterface(2)).Returns(A.Fake<ISafeDeviceInterface>());
+        A.CallTo(() => handle.ClaimInterface(3)).Returns(otherInterface);
+
+        device
+            .ClaimInterface(FakeInterfaceDescriptor(interfaceNumber: 2, alternateSetting: 1))
+            .Dispose();
+        device
+            .ClaimInterface(FakeInterfaceDescriptor(interfaceNumber: 3, alternateSetting: 0))
+            .Dispose();
+
+        A.CallTo(() => otherInterface.SetAlternateSetting(A<byte>._)).MustNotHaveHappened();
+    }
+
+    [Fact]
+    public void ClaimInterface_releases_the_interface_on_any_failure_to_select_the_alternate_setting()
+    {
+        using var device = CreateFakeDevice(out var handle);
+        var failingInterface = A.Fake<ISafeDeviceInterface>();
+        A.CallTo(() => failingInterface.SetAlternateSetting(A<byte>._))
+            .Throws(new ObjectDisposedException("SafeDeviceInterface"));
+        A.CallTo(() => handle.ClaimInterface(2)).Returns(failingInterface);
+
+        var act = () =>
+            device.ClaimInterface(FakeInterfaceDescriptor(interfaceNumber: 2, alternateSetting: 1));
+
+        act.Should().Throw<ObjectDisposedException>();
+        A.CallTo(() => failingInterface.Dispose()).MustHaveHappenedOnceExactly();
+    }
+
+    private static IUsbInterfaceDescriptor FakeInterfaceDescriptor(
+        byte interfaceNumber,
+        byte alternateSetting
+    )
+    {
+        var descriptor = A.Fake<IUsbInterfaceDescriptor>();
+        A.CallTo(() => descriptor.InterfaceNumber).Returns(interfaceNumber);
+        A.CallTo(() => descriptor.AlternateSetting).Returns(alternateSetting);
+        return descriptor;
+    }
+
     [Fact]
     public void Dispose_does_not_throw_when_BulkReads_race_an_in_progress_dispose()
     {

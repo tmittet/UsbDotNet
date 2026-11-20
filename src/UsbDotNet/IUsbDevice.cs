@@ -146,12 +146,23 @@ public interface IUsbDevice : IDisposable
 
     /// <summary>
     /// Claim a USB interface. The interface will be auto-released when the device is disposed.
+    /// <para>
+    /// The alternate setting of <paramref name="descriptor"/> is selected on the device. A
+    /// SET_INTERFACE request is sent to the device when it is not the default alternate setting
+    /// (0), and also for the default when another alternate setting of the interface has been
+    /// selected through this device earlier. The alternate setting an interface is left on
+    /// when it is released depends on the operating system.
+    /// </para>
     /// </summary>
-    /// <exception cref="ArgumentException">
-    /// Thrown when the USB interface is already claimed.
+    /// <exception cref="ArgumentNullException">
+    /// Thrown when <paramref name="descriptor"/> is null.
+    /// </exception>
+    /// <exception cref="InvalidOperationException">
+    /// Thrown when the USB interface is already claimed, with any alternate setting.
     /// </exception>
     /// <exception cref="UsbException">
-    /// Thrown when the USB interface claim operation fails.
+    /// Thrown when the USB interface claim operation fails, or when the alternate setting cannot
+    /// be selected; the interface is then not claimed.
     /// </exception>
     /// <exception cref="ObjectDisposedException">
     /// Thrown when the UsbDevice is disposed.
