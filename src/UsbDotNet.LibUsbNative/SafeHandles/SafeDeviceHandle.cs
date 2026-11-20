@@ -227,6 +227,17 @@ internal sealed class SafeDeviceHandle : SafeHandle, ISafeDeviceHandle
     }
 
     /// <inheritdoc/>
+    public void ClearHalt(byte endpointAddress)
+    {
+        using var reference = SafeHelper.AcquireReference(this);
+        var result = _context.Api.libusb_clear_halt(handle, endpointAddress);
+        result.ThrowLibUsbExceptionForApi(
+            nameof(_context.Api.libusb_clear_halt),
+            $"Endpoint 0x{endpointAddress:X2}."
+        );
+    }
+
+    /// <inheritdoc/>
     public ISafeTransfer AllocateTransfer(int isoPackets = 0)
     {
         if (isoPackets < 0)

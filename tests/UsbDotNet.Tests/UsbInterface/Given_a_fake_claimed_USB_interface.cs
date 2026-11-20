@@ -558,6 +558,99 @@ public sealed class Given_a_fake_claimed_USB_interface : IDisposable
         bytesWritten.Should().Be(0);
     }
 
+    [Theory]
+    [InlineData(0x81)]
+    [InlineData(0x02)]
+    [InlineData(0x83)]
+    [InlineData(0x04)]
+    public void ClearHalt_clears_the_halt_of_the_given_endpoint(byte address)
+    {
+        using var device = CreateFakeDevice(out var handle);
+        using var usbInterface = ClaimFakeInterfaceWithSeveralEndpoints(device, handle);
+        // An endpoint is identified by its address; the transfer type given here is not used
+        var endpoint = FakeEndpoint(address, UsbEndpointTransferType.Bulk);
+
+        usbInterface.ClearHalt(endpoint);
+
+        A.CallTo(() => handle.ClearHalt(address)).MustHaveHappenedOnceExactly();
+    }
+
+    [Fact]
+    public void ClearHalt_throws_when_the_endpoint_is_not_an_endpoint_of_the_interface()
+    {
+        using var device = CreateFakeDevice(out var handle);
+        using var usbInterface = ClaimFakeInterfaceWithSeveralEndpoints(device, handle);
+        var endpoint = FakeEndpoint(0x8F, UsbEndpointTransferType.Bulk);
+
+        var act = () => usbInterface.ClearHalt(endpoint);
+
+        act.Should()
+            .Throw<ArgumentException>()
+            .WithMessage("*not an endpoint of interface*")
+            .WithParameterName(nameof(endpoint));
+        A.CallTo(() => handle.ClearHalt(A<byte>._)).MustNotHaveHappened();
+    }
+
+    [Fact]
+    public void ClearHalt_throws_when_the_endpoint_is_null()
+    {
+        using var device = CreateFakeDevice(out var handle);
+        using var usbInterface = ClaimFakeInterfaceWithSeveralEndpoints(device, handle);
+
+        var act = () => usbInterface.ClearHalt(null!);
+
+        act.Should().Throw<ArgumentNullException>();
+    }
+
+    [Fact]
+    public void ClearHalt_throws_a_UsbException_that_names_the_endpoint_when_the_operation_fails()
+    {
+        using var device = CreateFakeDevice(out var handle);
+        using var usbInterface = ClaimFakeInterfaceWithSeveralEndpoints(device, handle);
+        usbInterface.TryGetInputEndpoint(out var endpoint, UsbEndpointTransferType.Bulk);
+        A.CallTo(() => handle.ClearHalt(A<byte>._))
+            .Throws(new LibUsbException(libusb_error.LIBUSB_ERROR_NO_DEVICE, "No device."));
+
+        var act = () => usbInterface.ClearHalt(endpoint!);
+
+        act.Should()
+            .Throw<UsbException>()
+            .WithMessage("Failed to clear halt on endpoint*")
+            .Which.Code.Should()
+            .Be(UsbResult.NoDevice);
+    }
+
+    [Fact]
+    public void ClearHalt_throws_when_the_interface_is_disposed()
+    {
+        using var device = CreateFakeDevice(out var handle);
+        var usbInterface = ClaimFakeInterfaceWithSeveralEndpoints(device, handle);
+        usbInterface.TryGetInputEndpoint(out var endpoint, UsbEndpointTransferType.Bulk);
+        usbInterface.Dispose();
+
+        var act = () => usbInterface.ClearHalt(endpoint!);
+
+        act.Should().Throw<ObjectDisposedException>();
+        A.CallTo(() => handle.ClearHalt(A<byte>._)).MustNotHaveHappened();
+    }
+
+    [Fact]
+    public void The_endpoint_can_be_used_for_a_transfer_after_ClearHalt()
+    {
+        using var device = CreateFakeDevice(out var handle);
+        using var usbInterface = ClaimFakeInterfaceWithSeveralEndpoints(device, handle);
+        usbInterface.TryGetInputEndpoint(out var endpoint, UsbEndpointTransferType.Bulk);
+
+        usbInterface.ClearHalt(endpoint!);
+        var transfer = CaptureSubmittedTransfer(
+            handle,
+            () => usbInterface.Read(endpoint!, new byte[64], out _, 100)
+        );
+
+        transfer.Should().NotBeNull();
+        transfer!.Value.endpoint.Should().Be(endpoint!.EndpointAddress.RawValue);
+    }
+
     /// <summary>
     /// Claim a fake interface with two bulk, one interrupt and one isochronous endpoint in each
     /// direction; all with a max packet size of 64 bytes.

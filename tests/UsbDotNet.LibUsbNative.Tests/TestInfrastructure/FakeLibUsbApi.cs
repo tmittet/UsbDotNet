@@ -78,6 +78,9 @@ internal sealed class FakeLibusbApi : ILibUsbApi
     /// <summary>The wIndex of each string descriptor request, in call order.</summary>
     internal ConcurrentQueue<ushort> ControlTransferLanguageIds { get; } = new();
 
+    /// <summary>The device handle and endpoint of each cleared halt, in call order.</summary>
+    internal ConcurrentQueue<(IntPtr Handle, byte Endpoint)> ClearedHalts { get; } = new();
+
     /// <summary>The number of calls to libusb_close.</summary>
     internal int CloseCount;
 
@@ -611,6 +614,17 @@ internal sealed class FakeLibusbApi : ILibUsbApi
     {
         Hook();
         return MaybeFail(nameof(libusb_reset_device));
+    }
+
+    public libusb_error libusb_clear_halt(IntPtr handle, byte endpoint)
+    {
+        Hook();
+        if (MaybeFail(nameof(libusb_clear_halt), out var error) != libusb_error.LIBUSB_SUCCESS)
+        {
+            return error;
+        }
+        ClearedHalts.Enqueue((handle, endpoint));
+        return libusb_error.LIBUSB_SUCCESS;
     }
 
     // ------------- Transfers -------------

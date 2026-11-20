@@ -164,6 +164,9 @@ public sealed class PInvokeLibUsbApi : ILibUsbApi
     [DllImport(Lib, CallingConvention = CallingConvention.Cdecl)]
     private static extern libusb_error libusb_reset_device(IntPtr h);
 
+    [DllImport(Lib, CallingConvention = CallingConvention.Cdecl)]
+    private static extern libusb_error libusb_clear_halt(IntPtr h, byte endpoint);
+
     #endregion
 
     #region Events/Async
@@ -334,6 +337,10 @@ public sealed class PInvokeLibUsbApi : ILibUsbApi
 
     /// <inheritdoc/>
     libusb_error ILibUsbApi.libusb_reset_device(IntPtr h) => libusb_reset_device(h);
+
+    /// <inheritdoc/>
+    libusb_error ILibUsbApi.libusb_clear_halt(IntPtr h, byte endpoint) =>
+        libusb_clear_halt(h, endpoint);
 
     /// <inheritdoc/>
     IntPtr ILibUsbApi.libusb_alloc_transfer(int iso) => libusb_alloc_transfer(iso);
