@@ -85,6 +85,11 @@ internal sealed class FakeLibusbApi : ILibUsbApi
     internal int ReleaseInterfaceCount;
 
     /// <summary>
+    /// The number of calls to libusb_release_interface with a device handle that is closed.
+    /// </summary>
+    internal int ReleaseInterfaceOnClosedHandleCount;
+
+    /// <summary>
     /// Actions invoked at the start of an API call, keyed by API name. A test can block here to
     /// hold the call in progress.
     /// </summary>
@@ -485,6 +490,8 @@ internal sealed class FakeLibusbApi : ILibUsbApi
     public libusb_error libusb_release_interface(IntPtr handle, byte interface_number)
     {
         Interlocked.Increment(ref ReleaseInterfaceCount);
+        if (!_openHandles.Contains(handle))
+            Interlocked.Increment(ref ReleaseInterfaceOnClosedHandleCount);
         var err = MaybeFail(nameof(libusb_release_interface));
         if (err == libusb_error.LIBUSB_SUCCESS)
             _claimed.Remove((handle, interface_number));

@@ -212,6 +212,34 @@ public class Given_a_native_call_in_progress
         await RunAndVerifyDeferredRelease(api, scenario);
     }
 
+    [Fact]
+    public async Task SetAlternateSetting_releases_the_interface_before_the_device_handle_is_closed()
+    {
+        // Both the interface and the device handle are disposed while the call is in progress
+        var api = new FakeLibusbApi();
+        var context = new LibUsb(api).CreateContext();
+        var list = context.GetDeviceList();
+        var handle = list[0].Open();
+        var deviceInterface = handle.ClaimInterface(0);
+        var scenario = new Scenario(
+            nameof(api.libusb_set_interface_alt_setting),
+            () => deviceInterface.SetAlternateSetting(1),
+            () =>
+            {
+                deviceInterface.Dispose();
+                handle.Dispose();
+                list.Dispose();
+                context.Dispose();
+            },
+            () => api.CloseCount
+        );
+
+        await RunAndVerifyDeferredRelease(api, scenario);
+
+        api.ReleaseInterfaceCount.Should().Be(1);
+        api.ReleaseInterfaceOnClosedHandleCount.Should().Be(0);
+    }
+
     /// <summary>
     /// Hold the native call of the scenario in progress, dispose, and verify that the native
     /// release happens only when the call has completed.
@@ -231,7 +259,9 @@ public class Given_a_native_call_in_progress
         {
             enteredNativeCall.Wait(Timeout).Should().BeTrue();
 
-            scenario.Dispose();
+            // Disposal must not wait for the call. It runs on another thread with a bounded wait,
+            // so that a disposal that does wait fails the test and does not hang it.
+            await Task.Run(scenario.Dispose).WaitAsync(Timeout);
 
             scenario.ReleaseCount().Should().Be(0);
         }
