@@ -165,6 +165,7 @@ public sealed class UsbDevice : IUsbDevice
                 $"Destination buffer must be at most {ushort.MaxValue} bytes."
             );
         }
+        TransferTimeout.ThrowIfInvalid(timeout);
 
         // A transfer reports a disposed device as a result, like a transfer that is canceled
         if (!TryAcquireSharedForTransfer(nameof(ControlRead)))
@@ -259,6 +260,7 @@ public sealed class UsbDevice : IUsbDevice
                 $"Payload must be less than {ushort.MaxValue} bytes."
             );
         }
+        TransferTimeout.ThrowIfInvalid(timeout);
 
         // A transfer reports a disposed device as a result, like a transfer that is canceled
         if (!TryAcquireSharedForTransfer(nameof(ControlWrite)))

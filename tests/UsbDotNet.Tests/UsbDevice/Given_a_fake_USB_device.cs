@@ -156,6 +156,77 @@ public sealed class Given_a_fake_USB_device : IDisposable
         write.Should().Throw<ArgumentOutOfRangeException>();
     }
 
+    [Theory]
+    [InlineData(0)]
+    [InlineData(-2)]
+    [InlineData(int.MinValue)]
+    public void Control_transfers_throw_for_an_invalid_timeout(int timeout)
+    {
+        using var device = CreateFakeDevice(out var handle);
+
+        var read = () =>
+            device.ControlRead(
+                new byte[8],
+                out _,
+                ControlRequestRecipient.Device,
+                ControlRequestType.Standard,
+                request: 0x06,
+                value: 0x0100,
+                index: 0,
+                timeout
+            );
+        var write = () =>
+            device.ControlWrite(
+                new byte[8],
+                out _,
+                ControlRequestRecipient.Device,
+                ControlRequestType.Vendor,
+                request: 0x01,
+                value: 0,
+                index: 0,
+                timeout
+            );
+
+        read.Should().Throw<ArgumentOutOfRangeException>().WithParameterName(nameof(timeout));
+        write.Should().Throw<ArgumentOutOfRangeException>().WithParameterName(nameof(timeout));
+        A.CallTo(() => handle.AllocateTransfer(A<int>._)).MustNotHaveHappened();
+    }
+
+    [Theory]
+    [InlineData(Timeout.Infinite)]
+    [InlineData(1)]
+    [InlineData(int.MaxValue)]
+    public void Control_transfers_accept_a_valid_timeout(int timeout)
+    {
+        // A disposed device returns Interrupted once the arguments are validated
+        var device = CreateFakeDevice(out _);
+        device.Dispose();
+
+        var read = device.ControlRead(
+            new byte[8],
+            out _,
+            ControlRequestRecipient.Device,
+            ControlRequestType.Standard,
+            request: 0x06,
+            value: 0x0100,
+            index: 0,
+            timeout
+        );
+        var write = device.ControlWrite(
+            new byte[8],
+            out _,
+            ControlRequestRecipient.Device,
+            ControlRequestType.Vendor,
+            request: 0x01,
+            value: 0,
+            index: 0,
+            timeout
+        );
+
+        read.Should().Be(UsbResult.Interrupted);
+        write.Should().Be(UsbResult.Interrupted);
+    }
+
     private UsbDotNet.UsbDevice CreateFakeDevice(
         out ISafeDeviceHandle handle,
         byte manufacturerIndex = 1,
