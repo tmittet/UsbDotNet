@@ -30,7 +30,9 @@ internal sealed class SafeDeviceInterface : SafeHandle, ISafeDeviceInterface
     /// <inheritdoc/>
     public void SetAlternateSetting(byte alternateSetting)
     {
-        SafeHelper.ThrowIfClosed(this);
+        using var reference = SafeHelper.AcquireReference(this);
+        // The native call is made on the device handle, which this interface does not keep alive
+        using var deviceHandleReference = SafeHelper.AcquireReference(_deviceHandle);
         var result = _deviceHandle.Api.libusb_set_interface_alt_setting(
             _deviceHandle.DangerousGetHandle(),
             _interfaceNumber,

@@ -40,7 +40,7 @@ internal sealed class SafeContext : SafeHandle, ISafeContext
     /// <inheritdoc/>
     public void SetOption(libusb_option libusbOption, int value)
     {
-        SafeHelper.ThrowIfClosed(this);
+        using var reference = SafeHelper.AcquireReference(this);
         var result = Api.libusb_set_option(handle, libusbOption, value);
         result.ThrowLibUsbExceptionForApi(nameof(Api.libusb_set_option));
     }
@@ -48,7 +48,7 @@ internal sealed class SafeContext : SafeHandle, ISafeContext
     /// <inheritdoc/>
     public void SetOption(libusb_option libusbOption, nint value)
     {
-        SafeHelper.ThrowIfClosed(this);
+        using var reference = SafeHelper.AcquireReference(this);
         var result = Api.libusb_set_option(handle, libusbOption, value);
         result.ThrowLibUsbExceptionForApi(nameof(Api.libusb_set_option));
     }
@@ -56,7 +56,7 @@ internal sealed class SafeContext : SafeHandle, ISafeContext
     /// <inheritdoc/>
     public libusb_error HandleEventsCompleted(nint completedPtr)
     {
-        SafeHelper.ThrowIfClosed(this);
+        using var reference = SafeHelper.AcquireReference(this);
 
         return completedPtr == IntPtr.Zero // TODO: Zero pointer OK according to libusb docs.
             ? throw new ArgumentNullException(nameof(completedPtr))
@@ -66,7 +66,7 @@ internal sealed class SafeContext : SafeHandle, ISafeContext
     /// <inheritdoc/>
     public void InterruptEventHandler()
     {
-        SafeHelper.ThrowIfClosed(this);
+        using var reference = SafeHelper.AcquireReference(this);
         Api.libusb_interrupt_event_handler(handle);
     }
 
@@ -128,7 +128,7 @@ internal sealed class SafeContext : SafeHandle, ISafeContext
     {
         const int HotPlugMatchAny = -1;
 
-        SafeHelper.ThrowIfClosed(this);
+        using var reference = SafeHelper.AcquireReference(this);
         ArgumentNullException.ThrowIfNull(callback);
 
         var safeHandle = new SafeHotplugCallbackHandle(this);
@@ -218,7 +218,7 @@ internal sealed class SafeContext : SafeHandle, ISafeContext
     /// <inheritdoc/>
     public ISafeDeviceList GetDeviceList()
     {
-        SafeHelper.ThrowIfClosed(this);
+        using var reference = SafeHelper.AcquireReference(this);
 
         var result = Api.libusb_get_device_list(handle, out var list);
         result.ThrowLibUsbExceptionForApi(nameof(Api.libusb_get_device_list));
