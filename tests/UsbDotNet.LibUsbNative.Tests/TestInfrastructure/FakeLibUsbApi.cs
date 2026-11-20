@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.Runtime.InteropServices;
 using System.Text;
 using UsbDotNet.LibUsbNative.Enums;
@@ -54,6 +55,24 @@ internal sealed class FakeLibusbApi : ILibUsbApi
 
     // Device list: single fake device pointer
     private readonly List<IntPtr> _devices = [new IntPtr(0x1000)];
+
+    /// <summary>The pointer of the single fake device.</summary>
+    internal IntPtr DevicePtr => _devices[0];
+
+    /// <summary>The speed reported for the fake device.</summary>
+    internal libusb_speed Speed = libusb_speed.LIBUSB_SPEED_HIGH;
+
+    /// <summary>
+    /// Invoked inside libusb_get_device_speed, with the device pointer, before it returns.
+    /// A test can block here to hold the call in progress.
+    /// </summary>
+    internal Action<IntPtr>? OnGetDeviceSpeed;
+
+    /// <summary>The device pointers passed to libusb_unref_device, in call order.</summary>
+    internal ConcurrentQueue<IntPtr> UnrefDevices { get; } = new();
+
+    /// <summary>The number of calls to libusb_exit.</summary>
+    internal int ExitCount;
 
     // Allocations we must free
     private readonly List<IntPtr> _deviceListBlocks = [];
@@ -185,7 +204,7 @@ internal sealed class FakeLibusbApi : ILibUsbApi
         return libusb_error.LIBUSB_SUCCESS;
     }
 
-    public void libusb_exit(IntPtr ctx) { }
+    public void libusb_exit(IntPtr ctx) => Interlocked.Increment(ref ExitCount);
 
     public libusb_error libusb_set_option(IntPtr ctx, libusb_option option, int value)
     {
@@ -244,7 +263,7 @@ internal sealed class FakeLibusbApi : ILibUsbApi
 
     public void libusb_ref_device(IntPtr dev) { }
 
-    public void libusb_unref_device(IntPtr dev) { }
+    public void libusb_unref_device(IntPtr dev) => UnrefDevices.Enqueue(dev);
 
     // ------------- Device metadata -------------
     public libusb_error libusb_get_device_descriptor(IntPtr dev, out libusb_device_descriptor desc)
@@ -385,7 +404,11 @@ internal sealed class FakeLibusbApi : ILibUsbApi
 
     public byte libusb_get_port_number(IntPtr dev) => 1;
 
-    public libusb_speed libusb_get_device_speed(IntPtr dev) => libusb_speed.LIBUSB_SPEED_HIGH;
+    public libusb_speed libusb_get_device_speed(IntPtr dev)
+    {
+        OnGetDeviceSpeed?.Invoke(dev);
+        return Speed;
+    }
 
     // ------------- Open / close -------------
     public libusb_error libusb_open(IntPtr dev, out IntPtr handle)
