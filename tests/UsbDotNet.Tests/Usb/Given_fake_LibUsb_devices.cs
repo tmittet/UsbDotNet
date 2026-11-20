@@ -321,21 +321,24 @@ public sealed class Given_fake_LibUsb_devices
 
     [Theory]
     // The operating speed decides the unit: 2 mA below SuperSpeed, 8 mA from SuperSpeed
-    [InlineData(libusb_speed.LIBUSB_SPEED_LOW, 0x0110, 100)]
-    [InlineData(libusb_speed.LIBUSB_SPEED_FULL, 0x0200, 100)]
-    [InlineData(libusb_speed.LIBUSB_SPEED_HIGH, 0x0210, 100)]
-    [InlineData(libusb_speed.LIBUSB_SPEED_SUPER, 0x0300, 400)]
-    [InlineData(libusb_speed.LIBUSB_SPEED_SUPER_PLUS, 0x0310, 400)]
-    [InlineData(libusb_speed.LIBUSB_SPEED_SUPER_PLUS_X2, 0x0320, 400)]
-    // A known speed wins over bcdUSB
-    [InlineData(libusb_speed.LIBUSB_SPEED_HIGH, 0x0300, 100)]
-    [InlineData(libusb_speed.LIBUSB_SPEED_SUPER, 0x0210, 400)]
-    // bcdUSB decides when the operating system does not report the speed
-    [InlineData(libusb_speed.LIBUSB_SPEED_UNKNOWN, 0x0210, 100)]
-    [InlineData(libusb_speed.LIBUSB_SPEED_UNKNOWN, 0x0300, 400)]
+    [InlineData(libusb_speed.LIBUSB_SPEED_LOW, 0x0110, 8, 100)]
+    [InlineData(libusb_speed.LIBUSB_SPEED_FULL, 0x0200, 64, 100)]
+    [InlineData(libusb_speed.LIBUSB_SPEED_HIGH, 0x0210, 64, 100)]
+    [InlineData(libusb_speed.LIBUSB_SPEED_SUPER, 0x0300, 9, 400)]
+    [InlineData(libusb_speed.LIBUSB_SPEED_SUPER_PLUS, 0x0310, 9, 400)]
+    [InlineData(libusb_speed.LIBUSB_SPEED_SUPER_PLUS_X2, 0x0320, 9, 400)]
+    // A known speed wins over the device descriptor
+    [InlineData(libusb_speed.LIBUSB_SPEED_HIGH, 0x0300, 9, 100)]
+    [InlineData(libusb_speed.LIBUSB_SPEED_SUPER, 0x0210, 64, 400)]
+    // The device descriptor decides when the operating system does not report the speed
+    [InlineData(libusb_speed.LIBUSB_SPEED_UNKNOWN, 0x0210, 64, 100)]
+    [InlineData(libusb_speed.LIBUSB_SPEED_UNKNOWN, 0x0300, 9, 400)]
+    // A device that reports bcdUSB 3.0 while operating at high speed
+    [InlineData(libusb_speed.LIBUSB_SPEED_UNKNOWN, 0x0300, 64, 100)]
     public void MaxPower_is_in_milliampere_for_the_speed_the_device_operates_at(
         libusb_speed speed,
         ushort bcdUsb,
+        byte maxPacketSize0,
         int expectedMaxPower
     )
     {
@@ -344,7 +347,8 @@ public sealed class Given_fake_LibUsb_devices
             ProductA1,
             BusNumber,
             busAddress: 1,
-            bcdUsb: bcdUsb
+            bcdUsb: bcdUsb,
+            maxPacketSize0: maxPacketSize0
         );
         A.CallTo(() => device.GetSpeed()).Returns(speed);
         A.CallTo(() => device.GetActiveConfigDescriptor())
@@ -369,6 +373,25 @@ public sealed class Given_fake_LibUsb_devices
         using var openDevice = usb.OpenDevice(deviceKey);
 
         openDevice.ConfigDescriptor.MaxPower.Should().Be(expectedMaxPower);
+    }
+
+    [Fact]
+    public void MaxPower_follows_the_raw_value_of_a_copied_config_descriptor()
+    {
+        var descriptor = new UsbConfigDescriptor(
+            ConfigId: 1,
+            StringDescriptionIndex: 0,
+            Attributes: default,
+            MaxPowerRawValue: 50,
+            MaxPowerMultiplier: 8,
+            ExtraBytes: [],
+            Interfaces: new Dictionary<byte, IDictionary<byte, IUsbInterfaceDescriptor>>()
+        );
+
+        var copy = descriptor with { MaxPowerRawValue = 25 };
+
+        descriptor.MaxPower.Should().Be(400);
+        copy.MaxPower.Should().Be(200);
     }
 
     /// <summary>
