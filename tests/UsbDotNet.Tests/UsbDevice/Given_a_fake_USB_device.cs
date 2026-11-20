@@ -1,8 +1,10 @@
 using FakeItEasy;
 using Microsoft.Extensions.Logging.Abstractions;
+using UsbDotNet.Core;
 using UsbDotNet.Descriptor;
 using UsbDotNet.LibUsbNative;
 using UsbDotNet.LibUsbNative.SafeHandles;
+using UsbDotNet.Transfer;
 
 namespace UsbDotNet.Tests.UsbDevice;
 
@@ -74,6 +76,84 @@ public sealed class Given_a_fake_USB_device : IDisposable
 
         getSerialNumber.Should().Throw<ObjectDisposedException>();
         readStringDescriptor.Should().Throw<ObjectDisposedException>();
+    }
+
+    [Fact]
+    public void ControlRead_returns_Interrupted_when_the_device_is_disposed()
+    {
+        var device = CreateFakeDevice(out var handle);
+        device.Dispose();
+
+        var result = device.ControlRead(
+            new byte[8],
+            out var bytesRead,
+            ControlRequestRecipient.Device,
+            ControlRequestType.Standard,
+            request: 0x06,
+            value: 0x0100,
+            index: 0,
+            timeout: 100
+        );
+
+        result.Should().Be(UsbResult.Interrupted);
+        bytesRead.Should().Be(0);
+        A.CallTo(() => handle.AllocateTransfer(A<int>._)).MustNotHaveHappened();
+    }
+
+    [Fact]
+    public void ControlWrite_returns_Interrupted_when_the_device_is_disposed()
+    {
+        var device = CreateFakeDevice(out var handle);
+        device.Dispose();
+
+        var result = device.ControlWrite(
+            new byte[8],
+            out var bytesWritten,
+            ControlRequestRecipient.Device,
+            ControlRequestType.Vendor,
+            request: 0x01,
+            value: 0,
+            index: 0,
+            timeout: 100
+        );
+
+        result.Should().Be(UsbResult.Interrupted);
+        bytesWritten.Should().Be(0);
+        A.CallTo(() => handle.AllocateTransfer(A<int>._)).MustNotHaveHappened();
+    }
+
+    [Fact]
+    public void Control_transfers_still_throw_for_an_invalid_buffer_when_the_device_is_disposed()
+    {
+        var device = CreateFakeDevice(out _);
+        device.Dispose();
+        var tooLarge = new byte[ushort.MaxValue + 1];
+
+        var read = () =>
+            device.ControlRead(
+                tooLarge,
+                out _,
+                ControlRequestRecipient.Device,
+                ControlRequestType.Standard,
+                request: 0x06,
+                value: 0,
+                index: 0,
+                timeout: 100
+            );
+        var write = () =>
+            device.ControlWrite(
+                tooLarge,
+                out _,
+                ControlRequestRecipient.Device,
+                ControlRequestType.Standard,
+                request: 0x06,
+                value: 0,
+                index: 0,
+                timeout: 100
+            );
+
+        read.Should().Throw<ArgumentOutOfRangeException>();
+        write.Should().Throw<ArgumentOutOfRangeException>();
     }
 
     private UsbDotNet.UsbDevice CreateFakeDevice(

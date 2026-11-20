@@ -29,7 +29,6 @@ public interface IUsbInterface : IDisposable
     /// The transfer type of the endpoint: bulk, interrupt or isochronous. Control endpoints are
     /// not part of an interface, so no endpoint is found for the control transfer type.
     /// </param>
-    /// <exception cref="ObjectDisposedException">Thrown when UsbInterface is disposed</exception>
     bool TryGetInputEndpoint(
         [NotNullWhen(true)] out IUsbEndpointDescriptor? endpoint,
         UsbEndpointTransferType transferType
@@ -45,7 +44,6 @@ public interface IUsbInterface : IDisposable
     /// The transfer type of the endpoint: bulk, interrupt or isochronous. Control endpoints are
     /// not part of an interface, so no endpoint is found for the control transfer type.
     /// </param>
-    /// <exception cref="ObjectDisposedException">Thrown when UsbInterface is disposed</exception>
     bool TryGetOutputEndpoint(
         [NotNullWhen(true)] out IUsbEndpointDescriptor? endpoint,
         UsbEndpointTransferType transferType
@@ -204,7 +202,6 @@ public interface IUsbInterface : IDisposable
     /// Thrown when timeout is invalid, or when the length of <paramref name="destination"/> is not
     /// a non-zero multiple of the endpoint max packet size.
     /// </exception>
-    /// <exception cref="ObjectDisposedException">Thrown when UsbInterface is disposed.</exception>
     /// <exception cref="InvalidOperationException">
     /// Thrown when no bulk input endpoint is found for this interface.
     /// </exception>
@@ -217,7 +214,10 @@ public interface IUsbInterface : IDisposable
     /// <item>PipeError = Halt condition detected (endpoint stalled).</item>
     /// <item>Timeout = The read operation timed out. Data may still have been received.</item>
     /// <item>Overflow = The device sent more data than expected.</item>
-    /// <item>Interrupted = The read operation was canceled. Data may still have been received.</item>
+    /// <item>
+    /// Interrupted = The read operation was canceled, or the interface is disposed. Data may
+    /// still have been received.
+    /// </item>
     /// <item>NotSupported = The transfer flags are not supported by the operating system.</item>
     /// </list>
     /// </returns>
@@ -248,7 +248,6 @@ public interface IUsbInterface : IDisposable
     /// </param>
     /// <param name="timeout">A timeout for the write operation</param>
     /// <exception cref="ArgumentException">Thrown when the timeout is invalid.</exception>
-    /// <exception cref="ObjectDisposedException">Thrown when the UsbInterface is disposed</exception>
     /// <exception cref="InvalidOperationException">
     /// Thrown when no bulk output endpoint is found for this interface.
     /// </exception>
@@ -261,7 +260,7 @@ public interface IUsbInterface : IDisposable
     /// <item>PipeError = Halt condition detected (endpoint stalled).</item>
     /// <item>Timeout = The write operation timed out.</item>
     /// <item>Overflow = The host sent more data than expected.</item>
-    /// <item>Interrupted = The write operation was canceled.</item>
+    /// <item>Interrupted = The write operation was canceled, or the interface is disposed.</item>
     /// <item>NotSupported = The transfer flags are not supported by the operating system.</item>
     /// </list>
     /// </returns>

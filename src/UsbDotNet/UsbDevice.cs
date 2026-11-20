@@ -166,8 +166,42 @@ public sealed class UsbDevice : IUsbDevice
             );
         }
 
-        using var token = _rundownGuard.AcquireSharedToken();
+        // A transfer reports a disposed device as a result, like a transfer that is canceled
+        if (!TryAcquireSharedForTransfer(nameof(ControlRead)))
+        {
+            bytesRead = 0;
+            return UsbResult.Interrupted;
+        }
+        try
+        {
+            return ExecuteControlRead(
+                destination,
+                out bytesRead,
+                recipient,
+                type,
+                request,
+                value,
+                index,
+                timeout
+            );
+        }
+        finally
+        {
+            _rundownGuard.ReleaseShared();
+        }
+    }
 
+    private UsbResult ExecuteControlRead(
+        Span<byte> destination,
+        out ushort bytesRead,
+        ControlRequestRecipient recipient,
+        ControlRequestType type,
+        byte request,
+        ushort value,
+        ushort index,
+        int timeout
+    )
+    {
         var length = (ushort)destination.Length;
         var buffer = ControlRequestPacket.CreateRead(
             recipient,
@@ -226,8 +260,42 @@ public sealed class UsbDevice : IUsbDevice
             );
         }
 
-        using var token = _rundownGuard.AcquireSharedToken();
+        // A transfer reports a disposed device as a result, like a transfer that is canceled
+        if (!TryAcquireSharedForTransfer(nameof(ControlWrite)))
+        {
+            bytesWritten = 0;
+            return UsbResult.Interrupted;
+        }
+        try
+        {
+            return ExecuteControlWrite(
+                source,
+                out bytesWritten,
+                recipient,
+                type,
+                request,
+                value,
+                index,
+                timeout
+            );
+        }
+        finally
+        {
+            _rundownGuard.ReleaseShared();
+        }
+    }
 
+    private UsbResult ExecuteControlWrite(
+        ReadOnlySpan<byte> source,
+        out int bytesWritten,
+        ControlRequestRecipient recipient,
+        ControlRequestType type,
+        byte request,
+        ushort value,
+        ushort index,
+        int timeout
+    )
+    {
         var length = (ushort)source.Length;
         var buffer = ControlRequestPacket.CreateWrite(
             recipient,
@@ -261,6 +329,30 @@ public sealed class UsbDevice : IUsbDevice
         finally
         {
             bufferHandle.Free();
+        }
+    }
+
+    /// <summary>
+    /// Acquire the shared rundown guard, which protects the device handle from teardown, for the
+    /// duration of a transfer. Release it with _rundownGuard.ReleaseShared(). Returns false, and
+    /// logs a warning, when the device is disposed or being disposed.
+    /// </summary>
+    private bool TryAcquireSharedForTransfer(string transferName)
+    {
+        try
+        {
+            _rundownGuard.AcquireShared();
+            return true;
+        }
+        catch (ObjectDisposedException ex)
+        {
+            _logger.LogWarning(
+                "{TransferName} interrupted. {ErrorType}: {ErrorMessage}",
+                transferName,
+                ex.GetType().Name,
+                ex.Message
+            );
+            return false;
         }
     }
 
