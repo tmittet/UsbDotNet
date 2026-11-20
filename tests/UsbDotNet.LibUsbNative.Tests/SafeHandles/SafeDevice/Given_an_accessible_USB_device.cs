@@ -33,6 +33,9 @@ public abstract class Given_an_accessible_USB_device(ITestOutputHelper output, I
             act = () => device.GetPortNumber();
             act.Should().Throw<ObjectDisposedException>();
 
+            act = () => device.GetSpeed();
+            act.Should().Throw<ObjectDisposedException>();
+
             act = () => device.GetDeviceDescriptor();
             act.Should().Throw<ObjectDisposedException>();
 

@@ -319,6 +319,91 @@ public sealed class Given_fake_LibUsb_devices
         usb.GetDeviceSerial(deviceKey).Should().Be("SERIAL");
     }
 
+    [Theory]
+    // The operating speed decides the unit: 2 mA below SuperSpeed, 8 mA from SuperSpeed
+    [InlineData(libusb_speed.LIBUSB_SPEED_LOW, 0x0110, 8, 100)]
+    [InlineData(libusb_speed.LIBUSB_SPEED_FULL, 0x0200, 64, 100)]
+    [InlineData(libusb_speed.LIBUSB_SPEED_HIGH, 0x0210, 64, 100)]
+    [InlineData(libusb_speed.LIBUSB_SPEED_SUPER, 0x0300, 9, 400)]
+    [InlineData(libusb_speed.LIBUSB_SPEED_SUPER_PLUS, 0x0310, 9, 400)]
+    [InlineData(libusb_speed.LIBUSB_SPEED_SUPER_PLUS_X2, 0x0320, 9, 400)]
+    // A known speed wins over the device descriptor
+    [InlineData(libusb_speed.LIBUSB_SPEED_HIGH, 0x0300, 9, 100)]
+    [InlineData(libusb_speed.LIBUSB_SPEED_SUPER, 0x0210, 64, 400)]
+    // The device descriptor decides when the operating system does not report the speed
+    [InlineData(libusb_speed.LIBUSB_SPEED_UNKNOWN, 0x0210, 64, 100)]
+    [InlineData(libusb_speed.LIBUSB_SPEED_UNKNOWN, 0x0300, 9, 400)]
+    // A device that reports bcdUSB 3.0 while operating at high speed
+    [InlineData(libusb_speed.LIBUSB_SPEED_UNKNOWN, 0x0300, 64, 100)]
+    public void MaxPower_is_in_milliampere_for_the_speed_the_device_operates_at(
+        libusb_speed speed,
+        ushort bcdUsb,
+        byte maxPacketSize0,
+        int expectedMaxPower
+    )
+    {
+        var device = FakeHelper.CreateFakeDevice(
+            VendorA,
+            ProductA1,
+            BusNumber,
+            busAddress: 1,
+            bcdUsb: bcdUsb,
+            maxPacketSize0: maxPacketSize0
+        );
+        A.CallTo(() => device.GetSpeed()).Returns(speed);
+        A.CallTo(() => device.GetActiveConfigDescriptor())
+            .Returns(
+                new libusb_config_descriptor(
+                    bLength: 9,
+                    libusb_descriptor_type.LIBUSB_DT_CONFIG,
+                    wTotalLength: 9,
+                    bNumInterfaces: 0,
+                    bConfigurationValue: 1,
+                    iConfiguration: 0,
+                    libusb_config_desc_attributes.NONE,
+                    bMaxPower: 50,
+                    interfaces: [],
+                    extra: []
+                )
+            );
+        A.CallTo(() => device.Open()).Returns(A.Fake<ISafeDeviceHandle>());
+        using var usb = CreateInitializedUsb(device);
+        var deviceKey = usb.GetDeviceList().Single().DeviceKey;
+
+        using var openDevice = usb.OpenDevice(deviceKey);
+
+        openDevice.ConfigDescriptor.MaxPower.Should().Be(expectedMaxPower);
+    }
+
+    [Fact]
+    public void MaxPower_follows_the_raw_value_of_a_copied_config_descriptor()
+    {
+        var descriptor = new UsbConfigDescriptor(
+            ConfigId: 1,
+            StringDescriptionIndex: 0,
+            Attributes: default,
+            MaxPowerRawValue: 50,
+            MaxPowerMultiplier: 8,
+            ExtraBytes: [],
+            Interfaces: new Dictionary<byte, IDictionary<byte, IUsbInterfaceDescriptor>>()
+        );
+
+        var copy = descriptor with { MaxPowerRawValue = 25 };
+
+        descriptor.MaxPower.Should().Be(400);
+        copy.MaxPower.Should().Be(200);
+    }
+
+    [Fact]
+    public void MaxPower_is_in_units_of_2_mA_when_the_multiplier_is_not_set()
+    {
+        var initialized = new UsbConfigDescriptor { MaxPowerRawValue = 50 };
+        var copiedDefault = default(UsbConfigDescriptor) with { MaxPowerRawValue = 50 };
+
+        initialized.MaxPower.Should().Be(100);
+        copiedDefault.MaxPower.Should().Be(100);
+    }
+
     /// <summary>
     /// Make the fake device return the given value for every operating system device string.
     /// </summary>

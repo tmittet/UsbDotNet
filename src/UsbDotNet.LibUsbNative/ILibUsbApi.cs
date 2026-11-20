@@ -165,6 +165,12 @@ public interface ILibUsbApi
     byte libusb_get_port_number(IntPtr dev);
 
     /// <summary>
+    /// Get the negotiated connection speed for a device. LIBUSB_SPEED_UNKNOWN means that the OS
+    /// doesn't know or doesn't support returning the negotiated speed.
+    /// </summary>
+    libusb_speed libusb_get_device_speed(IntPtr dev);
+
+    /// <summary>
     /// Retrieve a device string without needing to open the device.
     /// Available since libusb version v1.0.30
     /// <para>

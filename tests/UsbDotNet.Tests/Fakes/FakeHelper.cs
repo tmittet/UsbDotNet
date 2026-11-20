@@ -23,7 +23,8 @@ internal static class FakeHelper
         ushort bcdUsb = 0x0200,
         byte manufacturerIndex = 1,
         byte productIndex = 2,
-        byte serialNumberIndex = 3
+        byte serialNumberIndex = 3,
+        byte maxPacketSize0 = 64
     )
     {
         var device = A.Fake<ISafeDevice>();
@@ -36,7 +37,7 @@ internal static class FakeHelper
                     libusb_class_code.LIBUSB_CLASS_PER_INTERFACE,
                     bDeviceSubClass: 0,
                     bDeviceProtocol: 0,
-                    bMaxPacketSize0: 64,
+                    bMaxPacketSize0: maxPacketSize0,
                     vendorId,
                     productId,
                     bcdDevice: 0x0100,

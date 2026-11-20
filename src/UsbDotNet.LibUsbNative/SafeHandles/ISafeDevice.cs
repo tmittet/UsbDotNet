@@ -52,6 +52,13 @@ public interface ISafeDevice : IDisposable
     byte GetPortNumber();
 
     /// <summary>
+    /// Get the negotiated connection speed of the device. LIBUSB_SPEED_UNKNOWN means that the OS
+    /// doesn't know or doesn't support returning the negotiated speed.
+    /// </summary>
+    /// <exception cref="ObjectDisposedException">Thrown when the ISafeDevice is disposed.</exception>
+    libusb_speed GetSpeed();
+
+    /// <summary>
     /// Retrieve a device string without needing to open the device.
     /// <para>
     /// The string will be returned untranslated or in the default OS language when supported by the

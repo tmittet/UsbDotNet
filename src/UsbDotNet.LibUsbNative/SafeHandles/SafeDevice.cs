@@ -110,6 +110,26 @@ internal sealed class SafeDevice : SafeHandle, ISafeDevice
     }
 
     /// <inheritdoc/>
+    public libusb_speed GetSpeed()
+    {
+        SafeHelper.ThrowIfClosed(this);
+        // Hold a reference for the duration of the native call; the check above does not stop
+        // another thread from disposing this device, which would free the native device.
+        // Throws ObjectDisposedException when the handle was closed after the check.
+        var success = false;
+        try
+        {
+            DangerousAddRef(ref success);
+            return _context.Api.libusb_get_device_speed(handle);
+        }
+        finally
+        {
+            if (success)
+                DangerousRelease();
+        }
+    }
+
+    /// <inheritdoc/>
     public string GetDeviceString(libusb_device_string_type stringType) =>
         TryGetDeviceString(stringType, out var value, out var error)
             ? value

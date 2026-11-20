@@ -259,7 +259,9 @@ public sealed class Usb : IUsb, IUsbInternal
         IUsbConfigDescriptor configDescriptor;
         try
         {
-            configDescriptor = safeDevice.GetActiveConfigDescriptor().ToUsbConfigDescriptor();
+            configDescriptor = safeDevice
+                .GetActiveConfigDescriptor()
+                .ToUsbConfigDescriptor(safeDevice.GetSpeed(), descriptor);
         }
         catch (LibUsbException ex)
         {
