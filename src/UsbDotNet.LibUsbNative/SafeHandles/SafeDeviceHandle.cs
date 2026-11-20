@@ -70,7 +70,7 @@ internal sealed class SafeDeviceHandle : SafeHandle, ISafeDeviceHandle
         [NotNullWhen(false)] out libusb_error? usbError
     )
     {
-        SafeHelper.ThrowIfClosed(this);
+        using var reference = SafeHelper.AcquireReference(this);
 
         var buffer = new byte[256];
         var result = _context.Api.libusb_get_string_descriptor_ascii(
@@ -94,20 +94,30 @@ internal sealed class SafeDeviceHandle : SafeHandle, ISafeDeviceHandle
 
     public ISafeDeviceInterface ClaimInterface(byte interfaceNumber)
     {
-        SafeHelper.ThrowIfClosed(this);
+        using var reference = SafeHelper.AcquireReference(this);
 
         var result = _context.Api.libusb_claim_interface(handle, interfaceNumber);
         result.ThrowLibUsbExceptionForApi(
             nameof(_context.Api.libusb_claim_interface),
             $"Interface {interfaceNumber}."
         );
+
+        // Increment the device handle ref counter, SafeDeviceInterface will decrement on dispose.
+        // The device is not closed until its interfaces are released.
+        var success = false;
+        DangerousAddRef(ref success);
+        if (!success)
+        {
+            _ = _context.Api.libusb_release_interface(handle, interfaceNumber);
+            throw libusb_error.LIBUSB_ERROR_OTHER.ToLibUsbException("Failed to ref SafeHandle.");
+        }
         return new SafeDeviceInterface(this, interfaceNumber);
     }
 
     /// <inheritdoc/>
     public void ResetDevice()
     {
-        SafeHelper.ThrowIfClosed(this);
+        using var reference = SafeHelper.AcquireReference(this);
         var result = _context.Api.libusb_reset_device(handle);
         result.ThrowLibUsbExceptionForApi(nameof(_context.Api.libusb_reset_device));
     }

@@ -42,7 +42,7 @@ internal sealed class SafeDevice : SafeHandle, ISafeDevice
     /// <inheritdoc/>
     public libusb_device_descriptor GetDeviceDescriptor()
     {
-        SafeHelper.ThrowIfClosed(this);
+        using var reference = SafeHelper.AcquireReference(this);
 
         var result = _context.Api.libusb_get_device_descriptor(handle, out var descriptor);
         // NOTE: No exception should be thown here; Since libusb-1.0.16, libusb_get_device_descriptor always succeeds.
@@ -53,7 +53,7 @@ internal sealed class SafeDevice : SafeHandle, ISafeDevice
     /// <inheritdoc/>
     public libusb_config_descriptor GetActiveConfigDescriptor()
     {
-        SafeHelper.ThrowIfClosed(this);
+        using var reference = SafeHelper.AcquireReference(this);
 
         var result = _context.Api.libusb_get_active_config_descriptor(handle, out var descriptor);
         result.ThrowLibUsbExceptionForApi(nameof(_context.Api.libusb_get_active_config_descriptor));
@@ -70,7 +70,7 @@ internal sealed class SafeDevice : SafeHandle, ISafeDevice
     /// <inheritdoc/>
     public libusb_config_descriptor GetConfigDescriptor(byte config_index)
     {
-        SafeHelper.ThrowIfClosed(this);
+        using var reference = SafeHelper.AcquireReference(this);
 
         var result = _context.Api.libusb_get_config_descriptor(
             handle,
@@ -91,42 +91,29 @@ internal sealed class SafeDevice : SafeHandle, ISafeDevice
     /// <inheritdoc/>
     public byte GetBusNumber()
     {
-        SafeHelper.ThrowIfClosed(this);
+        using var reference = SafeHelper.AcquireReference(this);
         return _context.Api.libusb_get_bus_number(handle);
     }
 
     /// <inheritdoc/>
     public byte GetDeviceAddress()
     {
-        SafeHelper.ThrowIfClosed(this);
+        using var reference = SafeHelper.AcquireReference(this);
         return _context.Api.libusb_get_device_address(handle);
     }
 
     /// <inheritdoc/>
     public byte GetPortNumber()
     {
-        SafeHelper.ThrowIfClosed(this);
+        using var reference = SafeHelper.AcquireReference(this);
         return _context.Api.libusb_get_port_number(handle);
     }
 
     /// <inheritdoc/>
     public libusb_speed GetSpeed()
     {
-        SafeHelper.ThrowIfClosed(this);
-        // Hold a reference for the duration of the native call; the check above does not stop
-        // another thread from disposing this device, which would free the native device.
-        // Throws ObjectDisposedException when the handle was closed after the check.
-        var success = false;
-        try
-        {
-            DangerousAddRef(ref success);
-            return _context.Api.libusb_get_device_speed(handle);
-        }
-        finally
-        {
-            if (success)
-                DangerousRelease();
-        }
+        using var reference = SafeHelper.AcquireReference(this);
+        return _context.Api.libusb_get_device_speed(handle);
     }
 
     /// <inheritdoc/>
@@ -144,7 +131,7 @@ internal sealed class SafeDevice : SafeHandle, ISafeDevice
         [NotNullWhen(false)] out libusb_error? usbError
     )
     {
-        SafeHelper.ThrowIfClosed(this);
+        using var reference = SafeHelper.AcquireReference(this);
 
         var buffer = new byte[ILibUsbApi.LIBUSB_DEVICE_STRING_BYTES_MAX];
         var result = _context.Api.libusb_get_device_string(
@@ -169,7 +156,7 @@ internal sealed class SafeDevice : SafeHandle, ISafeDevice
     /// <inheritdoc/>
     public ISafeDeviceHandle Open()
     {
-        SafeHelper.ThrowIfClosed(this);
+        using var reference = SafeHelper.AcquireReference(this);
 
         var result = _context.Api.libusb_open(handle, out var deviceHandle);
         result.ThrowLibUsbExceptionForApi(nameof(_context.Api.libusb_open));

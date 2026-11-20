@@ -37,13 +37,13 @@ internal sealed class SafeTransfer : SafeHandle, ISafeTransfer
 
     public libusb_error Submit()
     {
-        SafeHelper.ThrowIfClosed(this);
+        using var reference = SafeHelper.AcquireReference(this);
         return _context.Api.libusb_submit_transfer(handle);
     }
 
     public libusb_error Cancel()
     {
-        SafeHelper.ThrowIfClosed(this);
+        using var reference = SafeHelper.AcquireReference(this);
         return _context.Api.libusb_cancel_transfer(handle);
     }
 }

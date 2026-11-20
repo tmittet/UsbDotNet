@@ -47,19 +47,26 @@ internal sealed class SafeDeviceList : SafeHandle, ISafeDeviceList
         }
     }
 
-    public ISafeDevice this[int index] => _lazyDevices.Value[index];
+    public ISafeDevice this[int index]
+    {
+        get
+        {
+            using var reference = SafeHelper.AcquireReference(this);
+            return _lazyDevices.Value[index];
+        }
+    }
 
     public int Count { get; }
 
     public IEnumerator<ISafeDevice> GetEnumerator()
     {
-        SafeHelper.ThrowIfClosed(this);
+        using var reference = SafeHelper.AcquireReference(this);
         return _lazyDevices.Value.GetEnumerator();
     }
 
     IEnumerator IEnumerable.GetEnumerator()
     {
-        SafeHelper.ThrowIfClosed(this);
+        using var reference = SafeHelper.AcquireReference(this);
         return _lazyDevices.Value.GetEnumerator();
     }
 
