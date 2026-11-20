@@ -1,19 +1,36 @@
 using System.Collections.Immutable;
 using UsbDotNet.Descriptor;
+using UsbDotNet.LibUsbNative.Enums;
 using UsbDotNet.LibUsbNative.Structs;
 
 namespace UsbDotNet.Internal;
 
 internal static class LibUsbDescriptorExtension
 {
+    /// <summary>
+    /// The first USB specification release with SuperSpeed, as a bcdUSB value.
+    /// </summary>
+    private const ushort BcdUsb3 = 0x0300;
+
+    /// <summary>
+    /// Convert a libusb config descriptor of a device operating at the given speed.
+    /// </summary>
+    /// <param name="descriptor">The libusb config descriptor.</param>
+    /// <param name="speed">The speed the device operates at.</param>
+    /// <param name="bcdUsb">
+    /// The bcdUSB of the device descriptor; used when the operating speed is unknown.
+    /// </param>
     internal static IUsbConfigDescriptor ToUsbConfigDescriptor(
-        this libusb_config_descriptor descriptor
+        this libusb_config_descriptor descriptor,
+        libusb_speed speed,
+        ushort bcdUsb
     ) =>
         new UsbConfigDescriptor(
             ConfigId: descriptor.bConfigurationValue,
             StringDescriptionIndex: descriptor.iConfiguration,
             Attributes: (UsbConfigAttributes)descriptor.bmAttributes,
             MaxPowerRawValue: descriptor.bMaxPower,
+            MaxPower: descriptor.bMaxPower * GetMaxPowerUnit(speed, bcdUsb),
             ExtraBytes: descriptor.extra,
             Interfaces: descriptor
                 // Flatten the alternate settings, since the index is not useful here
@@ -32,6 +49,26 @@ internal static class LibUsbDescriptorExtension
                 )
                 .ToImmutableDictionary()
         );
+
+    /// <summary>
+    /// Get the unit of bMaxPower in milliampere: 8 mA for a device operating at SuperSpeed or
+    /// faster, otherwise 2 mA. The unit follows the operating speed, not what the device is
+    /// capable of; a SuperSpeed device on a high speed port reports in units of 2 mA.
+    /// </summary>
+    internal static int GetMaxPowerUnit(libusb_speed speed, ushort bcdUsb)
+    {
+        // By the USB specification bcdUSB alone would do: a device reports 3.0 or higher only
+        // when it operates at SuperSpeed or faster, and 2.1 when connected at a lower speed.
+        // The negotiated speed is preferred since it is also right for a device that reports
+        // the same bcdUSB at every speed, and reading it is free; libusb caches the speed when
+        // the device is enumerated. bcdUSB is the fallback, since not every OS reports the speed.
+        var isSuperSpeed =
+            speed is libusb_speed.LIBUSB_SPEED_UNKNOWN
+                ? bcdUsb >= BcdUsb3
+                // Not a switch; a speed added in a later libusb version is also SuperSpeed or faster
+                : speed >= libusb_speed.LIBUSB_SPEED_SUPER;
+        return isSuperSpeed ? 8 : 2;
+    }
 
     internal static IUsbInterfaceDescriptor ToUsbInterfaceDescriptor(
         this libusb_interface_descriptor descriptor

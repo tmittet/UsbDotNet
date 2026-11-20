@@ -30,8 +30,9 @@ public interface IUsbConfigDescriptor
     UsbConfigAttributes Attributes { get; }
 
     /// <summary>
-    /// Maximum milliampere power consumption of the USB device from the
-    /// bus in this configuration, when the device is fully operation.
+    /// Maximum milliampere power consumption of the USB device from the bus in this
+    /// configuration, when the device is fully operational. The unit of the descriptor field
+    /// depends on the speed the device operates at, which is taken into account.
     /// </summary>
     int MaxPower { get; }
 

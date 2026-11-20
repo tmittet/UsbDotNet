@@ -385,6 +385,8 @@ internal sealed class FakeLibusbApi : ILibUsbApi
 
     public byte libusb_get_port_number(IntPtr dev) => 1;
 
+    public libusb_speed libusb_get_device_speed(IntPtr dev) => libusb_speed.LIBUSB_SPEED_HIGH;
+
     // ------------- Open / close -------------
     public libusb_error libusb_open(IntPtr dev, out IntPtr handle)
     {

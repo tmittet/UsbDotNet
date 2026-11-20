@@ -110,6 +110,13 @@ internal sealed class SafeDevice : SafeHandle, ISafeDevice
     }
 
     /// <inheritdoc/>
+    public libusb_speed GetSpeed()
+    {
+        SafeHelper.ThrowIfClosed(this);
+        return _context.Api.libusb_get_device_speed(handle);
+    }
+
+    /// <inheritdoc/>
     public string GetDeviceString(libusb_device_string_type stringType) =>
         TryGetDeviceString(stringType, out var value, out var error)
             ? value

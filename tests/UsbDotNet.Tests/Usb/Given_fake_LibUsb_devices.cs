@@ -319,6 +319,58 @@ public sealed class Given_fake_LibUsb_devices
         usb.GetDeviceSerial(deviceKey).Should().Be("SERIAL");
     }
 
+    [Theory]
+    // The operating speed decides the unit: 2 mA below SuperSpeed, 8 mA from SuperSpeed
+    [InlineData(libusb_speed.LIBUSB_SPEED_LOW, 0x0110, 100)]
+    [InlineData(libusb_speed.LIBUSB_SPEED_FULL, 0x0200, 100)]
+    [InlineData(libusb_speed.LIBUSB_SPEED_HIGH, 0x0210, 100)]
+    [InlineData(libusb_speed.LIBUSB_SPEED_SUPER, 0x0300, 400)]
+    [InlineData(libusb_speed.LIBUSB_SPEED_SUPER_PLUS, 0x0310, 400)]
+    [InlineData(libusb_speed.LIBUSB_SPEED_SUPER_PLUS_X2, 0x0320, 400)]
+    // A known speed wins over bcdUSB
+    [InlineData(libusb_speed.LIBUSB_SPEED_HIGH, 0x0300, 100)]
+    [InlineData(libusb_speed.LIBUSB_SPEED_SUPER, 0x0210, 400)]
+    // bcdUSB decides when the operating system does not report the speed
+    [InlineData(libusb_speed.LIBUSB_SPEED_UNKNOWN, 0x0210, 100)]
+    [InlineData(libusb_speed.LIBUSB_SPEED_UNKNOWN, 0x0300, 400)]
+    public void MaxPower_is_in_milliampere_for_the_speed_the_device_operates_at(
+        libusb_speed speed,
+        ushort bcdUsb,
+        int expectedMaxPower
+    )
+    {
+        var device = FakeHelper.CreateFakeDevice(
+            VendorA,
+            ProductA1,
+            BusNumber,
+            busAddress: 1,
+            bcdUsb: bcdUsb
+        );
+        A.CallTo(() => device.GetSpeed()).Returns(speed);
+        A.CallTo(() => device.GetActiveConfigDescriptor())
+            .Returns(
+                new libusb_config_descriptor(
+                    bLength: 9,
+                    libusb_descriptor_type.LIBUSB_DT_CONFIG,
+                    wTotalLength: 9,
+                    bNumInterfaces: 0,
+                    bConfigurationValue: 1,
+                    iConfiguration: 0,
+                    libusb_config_desc_attributes.NONE,
+                    bMaxPower: 50,
+                    interfaces: [],
+                    extra: []
+                )
+            );
+        A.CallTo(() => device.Open()).Returns(A.Fake<ISafeDeviceHandle>());
+        using var usb = CreateInitializedUsb(device);
+        var deviceKey = usb.GetDeviceList().Single().DeviceKey;
+
+        using var openDevice = usb.OpenDevice(deviceKey);
+
+        openDevice.ConfigDescriptor.MaxPower.Should().Be(expectedMaxPower);
+    }
+
     /// <summary>
     /// Make the fake device return the given value for every operating system device string.
     /// </summary>

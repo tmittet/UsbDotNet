@@ -58,7 +58,10 @@ public static class libusb_descriptor_ToStringExtension
             .AppendLine(_culture, $"  bConfigurationValue : {cfg.bConfigurationValue}")
             .AppendLine(_culture, $"  iConfiguration      : {cfg.iConfiguration}")
             .AppendLine(_culture, $"  bmAttributes        : {Fmt(cfg.bmAttributes)}")
-            .AppendLine(_culture, $"  MaxPower            : {cfg.bMaxPower} (units of 2mA)");
+            .AppendLine(
+                _culture,
+                $"  MaxPower            : {cfg.bMaxPower} (units of 2mA, 8mA at SuperSpeed)"
+            );
         if (cfg.extra is { Length: > 0 })
         {
             _ = sb.AppendLine(_culture, $"  Extra               : {cfg.extra.Length} bytes");

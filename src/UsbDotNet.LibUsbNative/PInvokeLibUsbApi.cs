@@ -94,6 +94,9 @@ public sealed class PInvokeLibUsbApi : ILibUsbApi
     [DllImport(Lib, CallingConvention = CallingConvention.Cdecl)]
     private static extern byte libusb_get_port_number(IntPtr dev);
 
+    [DllImport(Lib, CallingConvention = CallingConvention.Cdecl)]
+    private static extern libusb_speed libusb_get_device_speed(IntPtr dev);
+
     #endregion
 
     #region Open/close
@@ -266,6 +269,9 @@ public sealed class PInvokeLibUsbApi : ILibUsbApi
 
     /// <inheritdoc/>
     byte ILibUsbApi.libusb_get_port_number(IntPtr dev) => libusb_get_port_number(dev);
+
+    /// <inheritdoc/>
+    libusb_speed ILibUsbApi.libusb_get_device_speed(IntPtr dev) => libusb_get_device_speed(dev);
 
     /// <inheritdoc/>
     libusb_error ILibUsbApi.libusb_get_device_string(
