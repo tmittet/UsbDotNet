@@ -32,7 +32,7 @@ public static class UsbDeviceExtension
     /// </item>
     /// <item>Timeout = The read operation timed out.</item>
     /// <item>Overflow = The device sent more data than expected.</item>
-    /// <item>Interrupted = The read operation was canceled.</item>
+    /// <item>Interrupted = The read operation was canceled, or the device is disposed.</item>
     /// <item>NotSupported = The transfer flags are not supported by the operating system.</item>
     /// </list>
     /// </returns>
@@ -82,7 +82,7 @@ public static class UsbDeviceExtension
     /// </item>
     /// <item>Timeout = The write operation timed out.</item>
     /// <item>Overflow = The host sent more data than expected.</item>
-    /// <item>Interrupted = The write operation was canceled.</item>
+    /// <item>Interrupted = The write operation was canceled, or the device is disposed.</item>
     /// <item>NotSupported = The transfer flags are not supported by the operating system.</item>
     /// </list>
     /// </returns>

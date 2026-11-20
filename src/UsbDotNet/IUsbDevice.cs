@@ -93,7 +93,6 @@ public interface IUsbDevice : IDisposable
     /// <exception cref="ArgumentOutOfRangeException">
     /// Thrown when the destination buffer is too large.
     /// </exception>
-    /// <exception cref="ObjectDisposedException">Thrown when the UsbDevice is disposed.</exception>
     /// <returns>
     /// <list>
     /// <item>Success = The read operation completed successfully.</item>
@@ -105,7 +104,7 @@ public interface IUsbDevice : IDisposable
     /// </item>
     /// <item>Timeout = The read operation timed out.</item>
     /// <item>Overflow = The device sent more data than expected.</item>
-    /// <item>Interrupted = The read operation was canceled.</item>
+    /// <item>Interrupted = The read operation was canceled, or the device is disposed.</item>
     /// <item>NotSupported = The transfer flags are not supported by the operating system.</item>
     /// </list>
     /// </returns>
@@ -134,7 +133,6 @@ public interface IUsbDevice : IDisposable
     /// <exception cref="ArgumentOutOfRangeException">
     /// Thrown when the source payload is too large.
     /// </exception>
-    /// <exception cref="ObjectDisposedException">Thrown when the UsbDevice is disposed.</exception>
     /// <returns>
     /// <list>
     /// <item>Success = The write operation completed successfully.</item>
@@ -146,7 +144,7 @@ public interface IUsbDevice : IDisposable
     /// </item>
     /// <item>Timeout = The write operation timed out.</item>
     /// <item>Overflow = The host sent more data than expected.</item>
-    /// <item>Interrupted = The write operation was canceled.</item>
+    /// <item>Interrupted = The write operation was canceled, or the device is disposed.</item>
     /// <item>NotSupported = The transfer flags are not supported by the operating system.</item>
     /// </list>
     /// </returns>
