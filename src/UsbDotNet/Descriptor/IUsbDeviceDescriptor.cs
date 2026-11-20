@@ -100,4 +100,11 @@ public interface IUsbDeviceDescriptor
     /// </para>
     /// </summary>
     byte PortNumber { get; }
+
+    /// <summary>
+    /// The speed the device operates at: the speed negotiated for its connection, which may be
+    /// lower than what the device is capable of. <see cref="UsbSpeed.Unknown"/> when the operating
+    /// system does not report the speed.
+    /// </summary>
+    UsbSpeed Speed { get; }
 }

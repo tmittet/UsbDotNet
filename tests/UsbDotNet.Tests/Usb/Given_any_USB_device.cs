@@ -64,6 +64,24 @@ public sealed class Given_any_USB_device : IDisposable
     }
 
     [SkippableFact]
+    public void GetDeviceList_returns_a_known_speed_for_at_least_one_USB_device()
+    {
+        var descriptors = _usb.GetDeviceList();
+        Skip.If(descriptors.Count == 0, "No USB device available.");
+
+        foreach (var descriptor in descriptors)
+        {
+            _logger.LogInformation(
+                "Device '{DeviceKey}' operates at speed {Speed}.",
+                descriptor.DeviceKey,
+                descriptor.Speed
+            );
+            descriptor.Speed.Should().BeDefined();
+        }
+        descriptors.Should().Contain(d => d.Speed != UsbSpeed.Unknown);
+    }
+
+    [SkippableFact]
     public void OpenDevice_throws_UsbException_given_invalid_device_key()
     {
         var invalidDeviceKey = UsbDeviceDescriptor.GetKey(0xFFFF, 0xFFFF, 255, 255);

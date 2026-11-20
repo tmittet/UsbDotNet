@@ -19,16 +19,38 @@ internal static class LibUsbDescriptorExtension
     private const byte SuperSpeedMaxPacketSize0 = 9;
 
     /// <summary>
-    /// Convert a libusb config descriptor of a device operating at the given speed.
+    /// Convert the speed reported by libusb. A speed this version of the library does not know,
+    /// from a later libusb version, is <see cref="UsbSpeed.Unknown"/>.
+    /// </summary>
+    internal static UsbSpeed ToUsbSpeed(this libusb_speed speed)
+    {
+        // The value comes from the native library; without this check a speed added in a later
+        // libusb version would throw from the switch below and break the device enumeration
+        if (!Enum.IsDefined(speed))
+        {
+            return UsbSpeed.Unknown;
+        }
+        return speed switch
+        {
+            libusb_speed.LIBUSB_SPEED_UNKNOWN => UsbSpeed.Unknown,
+            libusb_speed.LIBUSB_SPEED_LOW => UsbSpeed.Low,
+            libusb_speed.LIBUSB_SPEED_FULL => UsbSpeed.Full,
+            libusb_speed.LIBUSB_SPEED_HIGH => UsbSpeed.High,
+            libusb_speed.LIBUSB_SPEED_SUPER => UsbSpeed.Super,
+            libusb_speed.LIBUSB_SPEED_SUPER_PLUS => UsbSpeed.SuperPlus,
+            libusb_speed.LIBUSB_SPEED_SUPER_PLUS_X2 => UsbSpeed.SuperPlusX2,
+        };
+    }
+
+    /// <summary>
+    /// Convert a libusb config descriptor of the device with the given device descriptor.
     /// </summary>
     /// <param name="descriptor">The libusb config descriptor.</param>
-    /// <param name="speed">The speed the device operates at.</param>
     /// <param name="deviceDescriptor">
-    /// The device descriptor of the device; used when the operating speed is unknown.
+    /// The device descriptor of the device, with the speed the device operates at.
     /// </param>
     internal static IUsbConfigDescriptor ToUsbConfigDescriptor(
         this libusb_config_descriptor descriptor,
-        libusb_speed speed,
         IUsbDeviceDescriptor deviceDescriptor
     ) =>
         new UsbConfigDescriptor(
@@ -36,7 +58,7 @@ internal static class LibUsbDescriptorExtension
             StringDescriptionIndex: descriptor.iConfiguration,
             Attributes: (UsbConfigAttributes)descriptor.bmAttributes,
             MaxPowerRawValue: descriptor.bMaxPower,
-            MaxPowerMultiplier: GetMaxPowerMultiplier(speed, deviceDescriptor),
+            MaxPowerMultiplier: GetMaxPowerMultiplier(deviceDescriptor),
             ExtraBytes: descriptor.extra,
             Interfaces: descriptor
                 // Flatten the alternate settings, since the index is not useful here
@@ -61,10 +83,7 @@ internal static class LibUsbDescriptorExtension
     /// SuperSpeed or faster, otherwise 2. It follows the operating speed, not what the device is
     /// capable of; a SuperSpeed device on a high speed port reports in units of 2 mA.
     /// </summary>
-    internal static int GetMaxPowerMultiplier(
-        libusb_speed speed,
-        IUsbDeviceDescriptor deviceDescriptor
-    )
+    internal static int GetMaxPowerMultiplier(IUsbDeviceDescriptor deviceDescriptor)
     {
         // By the USB specification bcdUSB alone would do: a device reports 3.0 or higher only
         // when it operates at SuperSpeed or faster, and 2.1 when connected at a lower speed.
@@ -74,11 +93,10 @@ internal static class LibUsbDescriptorExtension
         // reports the speed. It must also have the SuperSpeed bMaxPacketSize0, which a device
         // that reports the same bcdUSB at every speed does not have at a lower speed.
         var isSuperSpeed =
-            speed is libusb_speed.LIBUSB_SPEED_UNKNOWN
+            deviceDescriptor.Speed is UsbSpeed.Unknown
                 ? deviceDescriptor.BcdUsb >= BcdUsb3
                     && deviceDescriptor.MaxPacketSize0 == SuperSpeedMaxPacketSize0
-                // Not a switch; a speed added in a later libusb version is also SuperSpeed or faster
-                : speed >= libusb_speed.LIBUSB_SPEED_SUPER;
+                : deviceDescriptor.Speed >= UsbSpeed.Super;
         return isSuperSpeed ? 8 : 2;
     }
 
