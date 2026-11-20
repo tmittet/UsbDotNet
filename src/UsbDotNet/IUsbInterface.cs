@@ -62,11 +62,6 @@ public interface IUsbInterface : IDisposable
     /// One transfer at a time is in progress on an endpoint; a concurrent read from the same
     /// endpoint waits for it to complete. Transfers on different endpoints run concurrently.
     /// </para>
-    /// <para>
-    /// For a high-bandwidth interrupt endpoint, MaxPacketSize of the endpoint descriptor also
-    /// holds the number of additional transactions per microframe, in bits 11-12. Only the
-    /// packet size, in bits 0-10, is used to check the length of <paramref name="destination"/>.
-    /// </para>
     /// </remarks>
     /// <param name="endpoint">
     /// A bulk or interrupt input endpoint of this interface, from the descriptor of the interface
