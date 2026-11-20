@@ -145,6 +145,18 @@ public sealed class PInvokeLibUsbApi : ILibUsbApi
         int len
     );
 
+    [DllImport(Lib, CallingConvention = CallingConvention.Cdecl)]
+    private static extern libusb_error libusb_control_transfer(
+        IntPtr h,
+        byte bmRequestType,
+        byte bRequest,
+        ushort wValue,
+        ushort wIndex,
+        byte[] data,
+        ushort wLength,
+        uint timeout
+    );
+
     #endregion
 
     #region Halt/Reset
@@ -306,6 +318,19 @@ public sealed class PInvokeLibUsbApi : ILibUsbApi
         byte[] data,
         int len
     ) => libusb_get_string_descriptor_ascii(h, idx, data, len);
+
+    /// <inheritdoc/>
+    libusb_error ILibUsbApi.libusb_control_transfer(
+        IntPtr h,
+        byte bmRequestType,
+        byte bRequest,
+        ushort wValue,
+        ushort wIndex,
+        byte[] data,
+        ushort wLength,
+        uint timeout
+    ) =>
+        libusb_control_transfer(h, bmRequestType, bRequest, wValue, wIndex, data, wLength, timeout);
 
     /// <inheritdoc/>
     libusb_error ILibUsbApi.libusb_reset_device(IntPtr h) => libusb_reset_device(h);

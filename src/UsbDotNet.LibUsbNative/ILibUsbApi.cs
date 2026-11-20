@@ -273,6 +273,23 @@ public interface ILibUsbApi
     );
 
     /// <summary>
+    /// Perform a USB control transfer. The direction of the transfer is inferred from the
+    /// bmRequestType field of the setup packet. The wValue, wIndex and wLength fields values
+    /// should be given in host-endian byte order.
+    /// </summary>
+    /// <returns>The number of bytes transferred on success; otherwise a libusb_error.</returns>
+    libusb_error libusb_control_transfer(
+        IntPtr handle,
+        byte bmRequestType,
+        byte bRequest,
+        ushort wValue,
+        ushort wIndex,
+        byte[] data,
+        ushort wLength,
+        uint timeout
+    );
+
+    /// <summary>
     /// Perform a USB port reset to reinitialize a device.
     /// <para>
     /// The system will attempt to restore the previous configuration and alternate settings after

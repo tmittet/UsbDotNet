@@ -312,7 +312,7 @@ public sealed class Given_fake_LibUsb_devices
             );
         var handle = A.Fake<ISafeDeviceHandle>();
         A.CallTo(() => device.Open()).Returns(handle);
-        A.CallTo(() => handle.GetStringDescriptorAscii(3)).Returns("SERIAL");
+        A.CallTo(() => handle.GetStringDescriptor(3)).Returns("SERIAL");
         using var usb = CreateInitializedUsb(device);
         var deviceKey = usb.GetDeviceList().Single().DeviceKey;
 
