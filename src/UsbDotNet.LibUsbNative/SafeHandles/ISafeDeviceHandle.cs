@@ -89,6 +89,16 @@ public interface ISafeDeviceHandle : IDisposable
     void ResetDevice();
 
     /// <summary>
+    /// Clear the halt/stall condition for an endpoint. Endpoints with halt status are unable to
+    /// receive or transmit data until the halt condition is cleared. Cancel all pending transfers
+    /// on the endpoint before clearing the halt condition.
+    /// </summary>
+    /// <param name="endpointAddress">The address of the endpoint, including its direction.</param>
+    /// <exception cref="ObjectDisposedException">Thrown when the SafeDeviceHandle is disposed.</exception>
+    /// <exception cref="LibUsbException">Thrown when the clear halt operation fails.</exception>
+    void ClearHalt(byte endpointAddress);
+
+    /// <summary>
     /// Allocate a libusb transfer with a specified number of isochronous packet descriptors.
     /// </summary>
     /// <param name="isoPackets">Number of isochronous packet descriptors to allocate. Must be non-negative.</param>

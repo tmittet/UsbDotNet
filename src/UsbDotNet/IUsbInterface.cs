@@ -92,7 +92,7 @@ public interface IUsbInterface : IDisposable
     /// <item>IO = The read operation failed.</item>
     /// <item>InvalidParameter = Transfer size is larger than OS or hardware can support.</item>
     /// <item>NoDevice = The device has been disconnected.</item>
-    /// <item>PipeError = Halt condition detected (endpoint stalled).</item>
+    /// <item>PipeError = Halt condition detected (endpoint stalled); see ClearHalt.</item>
     /// <item>Timeout = The read operation timed out. Data may still have been received.</item>
     /// <item>Overflow = The device sent more data than expected.</item>
     /// <item>
@@ -149,7 +149,7 @@ public interface IUsbInterface : IDisposable
     /// <item>IO = The write operation failed.</item>
     /// <item>InvalidParameter = Transfer size is larger than OS or hardware can support.</item>
     /// <item>NoDevice = The device has been disconnected.</item>
-    /// <item>PipeError = Halt condition detected (endpoint stalled).</item>
+    /// <item>PipeError = Halt condition detected (endpoint stalled); see ClearHalt.</item>
     /// <item>Timeout = The write operation timed out.</item>
     /// <item>Overflow = The host sent more data than expected.</item>
     /// <item>Interrupted = The write operation was canceled, or the interface is disposed.</item>
@@ -211,7 +211,7 @@ public interface IUsbInterface : IDisposable
     /// <item>IO = The read operation failed.</item>
     /// <item>InvalidParameter = Transfer size is larger than OS or hardware can support.</item>
     /// <item>NoDevice = The device has been disconnected.</item>
-    /// <item>PipeError = Halt condition detected (endpoint stalled).</item>
+    /// <item>PipeError = Halt condition detected (endpoint stalled); see ClearHalt.</item>
     /// <item>Timeout = The read operation timed out. Data may still have been received.</item>
     /// <item>Overflow = The device sent more data than expected.</item>
     /// <item>
@@ -257,7 +257,7 @@ public interface IUsbInterface : IDisposable
     /// <item>IO = The write operation failed.</item>
     /// <item>InvalidParameter = Transfer size is larger than OS or hardware can support.</item>
     /// <item>NoDevice = The device has been disconnected.</item>
-    /// <item>PipeError = Halt condition detected (endpoint stalled).</item>
+    /// <item>PipeError = Halt condition detected (endpoint stalled); see ClearHalt.</item>
     /// <item>Timeout = The write operation timed out.</item>
     /// <item>Overflow = The host sent more data than expected.</item>
     /// <item>Interrupted = The write operation was canceled, or the interface is disposed.</item>
@@ -269,4 +269,30 @@ public interface IUsbInterface : IDisposable
         out int bytesWritten,
         int timeout = Timeout.Infinite
     );
+
+    /// <summary>
+    /// Clears the halt (stall) condition of an endpoint of this interface. A halted endpoint is
+    /// unable to receive or transmit data, and its transfers return PipeError, until the halt
+    /// condition is cleared.
+    /// <para>
+    /// Waits for a transfer that is in progress on the endpoint to complete. Do not call it while
+    /// a transfer without a timeout is waiting for data on the endpoint.
+    /// </para>
+    /// <para>
+    /// Clearing the halt condition makes the endpoint usable again; it does not remove the cause.
+    /// What made the device stall the endpoint, and what state the device expects afterwards, is
+    /// defined by the protocol of the device.
+    /// </para>
+    /// </summary>
+    /// <param name="endpoint">
+    /// An endpoint of this interface, typically from the interface descriptor that was used to
+    /// claim the interface, or from <see cref="TryGetInputEndpoint"/> or
+    /// <see cref="TryGetOutputEndpoint"/>. The endpoint is identified by its address.
+    /// </param>
+    /// <exception cref="ArgumentException">
+    /// Thrown when the endpoint is not an endpoint of this interface.
+    /// </exception>
+    /// <exception cref="UsbException">Thrown when the clear halt operation fails.</exception>
+    /// <exception cref="ObjectDisposedException">Thrown when the UsbInterface is disposed.</exception>
+    void ClearHalt(IUsbEndpointDescriptor endpoint);
 }

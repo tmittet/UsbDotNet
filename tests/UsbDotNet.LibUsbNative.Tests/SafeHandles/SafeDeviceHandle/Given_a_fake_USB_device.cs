@@ -167,6 +167,40 @@ public sealed class Given_a_fake_USB_device : IDisposable
             .Be(libusb_error.LIBUSB_ERROR_TIMEOUT);
     }
 
+    [Theory]
+    [InlineData(0x81)]
+    [InlineData(0x02)]
+    public void ClearHalt_clears_the_halt_of_the_endpoint_on_the_device_handle(byte endpoint)
+    {
+        _handle.ClearHalt(endpoint);
+
+        _api.ClearedHalts.Should().Equal((_handle.DangerousGetHandle(), endpoint));
+    }
+
+    [Fact]
+    public void ClearHalt_throws_when_the_request_fails()
+    {
+        _api.InjectError(nameof(_api.libusb_clear_halt), libusb_error.LIBUSB_ERROR_NOT_FOUND);
+
+        var act = () => _handle.ClearHalt(0x81);
+
+        act.Should()
+            .Throw<LibUsbException>()
+            .Which.Error.Should()
+            .Be(libusb_error.LIBUSB_ERROR_NOT_FOUND);
+    }
+
+    [Fact]
+    public void ClearHalt_throws_when_the_device_handle_is_disposed()
+    {
+        _handle.Dispose();
+
+        var act = () => _handle.ClearHalt(0x81);
+
+        act.Should().Throw<ObjectDisposedException>();
+        _api.ClearedHalts.Should().BeEmpty();
+    }
+
     public void Dispose()
     {
         _handle.Dispose();

@@ -305,6 +305,20 @@ public interface ILibUsbApi
     libusb_error libusb_reset_device(IntPtr handle);
 
     /// <summary>
+    /// Clear the halt/stall condition for an endpoint. Endpoints with halt status are unable to
+    /// receive or transmit data until the halt condition is cleared.
+    /// <para>
+    /// You should cancel all pending transfers before attempting to clear the halt condition.
+    /// </para>
+    /// <para>NOTE: This is a blocking function.</para>
+    /// </summary>
+    /// <returns>
+    /// LIBUSB_SUCCESS; LIBUSB_ERROR_NOT_FOUND when the endpoint does not exist;
+    /// LIBUSB_ERROR_NO_DEVICE when the device has been disconnected; or another libusb_error.
+    /// </returns>
+    libusb_error libusb_clear_halt(IntPtr handle, byte endpoint);
+
+    /// <summary>
     /// Allocate a libusb transfer with a specified number of isochronous packet descriptors. The
     /// returned transfer is pre-initialized for you. When the new transfer is no longer needed, it
     /// should be freed with libusb_free_transfer().

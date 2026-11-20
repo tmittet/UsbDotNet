@@ -145,6 +145,12 @@ public class Given_a_native_call_in_progress
                 nameof(api.libusb_claim_interface),
                 handle => handle.ClaimInterface(0).Dispose()
             ),
+        ["SafeDeviceHandle.ClearHalt"] = api =>
+            DeviceHandleScenario(
+                api,
+                nameof(api.libusb_clear_halt),
+                handle => handle.ClearHalt(0x81)
+            ),
         ["SafeDeviceHandle.ResetDevice"] = api =>
             DeviceHandleScenario(
                 api,
