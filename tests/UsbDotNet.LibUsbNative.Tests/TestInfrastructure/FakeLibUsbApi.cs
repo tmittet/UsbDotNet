@@ -78,6 +78,9 @@ internal sealed class FakeLibusbApi : ILibUsbApi
     /// <summary>The number of calls to libusb_close.</summary>
     internal int CloseCount;
 
+    /// <summary>The number of calls to libusb_free_device_list.</summary>
+    internal int FreeDeviceListCount;
+
     /// <summary>The number of calls to libusb_free_transfer.</summary>
     internal int FreeTransferCount;
 
@@ -290,11 +293,12 @@ internal sealed class FakeLibusbApi : ILibUsbApi
 
     public void libusb_free_device_list(IntPtr list, int unrefDevices)
     {
+        Interlocked.Increment(ref FreeDeviceListCount);
         if (list != IntPtr.Zero && _deviceListBlocks.Remove(list))
             Marshal.FreeHGlobal(list);
     }
 
-    public void libusb_ref_device(IntPtr dev) { }
+    public void libusb_ref_device(IntPtr dev) => Hook();
 
     public void libusb_unref_device(IntPtr dev) => UnrefDevices.Enqueue(dev);
 

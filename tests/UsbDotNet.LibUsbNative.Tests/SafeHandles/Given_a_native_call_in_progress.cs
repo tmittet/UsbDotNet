@@ -158,6 +158,11 @@ public class Given_a_native_call_in_progress
                 nameof(api.libusb_cancel_transfer),
                 transfer => transfer.Cancel()
             ),
+        // ---- SafeDeviceList, released with libusb_free_device_list. The devices are created
+        // from the native list on first access, which takes a reference on each native device.
+        ["SafeDeviceList.Indexer"] = api => DeviceListScenario(api, list => _ = list[0]),
+        ["SafeDeviceList.GetEnumerator"] = api =>
+            DeviceListScenario(api, list => list.GetEnumerator().Dispose()),
         // ---- SafeDeviceInterface, released with libusb_release_interface
         ["SafeDeviceInterface.SetAlternateSetting"] = api =>
         {
@@ -282,6 +287,22 @@ public class Given_a_native_call_in_progress
             },
             () => api.UnrefDevices.Count,
             expectedReleaseCount
+        );
+    }
+
+    private static Scenario DeviceListScenario(FakeLibusbApi api, Action<ISafeDeviceList> call)
+    {
+        var context = new LibUsb(api).CreateContext();
+        var list = context.GetDeviceList();
+        return new Scenario(
+            nameof(api.libusb_ref_device),
+            () => call(list),
+            () =>
+            {
+                list.Dispose();
+                context.Dispose();
+            },
+            () => api.FreeDeviceListCount
         );
     }
 
