@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Text;
 using UsbDotNet.LibUsbNative.Enums;
@@ -73,6 +74,27 @@ internal sealed class FakeLibusbApi : ILibUsbApi
 
     /// <summary>The number of calls to libusb_exit.</summary>
     internal int ExitCount;
+
+    /// <summary>The number of calls to libusb_close.</summary>
+    internal int CloseCount;
+
+    /// <summary>The number of calls to libusb_free_transfer.</summary>
+    internal int FreeTransferCount;
+
+    /// <summary>The number of calls to libusb_release_interface.</summary>
+    internal int ReleaseInterfaceCount;
+
+    /// <summary>
+    /// Actions invoked at the start of an API call, keyed by API name. A test can block here to
+    /// hold the call in progress.
+    /// </summary>
+    internal ConcurrentDictionary<string, Action> CallHooks { get; } = new(StringComparer.Ordinal);
+
+    private void Hook([CallerMemberName] string apiName = "")
+    {
+        if (CallHooks.TryGetValue(apiName, out var hook))
+            hook();
+    }
 
     // Allocations we must free
     private readonly List<IntPtr> _deviceListBlocks = [];
@@ -208,6 +230,7 @@ internal sealed class FakeLibusbApi : ILibUsbApi
 
     public libusb_error libusb_set_option(IntPtr ctx, libusb_option option, int value)
     {
+        Hook();
         if (MaybeFail(nameof(libusb_set_option), out var err) != libusb_error.LIBUSB_SUCCESS)
             return err;
         _options[option] = value;
@@ -216,16 +239,20 @@ internal sealed class FakeLibusbApi : ILibUsbApi
 
     public libusb_error libusb_set_option(IntPtr ctx, libusb_option option, IntPtr value)
     {
+        Hook();
         if (MaybeFail(nameof(libusb_set_option), out var err) != libusb_error.LIBUSB_SUCCESS)
             return err;
         _options[option] = value;
         return libusb_error.LIBUSB_SUCCESS;
     }
 
-    public libusb_error libusb_handle_events_completed(IntPtr ctx, IntPtr completed) =>
-        MaybeFail(nameof(libusb_handle_events_completed));
+    public libusb_error libusb_handle_events_completed(IntPtr ctx, IntPtr completed)
+    {
+        Hook();
+        return MaybeFail(nameof(libusb_handle_events_completed));
+    }
 
-    public void libusb_interrupt_event_handler(IntPtr ctx) { }
+    public void libusb_interrupt_event_handler(IntPtr ctx) => Hook();
 
     public IntPtr libusb_get_version() => _versionPtr;
 
@@ -239,6 +266,7 @@ internal sealed class FakeLibusbApi : ILibUsbApi
     // ------------- Device list -------------
     public libusb_error libusb_get_device_list(IntPtr ctx, out IntPtr list)
     {
+        Hook();
         list = IntPtr.Zero;
         if (MaybeFail(nameof(libusb_get_device_list), out var err) != libusb_error.LIBUSB_SUCCESS)
             return err;
@@ -268,6 +296,7 @@ internal sealed class FakeLibusbApi : ILibUsbApi
     // ------------- Device metadata -------------
     public libusb_error libusb_get_device_descriptor(IntPtr dev, out libusb_device_descriptor desc)
     {
+        Hook();
         desc = default;
         if (
             MaybeFail(nameof(libusb_get_device_descriptor), out var error)
@@ -285,6 +314,7 @@ internal sealed class FakeLibusbApi : ILibUsbApi
 
     public libusb_error libusb_get_config_descriptor(IntPtr dev, ushort index, out IntPtr config)
     {
+        Hook();
         config = IntPtr.Zero;
         if (
             MaybeFail(nameof(libusb_get_config_descriptor), out var error)
@@ -398,14 +428,27 @@ internal sealed class FakeLibusbApi : ILibUsbApi
         }
     }
 
-    public byte libusb_get_bus_number(IntPtr dev) => 3;
+    public byte libusb_get_bus_number(IntPtr dev)
+    {
+        Hook();
+        return 3;
+    }
 
-    public byte libusb_get_device_address(IntPtr dev) => 17;
+    public byte libusb_get_device_address(IntPtr dev)
+    {
+        Hook();
+        return 17;
+    }
 
-    public byte libusb_get_port_number(IntPtr dev) => 1;
+    public byte libusb_get_port_number(IntPtr dev)
+    {
+        Hook();
+        return 1;
+    }
 
     public libusb_speed libusb_get_device_speed(IntPtr dev)
     {
+        Hook();
         OnGetDeviceSpeed?.Invoke(dev);
         return Speed;
     }
@@ -413,6 +456,7 @@ internal sealed class FakeLibusbApi : ILibUsbApi
     // ------------- Open / close -------------
     public libusb_error libusb_open(IntPtr dev, out IntPtr handle)
     {
+        Hook();
         handle = IntPtr.Zero;
         if (MaybeFail(nameof(libusb_open), out var err) != libusb_error.LIBUSB_SUCCESS)
             return err;
@@ -423,6 +467,7 @@ internal sealed class FakeLibusbApi : ILibUsbApi
 
     public void libusb_close(IntPtr handle)
     {
+        Interlocked.Increment(ref CloseCount);
         _openHandles.Remove(handle);
         _claimed.RemoveWhere(c => c.Handle == handle);
     }
@@ -430,6 +475,7 @@ internal sealed class FakeLibusbApi : ILibUsbApi
     // ------------- Config / Interface -------------
     public libusb_error libusb_claim_interface(IntPtr handle, byte interface_number)
     {
+        Hook();
         var err = MaybeFail(nameof(libusb_claim_interface));
         if (err == libusb_error.LIBUSB_SUCCESS)
             _claimed.Add((handle, interface_number));
@@ -438,6 +484,7 @@ internal sealed class FakeLibusbApi : ILibUsbApi
 
     public libusb_error libusb_release_interface(IntPtr handle, byte interface_number)
     {
+        Interlocked.Increment(ref ReleaseInterfaceCount);
         var err = MaybeFail(nameof(libusb_release_interface));
         if (err == libusb_error.LIBUSB_SUCCESS)
             _claimed.Remove((handle, interface_number));
@@ -450,6 +497,7 @@ internal sealed class FakeLibusbApi : ILibUsbApi
         byte alternate_setting
     )
     {
+        Hook();
         var err = MaybeFail(nameof(libusb_set_interface_alt_setting));
         if (err != libusb_error.LIBUSB_SUCCESS)
             return err;
@@ -464,7 +512,11 @@ internal sealed class FakeLibusbApi : ILibUsbApi
         libusb_device_string_type string_type,
         byte[] data,
         int length
-    ) => libusb_error.LIBUSB_ERROR_NOT_FOUND;
+    )
+    {
+        Hook();
+        return libusb_error.LIBUSB_ERROR_NOT_FOUND;
+    }
 
     public libusb_error libusb_get_string_descriptor_ascii(
         IntPtr h,
@@ -473,6 +525,7 @@ internal sealed class FakeLibusbApi : ILibUsbApi
         int length
     )
     {
+        Hook();
         if (
             MaybeFail(nameof(libusb_get_string_descriptor_ascii), out var error)
             != libusb_error.LIBUSB_SUCCESS
@@ -490,19 +543,29 @@ internal sealed class FakeLibusbApi : ILibUsbApi
     }
 
     // ------------- Halt / Reset -------------
-    public libusb_error libusb_reset_device(IntPtr handle) =>
-        MaybeFail(nameof(libusb_reset_device));
+    public libusb_error libusb_reset_device(IntPtr handle)
+    {
+        Hook();
+        return MaybeFail(nameof(libusb_reset_device));
+    }
 
     // ------------- Transfers -------------
     public IntPtr libusb_alloc_transfer(int iso_packets) => new(_nextTransfer++);
 
-    public void libusb_free_transfer(IntPtr transfer) { }
+    public void libusb_free_transfer(IntPtr transfer) =>
+        Interlocked.Increment(ref FreeTransferCount);
 
-    public libusb_error libusb_submit_transfer(IntPtr transfer) =>
-        MaybeFail(nameof(libusb_submit_transfer));
+    public libusb_error libusb_submit_transfer(IntPtr transfer)
+    {
+        Hook();
+        return MaybeFail(nameof(libusb_submit_transfer));
+    }
 
-    public libusb_error libusb_cancel_transfer(IntPtr transfer) =>
-        MaybeFail(nameof(libusb_cancel_transfer));
+    public libusb_error libusb_cancel_transfer(IntPtr transfer)
+    {
+        Hook();
+        return MaybeFail(nameof(libusb_cancel_transfer));
+    }
 
     // ------------- Hotplug -------------
     public libusb_error libusb_hotplug_register_callback(
@@ -517,6 +580,7 @@ internal sealed class FakeLibusbApi : ILibUsbApi
         out IntPtr callbackHandle
     )
     {
+        Hook();
         callbackHandle = 0;
         if (
             MaybeFail(nameof(libusb_hotplug_register_callback), out var error)
