@@ -60,6 +60,9 @@ public static class UsbExtension
     /// Thrown when the Usb type is not initialized.
     /// </exception>
     /// <exception cref="ObjectDisposedException">Thrown when the Usb type is disposed.</exception>
+    /// <returns>
+    /// The manufacturer, or an empty string when the device has no manufacturer string.
+    /// </returns>
     public static string GetDeviceManufacturer(this IUsb usb, IUsbDeviceDescriptor descriptor) =>
         usb.GetDeviceManufacturer(descriptor.DeviceKey);
 
@@ -78,6 +81,9 @@ public static class UsbExtension
     /// Thrown when the Usb type is not initialized.
     /// </exception>
     /// <exception cref="ObjectDisposedException">Thrown when the Usb type is disposed.</exception>
+    /// <returns>
+    /// The product name, or an empty string when the device has no product name string.
+    /// </returns>
     public static string GetDeviceProduct(this IUsb usb, IUsbDeviceDescriptor descriptor) =>
         usb.GetDeviceProduct(descriptor.DeviceKey);
 
@@ -96,6 +102,9 @@ public static class UsbExtension
     /// Thrown when the Usb type is not initialized.
     /// </exception>
     /// <exception cref="ObjectDisposedException">Thrown when the Usb type is disposed.</exception>
+    /// <returns>
+    /// The serial number, or an empty string when the device has no serial number string.
+    /// </returns>
     public static string GetDeviceSerial(this IUsb usb, IUsbDeviceDescriptor descriptor) =>
         usb.GetDeviceSerial(descriptor.DeviceKey);
 

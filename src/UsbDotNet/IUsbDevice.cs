@@ -34,6 +34,9 @@ public interface IUsbDevice : IDisposable
     /// </summary>
     /// <exception cref="UsbException">Thrown when the descriptor read operation fails.</exception>
     /// <exception cref="ObjectDisposedException">Thrown when the UsbDevice is disposed.</exception>
+    /// <returns>
+    /// The manufacturer, or an empty string when the device has no manufacturer string.
+    /// </returns>
     string GetManufacturer();
 
     /// <summary>
@@ -42,6 +45,9 @@ public interface IUsbDevice : IDisposable
     /// </summary>
     /// <exception cref="UsbException">Thrown when the descriptor read operation fails.</exception>
     /// <exception cref="ObjectDisposedException">Thrown when the UsbDevice is disposed.</exception>
+    /// <returns>
+    /// The product name, or an empty string when the device has no product name string.
+    /// </returns>
     string GetProduct();
 
     /// <summary>
@@ -50,16 +56,27 @@ public interface IUsbDevice : IDisposable
     /// </summary>
     /// <exception cref="UsbException">Thrown when the descriptor read operation fails.</exception>
     /// <exception cref="ObjectDisposedException">Thrown when the UsbDevice is disposed.</exception>
+    /// <returns>
+    /// The serial number, or an empty string when the device has no serial number string.
+    /// </returns>
     string GetSerialNumber();
 
     /// <summary>
     /// Reads a string descriptor from the device, using the first language supported by the device.
     /// <para>
-    /// NOTE: On some devices it may fail even for basic fields like serial number (at index 0).
+    /// NOTE: On some devices it may fail even for basic fields like the serial number.
     /// </para>
     /// </summary>
+    /// <param name="descriptorIndex">
+    /// The index of the string descriptor, typically from a device, configuration or interface
+    /// descriptor. An index of zero means that the device does not have the string.
+    /// </param>
     /// <exception cref="UsbException">Thrown when the descriptor read operation fails.</exception>
     /// <exception cref="ObjectDisposedException">Thrown when the UsbDevice is disposed.</exception>
+    /// <returns>
+    /// The string, or an empty string when <paramref name="descriptorIndex"/> is zero; no request
+    /// is then sent to the device.
+    /// </returns>
     string ReadStringDescriptor(byte descriptorIndex);
 
     /// <summary>
