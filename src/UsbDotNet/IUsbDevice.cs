@@ -114,7 +114,7 @@ public interface IUsbDevice : IDisposable
     /// </returns>
     UsbResult ControlRead(
         Span<byte> destination,
-        out ushort bytesRead,
+        out int bytesRead,
         ControlRequestRecipient recipient,
         ControlRequestType type,
         byte request,

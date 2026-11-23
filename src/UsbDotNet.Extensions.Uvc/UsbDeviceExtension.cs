@@ -44,7 +44,7 @@ public static class UsbDeviceExtension
     public static UsbResult ControlReadUvc(
         this IUsbDevice device,
         Span<byte> destination,
-        out ushort bytesRead,
+        out int bytesRead,
         UvcControlRequest request,
         byte interfaceNumber,
         byte entityId,

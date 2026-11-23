@@ -40,7 +40,7 @@ public static class UsbDeviceExtension
     public static UsbResult ControlRead(
         this IUsbDevice device,
         Span<byte> destination,
-        out ushort bytesRead,
+        out int bytesRead,
         ControlRequestRecipient recipient,
         StandardRequest request,
         ushort value,
