@@ -7,8 +7,8 @@ namespace UsbDotNet.Descriptor;
 /// not set, as in a descriptor created with an object initializer, is treated as 2.
 /// </remarks>
 public readonly record struct UsbConfigDescriptor(
-    byte ConfigId,
-    byte StringDescriptionIndex,
+    byte IdentifierValue,
+    byte StringDescriptorIndex,
     UsbConfigAttributes Attributes,
     byte MaxPowerRawValue,
     int MaxPowerMultiplier,

@@ -56,9 +56,9 @@ public interface IUsbEndpointDescriptor
     byte Refresh { get; }
 
     /// <summary>
-    /// For audio devices only: the address if the synch endpoint.
+    /// For audio devices only: the address of the sync endpoint.
     /// </summary>
-    byte SynchAddress { get; }
+    byte SyncAddress { get; }
 
     /// <summary>
     /// Extra configuration bytes.

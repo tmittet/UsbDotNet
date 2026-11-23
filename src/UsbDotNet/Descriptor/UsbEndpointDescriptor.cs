@@ -7,7 +7,7 @@ public readonly record struct UsbEndpointDescriptor(
     ushort MaxPacketSizeRawValue,
     byte Interval,
     byte Refresh,
-    byte SynchAddress,
+    byte SyncAddress,
     ReadOnlyMemory<byte> ExtraBytes
 ) : IUsbEndpointDescriptor
 {

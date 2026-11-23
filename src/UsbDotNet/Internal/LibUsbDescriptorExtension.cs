@@ -54,8 +54,8 @@ internal static class LibUsbDescriptorExtension
         IUsbDeviceDescriptor deviceDescriptor
     ) =>
         new UsbConfigDescriptor(
-            ConfigId: descriptor.bConfigurationValue,
-            StringDescriptionIndex: descriptor.iConfiguration,
+            IdentifierValue: descriptor.bConfigurationValue,
+            StringDescriptorIndex: descriptor.iConfiguration,
             Attributes: (UsbConfigAttributes)descriptor.bmAttributes,
             MaxPowerRawValue: descriptor.bMaxPower,
             MaxPowerMultiplier: GetMaxPowerMultiplier(deviceDescriptor),
@@ -109,7 +109,7 @@ internal static class LibUsbDescriptorExtension
             InterfaceClass: (UsbClass)descriptor.bInterfaceClass,
             InterfaceSubClass: descriptor.bInterfaceSubClass,
             InterfaceProtocol: descriptor.bInterfaceProtocol,
-            StringDescriptionIndex: descriptor.iInterface,
+            StringDescriptorIndex: descriptor.iInterface,
             ExtraBytes: descriptor.extra,
             Endpoints: [.. descriptor.endpoints.Select(e => e.ToUsbEndpointDescriptor())]
         );
@@ -123,7 +123,7 @@ internal static class LibUsbDescriptorExtension
             MaxPacketSizeRawValue: descriptor.wMaxPacketSize,
             Interval: descriptor.bInterval,
             Refresh: descriptor.bRefresh,
-            SynchAddress: descriptor.bSynchAddress,
+            SyncAddress: descriptor.bSynchAddress,
             ExtraBytes: descriptor.extra
         );
 }

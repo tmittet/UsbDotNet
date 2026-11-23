@@ -30,7 +30,7 @@ public sealed class UsbEndpointDescriptorTest
             rawValue,
             Interval: 1,
             Refresh: 0,
-            SynchAddress: 0,
+            SyncAddress: 0,
             ExtraBytes: ReadOnlyMemory<byte>.Empty
         );
 
