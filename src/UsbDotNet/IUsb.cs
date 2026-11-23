@@ -40,6 +40,9 @@ public interface IUsb : IDisposable
     /// <see cref="UsbResult.AccessDenied"/> / <see cref="UsbResult.IoError"/>, typically because
     /// the device is inaccessible due to being open in another process or lacking permissions.
     /// </exception>
+    /// <exception cref="ArgumentException">
+    /// Thrown when <paramref name="deviceKey"/> is null or empty.
+    /// </exception>
     /// <exception cref="InvalidOperationException">Thrown when the Usb type is not initialized.</exception>
     /// <exception cref="ObjectDisposedException">Thrown when the Usb type is disposed.</exception>
     /// <returns>
@@ -57,6 +60,9 @@ public interface IUsb : IDisposable
     /// in the current system device list (for example it has been unplugged); or
     /// <see cref="UsbResult.AccessDenied"/> / <see cref="UsbResult.IoError"/>, typically because
     /// the device is inaccessible due to being open in another process or lacking permissions.
+    /// </exception>
+    /// <exception cref="ArgumentException">
+    /// Thrown when <paramref name="deviceKey"/> is null or empty.
     /// </exception>
     /// <exception cref="InvalidOperationException">Thrown when the Usb type is not initialized.</exception>
     /// <exception cref="ObjectDisposedException">Thrown when the Usb type is disposed.</exception>
@@ -76,6 +82,9 @@ public interface IUsb : IDisposable
     /// <see cref="UsbResult.AccessDenied"/> / <see cref="UsbResult.IoError"/>, typically because
     /// the device is inaccessible due to being open in another process or lacking permissions.
     /// </exception>
+    /// <exception cref="ArgumentException">
+    /// Thrown when <paramref name="deviceKey"/> is null or empty.
+    /// </exception>
     /// <exception cref="InvalidOperationException">Thrown when the Usb type is not initialized.</exception>
     /// <exception cref="ObjectDisposedException">Thrown when the Usb type is disposed.</exception>
     /// <returns>
@@ -90,6 +99,9 @@ public interface IUsb : IDisposable
     /// <exception cref="UsbException">
     /// UsbException.Code AccessDenied or IoError is typically an indication that the device
     /// is inaccessible; because it's open in another process or because of lacking permissions.
+    /// </exception>
+    /// <exception cref="ArgumentException">
+    /// Thrown when <paramref name="deviceKey"/> is null or empty.
     /// </exception>
     /// <exception cref="InvalidOperationException">
     /// Thrown when the Usb type is not initialized, or when the device is already open through
