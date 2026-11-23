@@ -99,6 +99,25 @@ public sealed class Given_a_vendor_class_USB_device : IDisposable
     }
 
     [SkippableFact]
+    public void ClearHalt_succeeds_on_the_bulk_endpoints_of_a_claimed_interface()
+    {
+        using var device = _deviceSource.OpenUsbDeviceOrSkip();
+        using var usbInterface = device.ClaimInterface(UsbClass.VendorSpecific);
+        usbInterface.TryGetInputEndpoint(out var input, UsbEndpointTransferType.Bulk);
+        usbInterface.TryGetOutputEndpoint(out var output, UsbEndpointTransferType.Bulk);
+        Skip.If(input is null || output is null, "The interface has no bulk endpoint pair.");
+
+        // Clearing the halt of an endpoint that is not halted is allowed
+        var act = () =>
+        {
+            usbInterface.ClearHalt(input!);
+            usbInterface.ClearHalt(output!);
+        };
+
+        act.Should().NotThrow();
+    }
+
+    [SkippableFact]
     public void Open_interfaces_are_auto_disposed_when_UsbDevice_is_disposed()
     {
         // Open device and leave it open

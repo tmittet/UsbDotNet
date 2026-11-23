@@ -4,6 +4,7 @@ using Microsoft.Extensions.Logging;
 using UsbDotNet.Core;
 using UsbDotNet.Descriptor;
 using UsbDotNet.Internal.Transfer;
+using UsbDotNet.LibUsbNative;
 using UsbDotNet.LibUsbNative.Enums;
 using UsbDotNet.LibUsbNative.Extensions;
 using UsbDotNet.LibUsbNative.SafeHandles;
@@ -180,6 +181,35 @@ public sealed class UsbInterface : IUsbInterface
     public UsbResult BulkWrite(ReadOnlySpan<byte> source, out int bytesWritten, int timeout) =>
         // The default bulk output endpoint is resolved lazily, on the first write
         ExecuteWrite(_bulkWriteEndpoint.Value, source, out bytesWritten, timeout);
+
+    /// <inheritdoc/>
+    public void ClearHalt(IUsbEndpointDescriptor endpoint)
+    {
+        var interfaceEndpoint = FindInterfaceEndpoint(endpoint);
+        var address = interfaceEndpoint.EndpointAddress;
+        EnterTransferLock();
+        try
+        {
+            // One operation at a time per endpoint: wait for a transfer in progress, and keep a
+            // new one from starting, since the halt must not be cleared with a transfer pending
+            lock (GetEndpointBuffer(interfaceEndpoint))
+            {
+                _device.Handle.ClearHalt(address.RawValue);
+            }
+        }
+        catch (LibUsbException ex)
+        {
+            throw new UsbException(
+                ex.Code,
+                $"Failed to clear halt on endpoint {address} of interface {this}.",
+                ex
+            );
+        }
+        finally
+        {
+            _disposeLock.ExitReadLock();
+        }
+    }
 
     /// <summary>
     /// Read from a bulk or interrupt input endpoint of this interface.
@@ -359,17 +389,29 @@ public sealed class UsbInterface : IUsbInterface
                 nameof(endpoint)
             );
         }
+        var interfaceEndpoint = FindInterfaceEndpoint(endpoint);
+        _ = ToLibUsbTransferType(interfaceEndpoint.Attributes.TransferType);
+        return interfaceEndpoint;
+    }
+
+    /// <summary>
+    /// Find the endpoint of this interface with the same address as the given endpoint.
+    /// </summary>
+    /// <exception cref="ArgumentException">
+    /// Thrown when the endpoint is not an endpoint of this interface.
+    /// </exception>
+    private IUsbEndpointDescriptor FindInterfaceEndpoint(IUsbEndpointDescriptor endpoint)
+    {
+        ArgumentNullException.ThrowIfNull(endpoint);
+        var address = endpoint.EndpointAddress;
         // Use the descriptor of this interface, not the one provided by the caller
-        var interfaceEndpoint =
-            _descriptor.Endpoints.FirstOrDefault(e =>
+        return _descriptor.Endpoints.FirstOrDefault(e =>
                 e.EndpointAddress.RawValue == address.RawValue
             )
             ?? throw new ArgumentException(
                 $"Invalid endpoint {address}; not an endpoint of interface {this}.",
                 nameof(endpoint)
             );
-        _ = ToLibUsbTransferType(interfaceEndpoint.Attributes.TransferType);
-        return interfaceEndpoint;
     }
 
     /// <summary>
