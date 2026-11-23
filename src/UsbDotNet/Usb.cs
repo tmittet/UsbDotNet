@@ -213,6 +213,7 @@ public sealed class Usb : IUsb, IUsbInternal
         Func<UsbDevice, string> readFromDevice
     )
     {
+        ThrowIfNullOrEmpty(deviceKey);
         lock (_lock)
         {
             CheckDisposed();
@@ -241,6 +242,7 @@ public sealed class Usb : IUsb, IUsbInternal
     /// <inheritdoc/>
     public IUsbDevice OpenDevice(string deviceKey)
     {
+        ThrowIfNullOrEmpty(deviceKey);
         lock (_lock)
         {
             CheckDisposed();
@@ -250,6 +252,19 @@ public sealed class Usb : IUsb, IUsbInternal
             }
             var context = GetInitializedContextOrThrow();
             return OpenDeviceUnlocked(context, deviceKey);
+        }
+    }
+
+    /// <summary>
+    /// Throw ArgumentNullException when the device key is null and ArgumentException when it is
+    /// empty. ArgumentException.ThrowIfNullOrEmpty is not available on .NET 6.
+    /// </summary>
+    private static void ThrowIfNullOrEmpty(string deviceKey)
+    {
+        ArgumentNullException.ThrowIfNull(deviceKey);
+        if (deviceKey.Length == 0)
+        {
+            throw new ArgumentException("The device key cannot be empty.", nameof(deviceKey));
         }
     }
 

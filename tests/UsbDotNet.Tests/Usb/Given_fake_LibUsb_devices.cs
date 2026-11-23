@@ -235,6 +235,30 @@ public sealed class Given_fake_LibUsb_devices
         devices.Should().HaveCount(1);
     }
 
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    public void Methods_taking_a_device_key_throw_ArgumentException_when_it_is_null_or_empty(
+        string? deviceKey
+    )
+    {
+        using var usb = CreateInitializedUsb();
+
+        var acts = new Action[]
+        {
+            () => usb.OpenDevice(deviceKey!),
+            () => usb.GetDeviceManufacturer(deviceKey!),
+            () => usb.GetDeviceProduct(deviceKey!),
+            () => usb.GetDeviceSerialNumber(deviceKey!),
+        };
+
+        using var scope = new AssertionScope();
+        foreach (var act in acts)
+        {
+            act.Should().Throw<ArgumentException>().WithParameterName(nameof(deviceKey));
+        }
+    }
+
     [Fact]
     public void GetDeviceList_throws_InvalidOperationException_when_Usb_is_not_initialized()
     {
