@@ -636,7 +636,7 @@ public sealed class Given_a_hotplug_event_notifier_over_a_fake_monitor
     /// </summary>
     private static async IAsyncEnumerable<UsbHotplugEvent> StreamOf(
         UsbHotplugEvent[] events,
-        [EnumeratorCancellation] CancellationToken cancellationToken
+        [EnumeratorCancellation] CancellationToken ct
     )
     {
         // Completes synchronously, so the burst below is still delivered inside RunAsync's
@@ -644,17 +644,17 @@ public sealed class Given_a_hotplug_event_notifier_over_a_fake_monitor
         await Task.CompletedTask;
         foreach (var e in events)
         {
-            cancellationToken.ThrowIfCancellationRequested();
+            ct.ThrowIfCancellationRequested();
             yield return e;
         }
     }
 
     /// <summary>A stream that only ever ends by cancellation, like a real live subscription.</summary>
     private static async IAsyncEnumerable<UsbHotplugEvent> NeverEnding(
-        [EnumeratorCancellation] CancellationToken cancellationToken
+        [EnumeratorCancellation] CancellationToken ct
     )
     {
-        await Task.Delay(System.Threading.Timeout.Infinite, cancellationToken);
+        await Task.Delay(System.Threading.Timeout.Infinite, ct);
         yield break;
     }
 
