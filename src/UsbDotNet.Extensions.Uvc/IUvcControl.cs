@@ -34,7 +34,8 @@ public interface IUvcControl : IDisposable
     /// <param name="value">Receives the current value.</param>
     /// <param name="controlType">
     /// Receives the current auto/manual mode
-    /// (Windows only; always <see cref="UvcControlType.Manual"/> on Linux/macOS).
+    /// (Windows only; always <see cref="UvcControlType.Manual"/> on Linux/macOS),
+    /// or <see cref="UvcControlType.None"/> when the call fails.
     /// </param>
     /// <returns>
     /// <see cref="UsbResult.Success"/> if the control was read successfully;
@@ -77,7 +78,8 @@ public interface IUvcControl : IDisposable
     /// <param name="value">Receives the current value.</param>
     /// <param name="controlType">
     /// Receives the current auto/manual mode
-    /// (Windows only; always <see cref="UvcControlType.Manual"/> on Linux/macOS).
+    /// (Windows only; always <see cref="UvcControlType.Manual"/> on Linux/macOS),
+    /// or <see cref="UvcControlType.None"/> when the call fails.
     /// </param>
     /// <returns>
     /// <see cref="UsbResult.Success"/> if the setting was read successfully;

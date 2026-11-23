@@ -57,7 +57,7 @@ internal sealed class WindowsUvcControl : IUvcControl
     )
     {
         value = 0;
-        controlType = default;
+        controlType = UvcControlType.None;
         _disposeLock.EnterReadLock();
         try
         {
@@ -155,7 +155,7 @@ internal sealed class WindowsUvcControl : IUvcControl
     )
     {
         value = 0;
-        controlType = default;
+        controlType = UvcControlType.None;
         _disposeLock.EnterReadLock();
         try
         {
