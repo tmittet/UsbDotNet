@@ -5,6 +5,19 @@ namespace UsbDotNet.LibUsbNative.Tests.SafeHandles.SafeDeviceInterface;
 public class Given_a_fake_USB_device
 {
     [Fact]
+    public void GetInterfaceNumber_returns_the_claimed_interface_number()
+    {
+        using var context = new LibUsb(new FakeLibusbApi()).CreateContext();
+        using var list = context.GetDeviceList();
+        using var handle = list[0].Open();
+        using var deviceInterface = handle.ClaimInterface(1);
+
+        var interfaceNumber = deviceInterface.GetInterfaceNumber();
+
+        interfaceNumber.Should().Be(1);
+    }
+
+    [Fact]
     public void A_claimed_interface_keeps_a_disposed_device_handle_open_until_it_is_released()
     {
         var api = new FakeLibusbApi();
