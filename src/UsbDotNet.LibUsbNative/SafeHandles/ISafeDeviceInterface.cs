@@ -6,7 +6,7 @@ public interface ISafeDeviceInterface : IDisposable
     /// Get the interface number.
     /// </summary>
     /// <exception cref="ObjectDisposedException">Thrown when the ISafeDeviceInterface is disposed.</exception>
-    int GetInterfaceNumber();
+    byte GetInterfaceNumber();
 
     /// <summary>
     /// Activate an alternate setting for the claimed interface. This is a blocking function; a
