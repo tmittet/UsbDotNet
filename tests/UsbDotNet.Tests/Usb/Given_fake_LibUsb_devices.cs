@@ -384,7 +384,7 @@ public sealed class Given_fake_LibUsb_devices
             Attributes: default,
             MaxPowerRawValue: 50,
             MaxPowerMultiplier: 8,
-            ExtraBytes: [],
+            ExtraBytes: ReadOnlyMemory<byte>.Empty,
             Interfaces: new Dictionary<byte, IReadOnlyDictionary<byte, IUsbInterfaceDescriptor>>()
         );
 

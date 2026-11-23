@@ -482,7 +482,7 @@ public sealed class Given_a_fake_claimed_USB_interface : IDisposable
             Interval: 1,
             Refresh: 0,
             SynchAddress: 0,
-            ExtraBytes: []
+            ExtraBytes: ReadOnlyMemory<byte>.Empty
         );
 
     [Fact]

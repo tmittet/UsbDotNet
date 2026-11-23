@@ -63,5 +63,5 @@ public interface IUsbEndpointDescriptor
     /// <summary>
     /// Extra configuration bytes.
     /// </summary>
-    byte[] ExtraBytes { get; }
+    ReadOnlyMemory<byte> ExtraBytes { get; }
 }

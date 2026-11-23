@@ -31,7 +31,7 @@ public sealed class UsbEndpointDescriptorTest
             Interval: 1,
             Refresh: 0,
             SynchAddress: 0,
-            ExtraBytes: []
+            ExtraBytes: ReadOnlyMemory<byte>.Empty
         );
 
         descriptor.MaxPacketSize.Should().Be(expectedMaxPacketSize);

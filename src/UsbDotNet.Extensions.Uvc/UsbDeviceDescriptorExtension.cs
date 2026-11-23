@@ -64,7 +64,7 @@ public static class UsbDeviceDescriptorExtension
         if (usbInterface is null)
             return null;
 
-        var span = usbInterface.ExtraBytes.AsSpan();
+        var span = usbInterface.ExtraBytes.Span;
         var offset = 0;
         while (TryReadNextCsInterfaceDescriptor(span, ref offset, out var descriptor))
         {
@@ -88,7 +88,7 @@ public static class UsbDeviceDescriptorExtension
         if (usbInterface is null)
             return null;
 
-        var span = usbInterface.ExtraBytes.AsSpan();
+        var span = usbInterface.ExtraBytes.Span;
         var offset = 0;
         while (TryReadNextCsInterfaceDescriptor(span, ref offset, out var descriptor))
         {
@@ -114,7 +114,7 @@ public static class UsbDeviceDescriptorExtension
             return null;
 
         var guidBytes = extensionGuid.ToByteArray();
-        var span = usbInterface.ExtraBytes.AsSpan();
+        var span = usbInterface.ExtraBytes.Span;
         var offset = 0;
         while (TryReadNextCsInterfaceDescriptor(span, ref offset, out var descriptor))
         {

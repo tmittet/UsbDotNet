@@ -49,7 +49,7 @@ public interface IUsbInterfaceDescriptor
     /// <summary>
     /// Extra configuration bytes.
     /// </summary>
-    byte[] ExtraBytes { get; }
+    ReadOnlyMemory<byte> ExtraBytes { get; }
 
     /// <summary>
     /// A list of endpoints.
