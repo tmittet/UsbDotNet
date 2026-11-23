@@ -16,9 +16,4 @@ public interface IUsbDeviceFilter
     /// </para>
     /// </summary>
     bool Matches(IUsbDeviceDescriptor descriptor);
-
-    /// <summary>
-    /// Returns a string representation of the filter.
-    /// </summary>
-    string ToString();
 }
