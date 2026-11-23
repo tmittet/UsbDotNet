@@ -91,7 +91,10 @@ public interface IUsb : IDisposable
     /// UsbException.Code AccessDenied or IoError is typically an indication that the device
     /// is inaccessible; because it's open in another process or because of lacking permissions.
     /// </exception>
-    /// <exception cref="InvalidOperationException">Thrown when the Usb type is not initialized.</exception>
+    /// <exception cref="InvalidOperationException">
+    /// Thrown when the Usb type is not initialized, or when the device is already open through
+    /// this Usb instance.
+    /// </exception>
     /// <exception cref="ObjectDisposedException">Thrown when the Usb type is disposed.</exception>
     IUsbDevice OpenDevice(string deviceKey);
 }

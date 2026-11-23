@@ -105,7 +105,8 @@ public static class UsbExtension
     /// is inaccessible because it's open in another process or due to lacking permissions.
     /// </exception>
     /// <exception cref="InvalidOperationException">
-    /// Thrown when the Usb type is not initialized.
+    /// Thrown when the Usb type is not initialized, or when the device is already open through
+    /// this Usb instance.
     /// </exception>
     /// <exception cref="ObjectDisposedException">Thrown when the Usb type is disposed.</exception>
     public static IUsbDevice OpenDevice(this IUsb usb, IUsbDeviceDescriptor descriptor) =>
