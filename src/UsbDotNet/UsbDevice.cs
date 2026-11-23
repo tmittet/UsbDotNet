@@ -256,7 +256,7 @@ public sealed class UsbDevice : IUsbDevice
             throw new ArgumentOutOfRangeException(
                 nameof(source),
                 source.Length,
-                $"Payload must be less than {ushort.MaxValue} bytes."
+                $"Payload must be at most {ushort.MaxValue} bytes."
             );
         }
         TransferTimeout.ThrowIfInvalid(timeout);
