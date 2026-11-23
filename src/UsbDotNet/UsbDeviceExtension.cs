@@ -93,9 +93,9 @@ public static class UsbDeviceExtension
     /// setting number. Per the USB spec, alternate setting 0 always exists and is the default
     /// alternate setting for each device configuration.
     /// </returns>
-    public static IDictionary<
+    public static IReadOnlyDictionary<
         byte,
-        IDictionary<byte, IUsbInterfaceDescriptor>
+        IReadOnlyDictionary<byte, IUsbInterfaceDescriptor>
     > GetInterfaceDescriptors(
         this IUsbDevice device,
         UsbClass interfaceClass,
@@ -122,9 +122,10 @@ public static class UsbDeviceExtension
     /// Regroup interface descriptors into a nested dictionary of USB interface
     /// descriptors grouped by interface number and alternate setting number.
     /// </summary>
-    private static ImmutableDictionary<byte, IDictionary<byte, IUsbInterfaceDescriptor>> Regroup(
-        this IEnumerable<IUsbInterfaceDescriptor> descriptors
-    ) =>
+    private static ImmutableDictionary<
+        byte,
+        IReadOnlyDictionary<byte, IUsbInterfaceDescriptor>
+    > Regroup(this IEnumerable<IUsbInterfaceDescriptor> descriptors) =>
         descriptors
             // Regroup by interface number
             .GroupBy(i => i.InterfaceNumber)
@@ -132,7 +133,7 @@ public static class UsbDeviceExtension
             .ToDictionary(
                 g => g.Key,
                 g =>
-                    (IDictionary<byte, IUsbInterfaceDescriptor>)
+                    (IReadOnlyDictionary<byte, IUsbInterfaceDescriptor>)
                         g.ToDictionary(i => i.AlternateSetting, i => i).ToImmutableDictionary()
             )
             .ToImmutableDictionary();
