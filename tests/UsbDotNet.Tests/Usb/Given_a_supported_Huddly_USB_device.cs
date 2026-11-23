@@ -92,14 +92,14 @@ public sealed class Given_a_supported_Huddly_USB_device : IDisposable
     }
 
     [SkippableFact]
-    public void GetDeviceSerial_returns_serial_given_a_Huddly_device_descriptor()
+    public void GetDeviceSerialNumber_returns_serial_given_a_Huddly_device_descriptor()
     {
         IUsbDeviceDescriptor deviceDescriptor;
         using (var device = _deviceSource.OpenUsbDeviceOrSkip())
         {
             deviceDescriptor = device.Descriptor;
         }
-        var serial = _usb.GetDeviceSerial(deviceDescriptor);
+        var serial = _usb.GetDeviceSerialNumber(deviceDescriptor);
         serial.Should().NotBeNullOrWhiteSpace();
         serial.Should().NotEndWith("\0", because: "null terminator should be trimmed");
     }
