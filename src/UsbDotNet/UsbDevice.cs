@@ -148,7 +148,7 @@ public sealed class UsbDevice : IUsbDevice
     /// <inheritdoc/>
     public UsbResult ControlRead(
         Span<byte> destination,
-        out ushort bytesRead,
+        out int bytesRead,
         ControlRequestRecipient recipient,
         ControlRequestType type,
         byte request,
@@ -194,7 +194,7 @@ public sealed class UsbDevice : IUsbDevice
 
     private UsbResult ExecuteControlRead(
         Span<byte> destination,
-        out ushort bytesRead,
+        out int bytesRead,
         ControlRequestRecipient recipient,
         ControlRequestType type,
         byte request,
@@ -223,10 +223,9 @@ public sealed class UsbDevice : IUsbDevice
                 bufferHandle,
                 buffer.Length,
                 timeout > 0 ? (uint)timeout : 0,
-                out var bytesReadInt, // Length of data only (not setup)
+                out bytesRead, // Length of data only (not setup)
                 _disposeCts.Token
             );
-            bytesRead = (ushort)bytesReadInt;
             if (result != libusb_error.LIBUSB_SUCCESS || bytesRead <= 0)
             {
                 return result.ToUsbResult();
