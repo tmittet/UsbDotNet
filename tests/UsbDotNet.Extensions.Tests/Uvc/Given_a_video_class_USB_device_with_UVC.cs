@@ -189,27 +189,20 @@ public sealed class Given_a_video_class_USB_device_with_UVC : IDisposable
     {
         using var device = _deviceSource.OpenUsbDeviceOrSkip();
         using var uvc = OpenFirstUvcControl(device);
-        var result = uvc.GetCameraControlRange(
-            control,
-            out var min,
-            out var max,
-            out var step,
-            out var defaultValue,
-            out var controlFlags
-        );
+        var result = uvc.GetCameraControlRange(control, out var range);
         result.Should().Be(UsbResult.Success);
         _logger.LogInformation(
             "{Control} range: min={Min}, max={Max}, step={Step}, default={Default}, flags={ControlFlags}.",
             control,
-            min,
-            max,
-            step,
-            defaultValue,
-            controlFlags
+            range.Min,
+            range.Max,
+            range.Step,
+            range.Default,
+            range.Capabilities
         );
-        min.Should().BeLessOrEqualTo(max);
+        range.Min.Should().BeLessOrEqualTo(range.Max);
         // Note: A step of 0 is valid and indicates that the control does not support stepping.
-        step.Should().BeGreaterThanOrEqualTo(0);
+        range.Step.Should().BeGreaterThanOrEqualTo(0);
     }
 
     [SkippableTheory]
@@ -220,9 +213,8 @@ public sealed class Given_a_video_class_USB_device_with_UVC : IDisposable
     {
         using var device = _deviceSource.OpenUsbDeviceOrSkip();
         using var uvc = OpenFirstUvcControl(device);
-        uvc.GetCameraControlRange(control, out var min, out var max, out _, out _, out _)
-            .Should()
-            .Be(UsbResult.Success);
+        uvc.GetCameraControlRange(control, out var range).Should().Be(UsbResult.Success);
+        var (min, max) = (range.Min, range.Max);
         var result = uvc.GetCameraControl(control, out var value, out _);
         result.Should().Be(UsbResult.Success);
         _logger.LogInformation(
@@ -243,9 +235,8 @@ public sealed class Given_a_video_class_USB_device_with_UVC : IDisposable
     {
         using var device = _deviceSource.OpenUsbDeviceOrSkip();
         using var uvc = OpenFirstUvcControl(device);
-        uvc.GetCameraControlRange(control, out var min, out var max, out var step, out _, out _)
-            .Should()
-            .Be(UsbResult.Success);
+        uvc.GetCameraControlRange(control, out var range).Should().Be(UsbResult.Success);
+        var (max, step) = (range.Max, range.Step);
         uvc.GetCameraControl(control, out var originalValue, out _).Should().Be(UsbResult.Success);
         var targetValue = originalValue + step <= max ? originalValue + step : originalValue - step;
         try
@@ -274,25 +265,18 @@ public sealed class Given_a_video_class_USB_device_with_UVC : IDisposable
     {
         using var device = _deviceSource.OpenUsbDeviceOrSkip();
         using var uvc = OpenFirstUvcControl(device);
-        var result = uvc.GetImageSettingRange(
-            setting,
-            out var min,
-            out var max,
-            out var step,
-            out var defaultValue,
-            out _
-        );
+        var result = uvc.GetImageSettingRange(setting, out var range);
         result.Should().Be(UsbResult.Success);
         _logger.LogInformation(
             "{Setting} range: min={Min}, max={Max}, step={Step}, default={Default}.",
             setting,
-            min,
-            max,
-            step,
-            defaultValue
+            range.Min,
+            range.Max,
+            range.Step,
+            range.Default
         );
-        min.Should().BeLessOrEqualTo(max);
-        step.Should().BePositive();
+        range.Min.Should().BeLessOrEqualTo(range.Max);
+        range.Step.Should().BePositive();
     }
 
     [SkippableTheory]
@@ -302,9 +286,8 @@ public sealed class Given_a_video_class_USB_device_with_UVC : IDisposable
     {
         using var device = _deviceSource.OpenUsbDeviceOrSkip();
         using var uvc = OpenFirstUvcControl(device);
-        uvc.GetImageSettingRange(setting, out var min, out var max, out _, out _, out _)
-            .Should()
-            .Be(UsbResult.Success);
+        uvc.GetImageSettingRange(setting, out var range).Should().Be(UsbResult.Success);
+        var (min, max) = (range.Min, range.Max);
         var result = uvc.GetImageSetting(setting, out var value, out _);
         result.Should().Be(UsbResult.Success);
         _logger.LogInformation(
@@ -324,9 +307,8 @@ public sealed class Given_a_video_class_USB_device_with_UVC : IDisposable
     {
         using var device = _deviceSource.OpenUsbDeviceOrSkip();
         using var uvc = OpenFirstUvcControl(device);
-        uvc.GetImageSettingRange(setting, out var min, out var max, out var step, out _, out _)
-            .Should()
-            .Be(UsbResult.Success);
+        uvc.GetImageSettingRange(setting, out var range).Should().Be(UsbResult.Success);
+        var (max, step) = (range.Max, range.Step);
         uvc.GetImageSetting(setting, out var originalValue, out _).Should().Be(UsbResult.Success);
         var targetValue = originalValue + step <= max ? originalValue + step : originalValue - step;
         try

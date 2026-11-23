@@ -85,38 +85,36 @@ internal sealed class UnixUvcControl : IUvcControl
     /// <inheritdoc />
     public UsbResult GetCameraControlRange(
         UvcCameraControl cameraControl,
-        out int minValue,
-        out int maxValue,
-        out int stepSize,
-        out int defaultValue,
-        out UvcControlType capsFlags
+        out UvcControlRange range
     )
     {
-        capsFlags = UvcControlType.Manual;
-
-        var result = ReadCameraControl(cameraControl, UvcControlRequest.GetMinimum, out minValue);
+        range = default;
+        var result = ReadCameraControl(cameraControl, UvcControlRequest.GetMinimum, out var min);
         if (result != UsbResult.Success)
         {
-            maxValue = stepSize = defaultValue = 0;
             return result;
         }
-
-        result = ReadCameraControl(cameraControl, UvcControlRequest.GetMaximum, out maxValue);
+        result = ReadCameraControl(cameraControl, UvcControlRequest.GetMaximum, out var max);
         if (result != UsbResult.Success)
         {
-            stepSize = defaultValue = 0;
             return result;
         }
-
-        result = ReadCameraControl(cameraControl, UvcControlRequest.GetResolution, out stepSize);
+        result = ReadCameraControl(cameraControl, UvcControlRequest.GetResolution, out var step);
         if (result != UsbResult.Success)
         {
-            defaultValue = 0;
             return result;
         }
-
-        result = ReadCameraControl(cameraControl, UvcControlRequest.GetDefault, out defaultValue);
-        return result;
+        result = ReadCameraControl(
+            cameraControl,
+            UvcControlRequest.GetDefault,
+            out var defaultValue
+        );
+        if (result != UsbResult.Success)
+        {
+            return result;
+        }
+        range = new UvcControlRange(min, max, step, defaultValue, UvcControlType.Manual);
+        return UsbResult.Success;
     }
 
     private UsbResult ReadCameraControl(
@@ -184,40 +182,31 @@ internal sealed class UnixUvcControl : IUvcControl
     }
 
     /// <inheritdoc />
-    public UsbResult GetImageSettingRange(
-        UvcImageSetting imageSetting,
-        out int min,
-        out int max,
-        out int step,
-        out int defaultValue,
-        out UvcControlType controlType
-    )
+    public UsbResult GetImageSettingRange(UvcImageSetting imageSetting, out UvcControlRange range)
     {
-        controlType = UvcControlType.Manual;
-
-        var result = ReadImageSetting(imageSetting, UvcControlRequest.GetMinimum, out min);
+        range = default;
+        var result = ReadImageSetting(imageSetting, UvcControlRequest.GetMinimum, out var min);
         if (result != UsbResult.Success)
         {
-            max = step = defaultValue = 0;
             return result;
         }
-
-        result = ReadImageSetting(imageSetting, UvcControlRequest.GetMaximum, out max);
+        result = ReadImageSetting(imageSetting, UvcControlRequest.GetMaximum, out var max);
         if (result != UsbResult.Success)
         {
-            step = defaultValue = 0;
             return result;
         }
-
-        result = ReadImageSetting(imageSetting, UvcControlRequest.GetResolution, out step);
+        result = ReadImageSetting(imageSetting, UvcControlRequest.GetResolution, out var step);
         if (result != UsbResult.Success)
         {
-            defaultValue = 0;
             return result;
         }
-
-        result = ReadImageSetting(imageSetting, UvcControlRequest.GetDefault, out defaultValue);
-        return result;
+        result = ReadImageSetting(imageSetting, UvcControlRequest.GetDefault, out var defaultValue);
+        if (result != UsbResult.Success)
+        {
+            return result;
+        }
+        range = new UvcControlRange(min, max, step, defaultValue, UvcControlType.Manual);
+        return UsbResult.Success;
     }
 
     private UsbResult ReadImageSetting(
