@@ -7,6 +7,7 @@ using UsbDotNet.Descriptor;
 using UsbDotNet.Internal;
 using UsbDotNet.LibUsbNative;
 using UsbDotNet.LibUsbNative.Enums;
+using UsbDotNet.LibUsbNative.Extensions;
 using UsbDotNet.LibUsbNative.SafeHandles;
 
 namespace UsbDotNet;
@@ -150,7 +151,7 @@ public sealed class Usb : IUsb, IUsbInternal
         var libUsbLogLevel = logLevel.ToLibUsbLogLevel();
         try
         {
-            context.SetOption(libusb_option.LIBUSB_OPTION_LOG_LEVEL, (int)libUsbLogLevel);
+            context.SetLogLevel(libUsbLogLevel);
         }
         catch (UsbException ex)
         {
