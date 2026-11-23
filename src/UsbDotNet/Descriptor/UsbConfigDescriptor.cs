@@ -12,7 +12,7 @@ public readonly record struct UsbConfigDescriptor(
     UsbConfigAttributes Attributes,
     byte MaxPowerRawValue,
     int MaxPowerMultiplier,
-    byte[] ExtraBytes,
+    ReadOnlyMemory<byte> ExtraBytes,
     IReadOnlyDictionary<byte, IReadOnlyDictionary<byte, IUsbInterfaceDescriptor>> Interfaces
 ) : IUsbConfigDescriptor
 {

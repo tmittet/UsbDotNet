@@ -8,7 +8,7 @@ public readonly record struct UsbInterfaceDescriptor(
     byte InterfaceSubClass,
     byte InterfaceProtocol,
     byte StringDescriptionIndex,
-    byte[] ExtraBytes,
+    ReadOnlyMemory<byte> ExtraBytes,
     IReadOnlyCollection<IUsbEndpointDescriptor> Endpoints
 ) : IUsbInterfaceDescriptor
 {

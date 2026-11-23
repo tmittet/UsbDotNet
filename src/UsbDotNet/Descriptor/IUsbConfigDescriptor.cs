@@ -39,7 +39,7 @@ public interface IUsbConfigDescriptor
     /// <summary>
     /// Extra configuration bytes.
     /// </summary>
-    byte[] ExtraBytes { get; }
+    ReadOnlyMemory<byte> ExtraBytes { get; }
 
     /// <summary>
     /// A dictionary of USB interface descriptors grouped by interface number. For each interface

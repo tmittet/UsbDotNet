@@ -8,7 +8,7 @@ public readonly record struct UsbEndpointDescriptor(
     byte Interval,
     byte Refresh,
     byte SynchAddress,
-    byte[] ExtraBytes
+    ReadOnlyMemory<byte> ExtraBytes
 ) : IUsbEndpointDescriptor
 {
     // Bits 0-10 of wMaxPacketSize are the packet size, bits 11-12 are the number of additional
