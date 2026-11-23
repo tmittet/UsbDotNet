@@ -17,12 +17,12 @@ public interface IUsbConfigDescriptor
     /// <summary>
     /// Identifier value for this configuration.
     /// </summary>
-    byte ConfigId { get; }
+    byte IdentifierValue { get; }
 
     /// <summary>
     /// Index of string descriptor describing this configuration.
     /// </summary>
-    byte StringDescriptionIndex { get; }
+    byte StringDescriptorIndex { get; }
 
     /// <summary>
     /// Configuration characteristics.

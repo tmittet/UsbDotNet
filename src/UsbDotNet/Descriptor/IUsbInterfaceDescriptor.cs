@@ -44,7 +44,7 @@ public interface IUsbInterfaceDescriptor
     /// <summary>
     /// Index of string descriptor describing this interface.
     /// </summary>
-    byte StringDescriptionIndex { get; }
+    byte StringDescriptorIndex { get; }
 
     /// <summary>
     /// Extra configuration bytes.

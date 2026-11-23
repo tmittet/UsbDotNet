@@ -78,7 +78,7 @@ public interface IUsbDeviceDescriptor
     /// <summary>
     /// The number of possible configurations.
     /// </summary>
-    byte NumConfigurations { get; }
+    byte ConfigurationCount { get; }
 
     /// <summary>
     /// The number of the bus that the device is connected to.

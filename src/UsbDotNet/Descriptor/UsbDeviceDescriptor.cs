@@ -42,7 +42,7 @@ public readonly record struct UsbDeviceDescriptor : IUsbDeviceDescriptor
     public byte SerialNumberIndex { get; init; }
 
     /// <inheritdoc/>
-    public byte NumConfigurations { get; init; }
+    public byte ConfigurationCount { get; init; }
 
     /// <inheritdoc/>
     public byte BusNumber { get; init; }
@@ -99,7 +99,7 @@ public readonly record struct UsbDeviceDescriptor : IUsbDeviceDescriptor
         ManufacturerIndex = partialDescriptor.iManufacturer;
         ProductIndex = partialDescriptor.iProduct;
         SerialNumberIndex = partialDescriptor.iSerialNumber;
-        NumConfigurations = partialDescriptor.bNumConfigurations;
+        ConfigurationCount = partialDescriptor.bNumConfigurations;
         BusNumber = busNumber;
         BusAddress = address;
         PortNumber = portNumber;

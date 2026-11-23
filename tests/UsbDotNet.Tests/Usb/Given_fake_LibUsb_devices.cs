@@ -379,8 +379,8 @@ public sealed class Given_fake_LibUsb_devices
     public void MaxPower_follows_the_raw_value_of_a_copied_config_descriptor()
     {
         var descriptor = new UsbConfigDescriptor(
-            ConfigId: 1,
-            StringDescriptionIndex: 0,
+            IdentifierValue: 1,
+            StringDescriptorIndex: 0,
             Attributes: default,
             MaxPowerRawValue: 50,
             MaxPowerMultiplier: 8,
