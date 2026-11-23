@@ -70,7 +70,7 @@ internal static class LibUsbDescriptorExtension
                     g => g.Key,
                     // Create a dictionary of alternate settings for each interface
                     g =>
-                        (IDictionary<byte, IUsbInterfaceDescriptor>)
+                        (IReadOnlyDictionary<byte, IUsbInterfaceDescriptor>)
                             g.Select(a => a.ToUsbInterfaceDescriptor())
                                 .ToDictionary(t => t.AlternateSetting, t => t)
                                 .ToImmutableDictionary()

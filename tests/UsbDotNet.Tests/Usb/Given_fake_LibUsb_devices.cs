@@ -385,7 +385,7 @@ public sealed class Given_fake_LibUsb_devices
             MaxPowerRawValue: 50,
             MaxPowerMultiplier: 8,
             ExtraBytes: [],
-            Interfaces: new Dictionary<byte, IDictionary<byte, IUsbInterfaceDescriptor>>()
+            Interfaces: new Dictionary<byte, IReadOnlyDictionary<byte, IUsbInterfaceDescriptor>>()
         );
 
         var copy = descriptor with { MaxPowerRawValue = 25 };

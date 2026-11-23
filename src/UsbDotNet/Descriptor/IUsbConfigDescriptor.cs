@@ -47,5 +47,8 @@ public interface IUsbConfigDescriptor
     /// setting number. Per the USB spec, alternate setting 0 always exists and is the default
     /// alternate setting for each device configuration.
     /// </summary>
-    IDictionary<byte, IDictionary<byte, IUsbInterfaceDescriptor>> Interfaces { get; }
+    IReadOnlyDictionary<
+        byte,
+        IReadOnlyDictionary<byte, IUsbInterfaceDescriptor>
+    > Interfaces { get; }
 }
