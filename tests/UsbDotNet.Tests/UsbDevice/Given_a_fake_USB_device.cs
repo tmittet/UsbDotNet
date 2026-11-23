@@ -152,8 +152,8 @@ public sealed class Given_a_fake_USB_device : IDisposable
                 timeout: 100
             );
 
-        read.Should().Throw<ArgumentOutOfRangeException>();
-        write.Should().Throw<ArgumentOutOfRangeException>();
+        read.Should().Throw<ArgumentOutOfRangeException>().WithMessage("*at most 65535 bytes*");
+        write.Should().Throw<ArgumentOutOfRangeException>().WithMessage("*at most 65535 bytes*");
     }
 
     [Theory]
