@@ -240,66 +240,6 @@ public sealed class Given_a_fake_claimed_USB_interface : IDisposable
             .BeFalse();
     }
 
-    [Theory]
-    // Read endpoint: wrong transfer type, then wrong direction
-    [InlineData(0x81, UsbEndpointTransferType.Interrupt, true, "readEndpoint")]
-    [InlineData(0x81, UsbEndpointTransferType.Isochronous, true, "readEndpoint")]
-    [InlineData(0x01, UsbEndpointTransferType.Bulk, true, "readEndpoint")]
-    // Write endpoint: wrong transfer type, then wrong direction
-    [InlineData(0x01, UsbEndpointTransferType.Interrupt, false, "writeEndpoint")]
-    [InlineData(0x81, UsbEndpointTransferType.Bulk, false, "writeEndpoint")]
-    public void Constructor_throws_when_an_explicit_endpoint_is_not_a_bulk_endpoint_in_that_direction(
-        byte address,
-        UsbEndpointTransferType transferType,
-        bool isReadEndpoint,
-        string expectedParameterName
-    )
-    {
-        using var device = CreateFakeDevice(out _);
-        var endpoint = FakeEndpoint(address, transferType);
-
-        var act = () =>
-            new UsbDotNet.UsbInterface(
-                NullLogger<UsbDotNet.UsbInterface>.Instance,
-                device,
-                A.Fake<IUsbInterfaceDescriptor>(),
-                A.Fake<ISafeDeviceInterface>(),
-                readEndpoint: isReadEndpoint ? endpoint : null,
-                writeEndpoint: isReadEndpoint ? null : endpoint
-            );
-
-        act.Should()
-            .Throw<ArgumentException>()
-            .WithMessage("*must be a bulk*")
-            .WithParameterName(expectedParameterName);
-    }
-
-    [Fact]
-    public void Bulk_transfers_use_the_explicit_bulk_endpoints_from_the_constructor()
-    {
-        using var device = CreateFakeDevice(out _);
-        var readEndpoint = FakeEndpoint(0x85, UsbEndpointTransferType.Bulk);
-        var writeEndpoint = FakeEndpoint(0x06, UsbEndpointTransferType.Bulk);
-
-        // Not disposed: the interface was not claimed through the device, so the device
-        // does not know it and Dispose would throw when asking the device to release it.
-#pragma warning disable CA2000 // Dispose objects before losing scope
-        var usbInterface = new UsbDotNet.UsbInterface(
-            NullLogger<UsbDotNet.UsbInterface>.Instance,
-            device,
-            A.Fake<IUsbInterfaceDescriptor>(),
-            A.Fake<ISafeDeviceInterface>(),
-            readEndpoint,
-            writeEndpoint
-        );
-#pragma warning restore CA2000
-
-        usbInterface.TryGetInputEndpoint(out var input, UsbEndpointTransferType.Bulk);
-        usbInterface.TryGetOutputEndpoint(out var output, UsbEndpointTransferType.Bulk);
-        input.Should().BeSameAs(readEndpoint);
-        output.Should().BeSameAs(writeEndpoint);
-    }
-
     [Fact]
     public void Bulk_transfers_throw_when_the_interface_has_no_bulk_endpoint()
     {

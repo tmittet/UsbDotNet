@@ -50,49 +50,35 @@ public sealed class UsbInterface : IUsbInterface
     public byte AlternateSetting => _descriptor.AlternateSetting;
 
     /// <summary>
-    /// A type representing a claimed USB interface.
+    /// A type representing a claimed USB interface. Claim an interface with
+    /// <see cref="IUsbDevice.ClaimInterface"/>.
+    /// <para>
+    /// The bulk endpoints that <see cref="BulkRead"/> and <see cref="BulkWrite"/> use are the
+    /// first bulk input and bulk output endpoint of the interface; they are resolved on the first
+    /// transfer. Use <see cref="Read"/> and <see cref="Write"/> to transfer to another endpoint.
+    /// </para>
     /// </summary>
     /// <param name="logger">Logger for this UsbInterface.</param>
     /// <param name="device">The parent USB device.</param>
     /// <param name="descriptor">The USB interface descriptor.</param>
     /// <param name="claimedInterface">A claimed USB device interface.</param>
-    /// <param name="readEndpoint">
-    /// Optional bulk input endpoint. When nothing is specified and a read operation is attempted,
-    /// an attempt is made to pick the first available bulk input endpoint for this interface.
-    /// </param>
-    /// <param name="writeEndpoint">
-    /// Optional bulk output endpoint. When nothing is specified and a write operation is attempted,
-    /// an attempt is made to pick the first available bulk output endpoint for this interface.
-    /// </param>
-    /// <exception cref="ArgumentException">
-    /// Thrown when <paramref name="readEndpoint"/> is not a bulk input endpoint, or when
-    /// <paramref name="writeEndpoint"/> is not a bulk output endpoint.
-    /// </exception>
-    public UsbInterface(
+    internal UsbInterface(
         ILogger<UsbInterface> logger,
         UsbDevice device,
         IUsbInterfaceDescriptor descriptor,
-        ISafeDeviceInterface claimedInterface,
-        IUsbEndpointDescriptor? readEndpoint = default,
-        IUsbEndpointDescriptor? writeEndpoint = default
+        ISafeDeviceInterface claimedInterface
     )
     {
-        CheckBulkEndpoint(readEndpoint, UsbEndpointDirection.Input, nameof(readEndpoint));
-        CheckBulkEndpoint(writeEndpoint, UsbEndpointDirection.Output, nameof(writeEndpoint));
         _logger = logger;
         _device = device;
         _descriptor = descriptor;
         _claimedInterface = claimedInterface;
-        _bulkReadEndpoint = readEndpoint is null
-            ? new Lazy<IUsbEndpointDescriptor>(() =>
-                GetBulkEndpoint(descriptor, UsbEndpointDirection.Input)
-            )
-            : new Lazy<IUsbEndpointDescriptor>(readEndpoint);
-        _bulkWriteEndpoint = writeEndpoint is null
-            ? new Lazy<IUsbEndpointDescriptor>(() =>
-                GetBulkEndpoint(descriptor, UsbEndpointDirection.Output)
-            )
-            : new Lazy<IUsbEndpointDescriptor>(writeEndpoint);
+        _bulkReadEndpoint = new Lazy<IUsbEndpointDescriptor>(() =>
+            GetBulkEndpoint(descriptor, UsbEndpointDirection.Input)
+        );
+        _bulkWriteEndpoint = new Lazy<IUsbEndpointDescriptor>(() =>
+            GetBulkEndpoint(descriptor, UsbEndpointDirection.Output)
+        );
         _disposeCts = new CancellationTokenSource();
     }
 
@@ -467,32 +453,6 @@ public sealed class UsbInterface : IUsbInterface
             );
         }
         return endpoints[0];
-    }
-
-    /// <summary>
-    /// Throw ArgumentException when an explicitly provided endpoint is not a bulk endpoint with
-    /// the expected direction. BulkRead and BulkWrite submit bulk transfers to these endpoints.
-    /// </summary>
-    private static void CheckBulkEndpoint(
-        IUsbEndpointDescriptor? endpoint,
-        UsbEndpointDirection direction,
-        string paramName
-    )
-    {
-        if (
-            endpoint is not null
-            && (
-                endpoint.EndpointAddress.Direction != direction
-                || endpoint.Attributes.TransferType != UsbEndpointTransferType.Bulk
-            )
-        )
-        {
-            throw new ArgumentException(
-                $"Invalid endpoint {endpoint.EndpointAddress} with transfer type "
-                    + $"{endpoint.Attributes.TransferType}; must be a bulk {direction} endpoint.",
-                paramName
-            );
-        }
     }
 
     /// <summary>
