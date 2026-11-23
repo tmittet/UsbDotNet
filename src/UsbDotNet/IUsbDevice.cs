@@ -26,7 +26,7 @@ public interface IUsbDevice : IDisposable
     /// A device config descriptor that includes information about device interfaces and endpoints.
     /// It is safe to read/inspect 'ConfigDescriptor' info after the UsbDevice has been disposed.
     /// </summary>
-    IUsbConfigDescriptor ConfigDescriptor { get; init; }
+    IUsbConfigDescriptor ConfigDescriptor { get; }
 
     /// <summary>
     /// Reads the manufacturer from the device if required; otherwise a cached value is returned.
