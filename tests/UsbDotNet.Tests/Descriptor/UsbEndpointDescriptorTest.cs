@@ -37,4 +37,27 @@ public sealed class UsbEndpointDescriptorTest
         descriptor.MaxPacketSize.Should().Be(expectedMaxPacketSize);
         descriptor.AdditionalTransactions.Should().Be(expectedAdditionalTransactions);
     }
+
+    [Fact]
+    public void Endpoint_addresses_with_the_same_raw_value_are_equal()
+    {
+        var address = new UsbEndpointAddress(0x81);
+
+        address.Should().Be(new UsbEndpointAddress(0x81));
+        address.Should().NotBe(new UsbEndpointAddress(0x01));
+        address.Direction.Should().Be(UsbEndpointDirection.Input);
+        address.Number.Should().Be(UsbEndpointNumber.Ep01);
+    }
+
+    [Fact]
+    public void Endpoint_attributes_with_the_same_raw_value_are_equal()
+    {
+        var attributes = new UsbEndpointAttributes((byte)UsbEndpointTransferType.Bulk);
+
+        attributes.Should().Be(new UsbEndpointAttributes((byte)UsbEndpointTransferType.Bulk));
+        attributes
+            .Should()
+            .NotBe(new UsbEndpointAttributes((byte)UsbEndpointTransferType.Interrupt));
+        attributes.TransferType.Should().Be(UsbEndpointTransferType.Bulk);
+    }
 }
