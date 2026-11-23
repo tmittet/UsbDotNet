@@ -112,15 +112,10 @@ internal sealed class WindowsUvcControl : IUvcControl
     /// </summary>
     public UsbResult GetCameraControlRange(
         UvcCameraControl cameraControl,
-        out int minValue,
-        out int maxValue,
-        out int stepSize,
-        out int defaultValue,
-        out UvcControlType controlType
+        out UvcControlRange range
     )
     {
-        minValue = maxValue = stepSize = defaultValue = 0;
-        controlType = default;
+        range = default;
         _disposeLock.EnterReadLock();
         try
         {
@@ -131,15 +126,15 @@ internal sealed class WindowsUvcControl : IUvcControl
             }
             var hr = _cameraControl.GetRange(
                 (int)cameraControl,
-                out minValue,
-                out maxValue,
-                out stepSize,
-                out defaultValue,
+                out var min,
+                out var max,
+                out var step,
+                out var defaultValue,
                 out var rawFlags
             );
             if (hr == 0)
             {
-                controlType = (UvcControlType)rawFlags;
+                range = new UvcControlRange(min, max, step, defaultValue, (UvcControlType)rawFlags);
                 return UsbResult.Success;
             }
             return MapHResult(hr);
@@ -213,17 +208,9 @@ internal sealed class WindowsUvcControl : IUvcControl
     /// Gets the supported range (minValue, maxValue, stepSize, default)
     /// and capabilities for a video proc amp property.
     /// </summary>
-    public UsbResult GetImageSettingRange(
-        UvcImageSetting imageSetting,
-        out int minValue,
-        out int maxValue,
-        out int stepSize,
-        out int defaultValue,
-        out UvcControlType capsFlags
-    )
+    public UsbResult GetImageSettingRange(UvcImageSetting imageSetting, out UvcControlRange range)
     {
-        minValue = maxValue = stepSize = defaultValue = 0;
-        capsFlags = default;
+        range = default;
         _disposeLock.EnterReadLock();
         try
         {
@@ -234,15 +221,15 @@ internal sealed class WindowsUvcControl : IUvcControl
             }
             var hr = _videoProcAmp.GetRange(
                 (int)imageSetting,
-                out minValue,
-                out maxValue,
-                out stepSize,
-                out defaultValue,
+                out var min,
+                out var max,
+                out var step,
+                out var defaultValue,
                 out var rawFlags
             );
             if (hr == 0)
             {
-                capsFlags = (UvcControlType)rawFlags;
+                range = new UvcControlRange(min, max, step, defaultValue, (UvcControlType)rawFlags);
                 return UsbResult.Success;
             }
             return MapHResult(hr);

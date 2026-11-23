@@ -64,27 +64,13 @@ public interface IUvcControl : IDisposable
 
     /// <summary>Gets the supported range and capabilities of a Camera Terminal control.</summary>
     /// <param name="cameraControl">The camera control to query.</param>
-    /// <param name="minValue">Receives the minimum supported value.</param>
-    /// <param name="maxValue">Receives the maximum supported value.</param>
-    /// <param name="stepSize">Receives the stepping delta between valid values.</param>
-    /// <param name="defaultValue">Receives the default value.</param>
-    /// <param name="capsFlags">
-    /// Receives the supported modes
-    /// (Windows only; always <see cref="UvcControlType.Manual"/> on Linux/macOS).
-    /// </param>
+    /// <param name="range">Receives the supported range and capabilities.</param>
     /// <returns>
     /// <see cref="UsbResult.Success"/> if the range was read successfully;
     /// <see cref="UsbResult.NotSupported"/> if the control is not supported by the device or
     /// platform; otherwise an error code describing the failure.
     /// </returns>
-    UsbResult GetCameraControlRange(
-        UvcCameraControl cameraControl,
-        out int minValue,
-        out int maxValue,
-        out int stepSize,
-        out int defaultValue,
-        out UvcControlType capsFlags
-    );
+    UsbResult GetCameraControlRange(UvcCameraControl cameraControl, out UvcControlRange range);
 
     /// <summary>Gets the current value and control mode of a processing unit image setting.</summary>
     /// <param name="imageSetting">The image setting to query.</param>
@@ -123,24 +109,13 @@ public interface IUvcControl : IDisposable
 
     /// <summary>Gets the supported range and capabilities of a processing unit image setting.</summary>
     /// <param name="imageSetting">The image setting to query.</param>
-    /// <param name="minValue">Receives the minimum supported value.</param>
-    /// <param name="maxValue">Receives the maximum supported value.</param>
-    /// <param name="stepSize">Receives the stepping delta between valid values.</param>
-    /// <param name="defaultValue">Receives the default value.</param>
-    /// <param name="capsFlags">Receives the supported modes (Windows only; always <see cref="UvcControlType.Manual"/> on Linux/macOS).</param>
+    /// <param name="range">Receives the supported range and capabilities.</param>
     /// <returns>
     /// <see cref="UsbResult.Success"/> if the range was read successfully;
     /// <see cref="UsbResult.NotSupported"/> if the setting is not supported by the device or
     /// platform; otherwise an error code describing the failure.
     /// </returns>
-    UsbResult GetImageSettingRange(
-        UvcImageSetting imageSetting,
-        out int minValue,
-        out int maxValue,
-        out int stepSize,
-        out int defaultValue,
-        out UvcControlType capsFlags
-    );
+    UsbResult GetImageSettingRange(UvcImageSetting imageSetting, out UvcControlRange range);
 
     /// <summary>Queries the required data length for a control within this extension unit.</summary>
     /// <param name="extensionGuid">The extension unit property set GUID.</param>
