@@ -17,10 +17,10 @@ public interface ISafeTransfer : IDisposable
     libusb_error Cancel();
 
     /// <summary>
-    /// Get a pointer to the transfer buffer.
+    /// Get a pointer to the native libusb_transfer struct.
     /// </summary>
     /// <exception cref="ObjectDisposedException">Thrown when the ISafeTransfer is disposed.</exception>
-    nint GetBufferPtr();
+    nint GetTransferPtr();
 
     /// <summary>
     /// Gets a value indicating whether the underlying handle is closed or not.
