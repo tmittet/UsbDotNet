@@ -104,7 +104,7 @@ internal static class SafeDeviceExtension
         }
         catch (EntryPointNotFoundException ex)
         {
-            var libUsbVersion = Usb.GetVersion();
+            var libUsbVersion = Usb.GetLibUsbVersion();
             if (libUsbVersion < new Version(1, 0, 30))
             {
                 logger.LogDebug(
