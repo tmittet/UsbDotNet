@@ -40,7 +40,7 @@ public class LibUsbNativeTestBase(ITestOutputHelper _output, ILibUsbApi _api)
         );
         try
         {
-            context.SetOption(logLevel);
+            context.SetLogLevel(logLevel);
         }
         catch (LibUsbException ex)
             when (OperatingSystem.IsMacOS() && ex.Error is libusb_error.LIBUSB_ERROR_INVALID_PARAM)
@@ -49,7 +49,7 @@ public class LibUsbNativeTestBase(ITestOutputHelper _output, ILibUsbApi _api)
             // nothing in the LibUsb doc or source code indicating that this should not work.
             // Could be a bug in libusb on macOS arm64 or an interop issue? We need to investigate.
             Output.WriteLine(
-                $"WARNING: SetOption failed. "
+                $"WARNING: SetLogLevel failed. "
                     + $"Option '{libusb_option.LIBUSB_OPTION_LOG_LEVEL}' not supported on macOS arm64."
             );
         }
