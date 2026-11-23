@@ -11,6 +11,11 @@ namespace UsbDotNet.Extensions.Uvc;
 [Flags]
 public enum UvcControlType
 {
+    /// <summary>
+    /// No mode. This is the value of an output parameter when the call that should set it fails.
+    /// </summary>
+    None = 0,
+
     /// <summary>The property is controlled automatically by the device.</summary>
     Auto = 0x01,
 

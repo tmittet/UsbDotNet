@@ -28,8 +28,10 @@ internal sealed class UnixUvcControl : IUvcControl
         out UvcControlType controlType
     )
     {
-        controlType = UvcControlType.Manual;
-        return ReadCameraControl(cameraControl, UvcControlRequest.GetCurrent, out value);
+        var result = ReadCameraControl(cameraControl, UvcControlRequest.GetCurrent, out value);
+        // The mode is always manual here; None when the value could not be read
+        controlType = result is UsbResult.Success ? UvcControlType.Manual : UvcControlType.None;
+        return result;
     }
 
     /// <inheritdoc />
@@ -152,8 +154,10 @@ internal sealed class UnixUvcControl : IUvcControl
         out UvcControlType controlType
     )
     {
-        controlType = UvcControlType.Manual;
-        return ReadImageSetting(imageSetting, UvcControlRequest.GetCurrent, out value);
+        var result = ReadImageSetting(imageSetting, UvcControlRequest.GetCurrent, out value);
+        // The mode is always manual here; None when the value could not be read
+        controlType = result is UsbResult.Success ? UvcControlType.Manual : UvcControlType.None;
+        return result;
     }
 
     /// <inheritdoc />
