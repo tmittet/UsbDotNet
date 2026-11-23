@@ -29,8 +29,8 @@ internal sealed class HLink(IUsbInterface usb, ILogger<HLink>? logger = null)
     )
     {
         // Reset (two empty writes, as per protocol)
-        var resetResult1 = usb.BulkWrite([], 0, out _, writeTimeout);
-        var resetResult2 = usb.BulkWrite([], 0, out _, writeTimeout);
+        var resetResult1 = usb.BulkWrite([], out _, writeTimeout);
+        var resetResult2 = usb.BulkWrite([], out _, writeTimeout);
 
         if (resetResult1 != UsbResult.Success || resetResult2 != UsbResult.Success)
             throw new IOException($"HLink reset write failed: {resetResult1}, {resetResult2}.");
@@ -42,7 +42,7 @@ internal sealed class HLink(IUsbInterface usb, ILogger<HLink>? logger = null)
             logger?.LogDebug("Flushed {Bytes} bytes of stale HLink data.", n);
 
         // Send salute (single 0x00 byte)
-        var saluteWriteResult = usb.BulkWrite([0x00], 1, out _, writeTimeout);
+        var saluteWriteResult = usb.BulkWrite([0x00], out _, writeTimeout);
         if (saluteWriteResult != UsbResult.Success)
             throw new IOException($"HLink salute write failed: {saluteWriteResult}.");
 
@@ -93,7 +93,7 @@ internal sealed class HLink(IUsbInterface usb, ILogger<HLink>? logger = null)
         BinaryPrimitives.WriteUInt32LittleEndian(packet.AsSpan(12), (uint)payload.Length);
         nameBytes.CopyTo(packet, HeaderSize);
         payload.CopyTo(packet, HeaderSize + nameBytes.Length);
-        var result = usb.BulkWrite(packet, packet.Length, out _, timeout);
+        var result = usb.BulkWrite(packet, out _, timeout);
         if (result == UsbResult.Timeout)
             throw new TimeoutException($"HLink send '{msgName}' timed out after {timeout} ms.");
         if (result != UsbResult.Success)

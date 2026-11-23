@@ -129,15 +129,15 @@ public sealed class Given_a_supported_Huddly_USB_device : IDisposable
         using var usbInterface = device.ClaimInterface(UsbClass.VendorSpecific, HLinkSubClass);
         // Send Huddly "reset"
         usbInterface
-            .BulkWrite([], 0, out _, 200)
+            .BulkWrite([], out _, 200)
             .Should()
             .Be(UsbResult.Success, "first reset should not fail");
         usbInterface
-            .BulkWrite([], 0, out _, 200)
+            .BulkWrite([], out _, 200)
             .Should()
             .Be(UsbResult.Success, "second reset should not fail");
         // Send Huddly "salute"
-        var writeError = usbInterface.BulkWrite([0x00], 1, out var writeLength, 200);
+        var writeError = usbInterface.BulkWrite([0x00], out var writeLength, 200);
         writeError.Should().Be(UsbResult.Success, "salute should not fail");
         writeLength.Should().Be(1, "salute should write 1 byte");
     }
@@ -154,15 +154,15 @@ public sealed class Given_a_supported_Huddly_USB_device : IDisposable
         using var usbInterface = device.ClaimInterface(UsbClass.VendorSpecific, HLinkSubClass);
         // Send Huddly "reset"
         usbInterface
-            .BulkWrite([], 0, out _, 200)
+            .BulkWrite([], out _, 200)
             .Should()
             .Be(UsbResult.Success, "first reset should not fail");
         usbInterface
-            .BulkWrite([], 0, out _, 200)
+            .BulkWrite([], out _, 200)
             .Should()
             .Be(UsbResult.Success, "second reset should not fail");
         // Send Huddly "salute"
-        var writeError = usbInterface.BulkWrite([0x00], 1, out var writeLength, 200);
+        var writeError = usbInterface.BulkWrite([0x00], out var writeLength, 200);
         writeError.Should().Be(UsbResult.Success, "salute should not fail");
         writeLength.Should().Be(1, "salute should write 1 byte");
         // Wait for salute response
