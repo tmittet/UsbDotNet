@@ -52,8 +52,8 @@ internal static class LibUsbTransfer
             callbackHandle = GCHandle.Alloc(nativeCallback);
 
             // Allocate and initialize the libusb transfer
-            using var transferBuffer = deviceHandle.AllocateTransfer(0);
-            transferPtr = transferBuffer.GetBufferPtr();
+            using var safeTransfer = deviceHandle.AllocateTransfer(0);
+            transferPtr = safeTransfer.GetTransferPtr();
 
             // libusb_alloc_transfer returns zero pointer on error
             if (transferPtr == IntPtr.Zero)
@@ -76,7 +76,7 @@ internal static class LibUsbTransfer
 #endif
             // Submit the USB transfer and then return immediately.
             // The registered LibUsbTransferCallback is invoked on completion.
-            var submitResult = transferBuffer.Submit();
+            var submitResult = safeTransfer.Submit();
             if (submitResult is not libusb_error.LIBUSB_SUCCESS)
             {
                 return submitResult;
@@ -88,7 +88,7 @@ internal static class LibUsbTransfer
             {
                 // Tell libusb to cancel the transfer, the final transfer status
                 // is received through the LibUsbTransferCallback.
-                var cancelResult = transferBuffer.Cancel();
+                var cancelResult = safeTransfer.Cancel();
                 if (
                     cancelResult
                     is not libusb_error.LIBUSB_ERROR_NO_DEVICE
@@ -109,7 +109,7 @@ internal static class LibUsbTransfer
             }
 
             Debug.Assert(
-                transferBuffer.Cancel() == libusb_error.LIBUSB_ERROR_NOT_FOUND,
+                safeTransfer.Cancel() == libusb_error.LIBUSB_ERROR_NOT_FOUND,
                 "libusb_cancel_transfer should return LIBUSB_ERROR_NOT_FOUND, after transfer complete event."
             );
 

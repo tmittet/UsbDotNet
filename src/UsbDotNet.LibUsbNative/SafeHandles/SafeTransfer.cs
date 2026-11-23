@@ -29,7 +29,7 @@ internal sealed class SafeTransfer : SafeHandle, ISafeTransfer
         return true;
     }
 
-    public nint GetBufferPtr()
+    public nint GetTransferPtr()
     {
         SafeHelper.ThrowIfClosed(this);
         return DangerousGetHandle();

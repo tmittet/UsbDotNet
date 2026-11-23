@@ -112,7 +112,7 @@ public sealed class Given_a_fake_claimed_USB_interface : IDisposable
             int? transferLength = null;
             var transfer = A.Fake<ISafeTransfer>();
             A.CallTo(() => handle.AllocateTransfer(A<int>._)).Returns(transfer);
-            A.CallTo(() => transfer.GetBufferPtr()).Returns(transferPtr);
+            A.CallTo(() => transfer.GetTransferPtr()).Returns(transferPtr);
             // Fail the submit, so that the read returns without waiting for a completion
             A.CallTo(() => transfer.Submit())
                 .Invokes(() =>
@@ -752,7 +752,7 @@ public sealed class Given_a_fake_claimed_USB_interface : IDisposable
         {
             var transfer = A.Fake<ISafeTransfer>();
             A.CallTo(() => handle.AllocateTransfer(A<int>._)).Returns(transfer);
-            A.CallTo(() => transfer.GetBufferPtr()).Returns(_transferPtr);
+            A.CallTo(() => transfer.GetTransferPtr()).Returns(_transferPtr);
             // libusb does not find a transfer that has completed
             A.CallTo(() => transfer.Cancel()).Returns(libusb_error.LIBUSB_ERROR_NOT_FOUND);
             A.CallTo(() => transfer.Submit())
@@ -829,7 +829,7 @@ public sealed class Given_a_fake_claimed_USB_interface : IDisposable
             libusb_transfer? submitted = null;
             var safeTransfer = A.Fake<ISafeTransfer>();
             A.CallTo(() => handle.AllocateTransfer(A<int>._)).Returns(safeTransfer);
-            A.CallTo(() => safeTransfer.GetBufferPtr()).Returns(transferPtr);
+            A.CallTo(() => safeTransfer.GetTransferPtr()).Returns(transferPtr);
             A.CallTo(() => safeTransfer.Submit())
                 .Invokes(() => submitted = Marshal.PtrToStructure<libusb_transfer>(transferPtr))
                 .Returns(libusb_error.LIBUSB_ERROR_NO_DEVICE);
