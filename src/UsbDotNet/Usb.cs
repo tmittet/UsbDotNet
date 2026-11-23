@@ -49,9 +49,9 @@ public sealed class Usb : IUsb, IUsbInternal
     }
 
     /// <summary>
-    /// Get the Usb library version.
+    /// Get the version of the native libusb library.
     /// </summary>
-    public static Version GetVersion()
+    public static Version GetLibUsbVersion()
     {
         var libusb = new LibUsb();
         var version = libusb.GetVersion();
@@ -119,7 +119,7 @@ public sealed class Usb : IUsb, IUsbInternal
             }
 
             _context = _libUsb.CreateContext();
-            _logger.LogInformation("LibUsb v{LibUsbVersion} initialized.", GetVersion());
+            _logger.LogInformation("LibUsb v{LibUsbVersion} initialized.", GetLibUsbVersion());
 
             InitializeLibUsbLogHandler(_context, _options.NativeLibraryLogLevel);
             _eventLoop = new LibUsbEventLoop(
