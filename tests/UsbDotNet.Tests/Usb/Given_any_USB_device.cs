@@ -198,20 +198,20 @@ public sealed class Given_any_USB_device : IDisposable
     }
 
     [SkippableFact]
-    public void GetDeviceSerial_returns_serial_given_a_device_descriptor_when_device_is_not_open()
+    public void GetDeviceSerialNumber_returns_serial_given_a_device_descriptor_when_device_is_not_open()
     {
         IUsbDeviceDescriptor deviceDescriptor;
         using (var device = _deviceSource.OpenUsbDeviceOrSkip())
         {
             deviceDescriptor = device.Descriptor;
         }
-        var serial = _usb.GetDeviceSerial(deviceDescriptor);
+        var serial = _usb.GetDeviceSerialNumber(deviceDescriptor);
         serial.Should().NotBeNullOrWhiteSpace();
         serial.Should().NotEndWith("\0", because: "null terminator should be trimmed");
     }
 
     [SkippableFact]
-    public void GetDeviceSerial_from_OS_matches_value_read_from_open_device()
+    public void GetDeviceSerialNumber_from_OS_matches_value_read_from_open_device()
     {
         Skip.If(
             UsbDotNet.Usb.GetVersion() < new Version(1, 0, 30),
@@ -221,14 +221,14 @@ public sealed class Given_any_USB_device : IDisposable
         // Read the string descriptor directly from the open device
         var fromDevice = device.GetSerialNumber();
         // Read the same value via the Usb type, which reads it from the operating system
-        var fromOs = _usb.GetDeviceSerial(device.Descriptor);
+        var fromOs = _usb.GetDeviceSerialNumber(device.Descriptor);
 
         _logger.LogInformation("Serial: OS='{FromOs}', Device='{FromDevice}'.", fromOs, fromDevice);
         fromOs.Should().Be(fromDevice);
     }
 
     [SkippableFact]
-    public void GetDeviceSerial_succeeds_given_a_device_descriptor_when_device_is_already_open()
+    public void GetDeviceSerialNumber_succeeds_given_a_device_descriptor_when_device_is_already_open()
     {
         using var openDevice = _deviceSource.OpenUsbDeviceOrSkip();
         _logger.LogInformation(
@@ -238,7 +238,7 @@ public sealed class Given_any_USB_device : IDisposable
             openDevice.GetSerialNumber()
         );
         // Get serial using the descriptor (not the open device)
-        var serial = _usb.GetDeviceSerial(openDevice.Descriptor);
+        var serial = _usb.GetDeviceSerialNumber(openDevice.Descriptor);
         serial.Should().NotBeNullOrWhiteSpace();
     }
 

@@ -275,7 +275,7 @@ public sealed class Given_fake_LibUsb_devices
         using var scope = new AssertionScope();
         usb.GetDeviceManufacturer(deviceKey).Should().BeEmpty();
         usb.GetDeviceProduct(deviceKey).Should().BeEmpty();
-        usb.GetDeviceSerial(deviceKey).Should().BeEmpty();
+        usb.GetDeviceSerialNumber(deviceKey).Should().BeEmpty();
         string? ignoredValue;
         libusb_error? ignoredError;
         A.CallTo(() =>
@@ -316,7 +316,7 @@ public sealed class Given_fake_LibUsb_devices
         using var usb = CreateInitializedUsb(device);
         var deviceKey = usb.GetDeviceList().Single().DeviceKey;
 
-        usb.GetDeviceSerial(deviceKey).Should().Be("SERIAL");
+        usb.GetDeviceSerialNumber(deviceKey).Should().Be("SERIAL");
     }
 
     [Theory]

@@ -105,8 +105,8 @@ public static class UsbExtension
     /// <returns>
     /// The serial number, or an empty string when the device has no serial number string.
     /// </returns>
-    public static string GetDeviceSerial(this IUsb usb, IUsbDeviceDescriptor descriptor) =>
-        usb.GetDeviceSerial(descriptor.DeviceKey);
+    public static string GetDeviceSerialNumber(this IUsb usb, IUsbDeviceDescriptor descriptor) =>
+        usb.GetDeviceSerialNumber(descriptor.DeviceKey);
 
     /// <summary>
     /// Opens the USB device without claiming any device interfaces or reading device serial.

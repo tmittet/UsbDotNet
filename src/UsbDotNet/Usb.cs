@@ -197,7 +197,7 @@ public sealed class Usb : IUsb, IUsbInternal
         );
 
     /// <inheritdoc/>
-    public string GetDeviceSerial(string deviceKey) =>
+    public string GetDeviceSerialNumber(string deviceKey) =>
         GetDeviceString(
             deviceKey,
             libusb_device_string_type.LIBUSB_DEVICE_STRING_SERIAL_NUMBER,

@@ -81,7 +81,7 @@ public interface IUsb : IDisposable
     /// <returns>
     /// The serial number, or an empty string when the device has no serial number string.
     /// </returns>
-    string GetDeviceSerial(string deviceKey);
+    string GetDeviceSerialNumber(string deviceKey);
 
     /// <summary>
     /// Opens the USB device without claiming any device interfaces or reading device serial.
