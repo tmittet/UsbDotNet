@@ -85,10 +85,14 @@ public sealed class Given_a_supported_Huddly_USB_device : IDisposable
             HLinkSubClass
         );
         vendorInterfaces.Should().ContainSingle("Huddly device has one vendor interface");
-        vendorInterfaces.Single().GetEndpoint(UsbEndpointDirection.Input, out var inputCount);
-        inputCount.Should().Be(1, "Huddly vendor interface has one read (host input) endpoint");
-        vendorInterfaces.Single().GetEndpoint(UsbEndpointDirection.Output, out var outputCount);
-        outputCount.Should().Be(1, "Huddly vendor interface has one write (host output) endpoint");
+        var inputEndpoints = vendorInterfaces.Single().GetEndpoints(UsbEndpointDirection.Input);
+        inputEndpoints
+            .Should()
+            .ContainSingle("Huddly vendor interface has one read (host input) endpoint");
+        var outputEndpoints = vendorInterfaces.Single().GetEndpoints(UsbEndpointDirection.Output);
+        outputEndpoints
+            .Should()
+            .ContainSingle("Huddly vendor interface has one write (host output) endpoint");
     }
 
     [SkippableFact]

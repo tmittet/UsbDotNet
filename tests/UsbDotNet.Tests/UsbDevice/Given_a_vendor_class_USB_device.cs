@@ -47,18 +47,16 @@ public sealed class Given_a_vendor_class_USB_device : IDisposable
         using var device = _deviceSource.OpenUsbDeviceOrSkip();
         var vendorInterfaces = device.GetInterfaceDescriptorList(UsbClass.VendorSpecific);
         vendorInterfaces.Should().ContainSingle("Test device must have one vendor interface");
-        vendorInterfaces.Single().GetEndpoint(UsbEndpointDirection.Input, out var inputCount);
-        inputCount
+        var inputEndpoints = vendorInterfaces.Single().GetEndpoints(UsbEndpointDirection.Input);
+        inputEndpoints
             .Should()
-            .BeGreaterThanOrEqualTo(
-                1,
+            .NotBeEmpty(
                 "Test device vendor interface must have one or more read (host input) endpoints"
             );
-        vendorInterfaces.Single().GetEndpoint(UsbEndpointDirection.Output, out var outputCount);
-        outputCount
+        var outputEndpoints = vendorInterfaces.Single().GetEndpoints(UsbEndpointDirection.Output);
+        outputEndpoints
             .Should()
-            .BeGreaterThanOrEqualTo(
-                1,
+            .NotBeEmpty(
                 "Test device vendor interface must have one or more write (host output) endpoints"
             );
     }
