@@ -128,12 +128,12 @@ public sealed class UsbHotplugMonitor : IUsbHotplugMonitor, IHotplugListener
     /// </remarks>
     public async IAsyncEnumerable<UsbHotplugEvent> Subscribe(
         IUsbDeviceFilter? filter = null,
-        [EnumeratorCancellation] CancellationToken cancellationToken = default
+        [EnumeratorCancellation] CancellationToken ct = default
     )
     {
         // Before registering: an already-cancelled consumer should not cause a native registration
         // that nothing will ever read.
-        cancellationToken.ThrowIfCancellationRequested();
+        ct.ThrowIfCancellationRequested();
         filter ??= UsbDeviceFilter.Any;
         EnsureRegistered();
 
@@ -167,7 +167,7 @@ public sealed class UsbHotplugMonitor : IUsbHotplugMonitor, IHotplugListener
             foreach (var descriptor in alreadyConnected)
             {
                 ThrowIfTerminated();
-                cancellationToken.ThrowIfCancellationRequested();
+                ct.ThrowIfCancellationRequested();
                 yield return new UsbHotplugEvent(UsbHotplugEventType.Connected, descriptor);
             }
 
@@ -177,12 +177,12 @@ public sealed class UsbHotplugMonitor : IUsbHotplugMonitor, IHotplugListener
             // provider teardown wake the consumer here. That is not sufficient on its own
             // as WaitToReadAsync reports a non-empty queue as readable regardless of the
             // writer being completed, which is what ThrowIfTerminated covers.
-            while (await channel.Reader.WaitToReadAsync(cancellationToken).ConfigureAwait(false))
+            while (await channel.Reader.WaitToReadAsync(ct).ConfigureAwait(false))
             {
                 while (channel.Reader.TryRead(out var e))
                 {
                     ThrowIfTerminated();
-                    cancellationToken.ThrowIfCancellationRequested();
+                    ct.ThrowIfCancellationRequested();
                     yield return e;
                 }
             }

@@ -52,12 +52,12 @@ internal sealed class LibUsbEventLoop : IDisposable
         }
     }
 
-    private void HandleEventsLoop(CancellationToken token)
+    private void HandleEventsLoop(CancellationToken ct)
     {
         try
         {
             _logger.LogDebug("HandleEventsLoop started.");
-            while (!token.IsCancellationRequested)
+            while (!ct.IsCancellationRequested)
             {
                 // libusb does not write to completed, so there is no reason to check it
                 // See: https://github.com/libusb/libusb/blob/master/libusb/io.c

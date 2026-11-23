@@ -41,6 +41,6 @@ public interface IUsbHotplugMonitor : IDisposable
     /// </exception>
     IAsyncEnumerable<UsbHotplugEvent> Subscribe(
         IUsbDeviceFilter? filter = null,
-        CancellationToken cancellationToken = default
+        CancellationToken ct = default
     );
 }
