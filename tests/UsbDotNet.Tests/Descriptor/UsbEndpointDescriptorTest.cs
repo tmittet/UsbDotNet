@@ -46,7 +46,7 @@ public sealed class UsbEndpointDescriptorTest
         address.Should().Be(new UsbEndpointAddress(0x81));
         address.Should().NotBe(new UsbEndpointAddress(0x01));
         address.Direction.Should().Be(UsbEndpointDirection.Input);
-        address.Number.Should().Be(UsbEndpointNumber.Ep01);
+        address.Number.Should().Be(1);
     }
 
     [Fact]

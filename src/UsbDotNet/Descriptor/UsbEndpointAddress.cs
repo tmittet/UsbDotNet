@@ -14,9 +14,9 @@
 public readonly record struct UsbEndpointAddress(byte RawValue)
 {
     /// <summary>
-    /// Bits 0:3 of the RawValue are the endpoint number.
+    /// The endpoint number, 0 to 15; bits 0:3 of the RawValue.
     /// </summary>
-    public UsbEndpointNumber Number => (UsbEndpointNumber)(RawValue & 0x0F);
+    public byte Number => (byte)(RawValue & 0x0F);
 
     /// <summary>
     /// Bit 7 of the RawValue indicates direction; output: 0x00-0x7F, input: 0x80-0xFF.
