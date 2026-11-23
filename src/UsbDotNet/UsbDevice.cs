@@ -76,7 +76,7 @@ public sealed class UsbDevice : IUsbDevice
     public IUsbDeviceDescriptor Descriptor => _descriptor;
 
     /// <inheritdoc/>
-    public IUsbConfigDescriptor ConfigDescriptor { get; init; }
+    public IUsbConfigDescriptor ConfigDescriptor { get; }
 
     internal UsbDevice(
         ILoggerFactory loggerFactory,
