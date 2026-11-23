@@ -53,7 +53,11 @@ public sealed class TestDeviceSource(ILogger _logger, IUsb _usb)
 
     public bool TryOpenUsbDevice([NotNullWhen(true)] out IUsbDevice? openDevice)
     {
-        var devices = _usb.GetDeviceList(_requiredVendorId, _requiredProductIds)
+        var filter = new UsbDeviceFilter(
+            _requiredVendorId is { } vendorId ? [vendorId] : null,
+            _requiredProductIds.Length == 0 ? null : _requiredProductIds
+        );
+        var devices = _usb.GetDeviceList(filter)
             .OrderBy(d => d.VendorId == _preferredVendorId ? 0 : 1);
 
         foreach (var deviceDescriptor in devices)

@@ -15,8 +15,10 @@ internal sealed class DeviceInteraction(
         usb.Initialize();
 
         var devices = usb.GetDeviceList(
-            vendorId: options.Value.VendorId,
-            productIds: options.Value.ProductId is { } pid ? [pid] : null
+            new UsbDeviceFilter(
+                options.Value.VendorId is { } vid ? [vid] : null,
+                options.Value.ProductId is { } pid ? [pid] : null
+            )
         );
 
         logger.LogInformation("Found {Count} matching USB device(s).", devices.Count);

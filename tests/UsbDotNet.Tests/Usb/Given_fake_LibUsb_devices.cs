@@ -49,7 +49,7 @@ public sealed class Given_fake_LibUsb_devices
             FakeHelper.CreateFakeDevice(VendorB, ProductB1, BusNumber, busAddress: 2)
         );
 
-        var devices = usb.GetDeviceList(null, productIds: null);
+        var devices = usb.GetDeviceList(new UsbDeviceFilter());
 
         devices.Should().HaveCount(2);
     }
@@ -92,7 +92,7 @@ public sealed class Given_fake_LibUsb_devices
             FakeHelper.CreateFakeDevice(VendorB, ProductB1, BusNumber, busAddress: 3)
         );
 
-        var devices = usb.GetDeviceList(null, [ProductA1, ProductB1]);
+        var devices = usb.GetDeviceList(new UsbDeviceFilter(ProductIds: [ProductA1, ProductB1]));
 
         using var scope = new AssertionScope();
         devices.Should().HaveCount(2);
@@ -108,8 +108,7 @@ public sealed class Given_fake_LibUsb_devices
         );
 
         // Unlike a null set or an empty productId array, an empty set matches no product IDs
-        HashSet<ushort> productIds = [];
-        var devices = usb.GetDeviceList(null, productIds);
+        var devices = usb.GetDeviceList(new UsbDeviceFilter(ProductIds: []));
 
         devices.Should().BeEmpty();
     }
@@ -139,7 +138,7 @@ public sealed class Given_fake_LibUsb_devices
             FakeHelper.CreateFakeDevice(VendorB, ProductA1, BusNumber, busAddress: 3)
         );
 
-        var devices = usb.GetDeviceList(VendorA, [ProductA1]);
+        var devices = usb.GetDeviceList(VendorA, ProductA1);
 
         using var scope = new AssertionScope();
         devices.Should().HaveCount(1);
@@ -199,14 +198,14 @@ public sealed class Given_fake_LibUsb_devices
         using var usb = CreateInitializedUsb(
             FakeHelper.CreateFakeDevice(VendorA, ProductA1, BusNumber, busAddress: 1),
             FakeHelper.CreateFakeDevice(VendorA, ProductA2, BusNumber, busAddress: 2),
-            FakeHelper.CreateFakeDevice(VendorB, ProductB1, BusNumber, busAddress: 3)
+            FakeHelper.CreateFakeDevice(VendorA, 0xAA99, BusNumber, busAddress: 3)
         );
 
-        var devices = usb.GetDeviceList(null, ProductA1, ProductB1);
+        var devices = usb.GetDeviceList(VendorA, ProductA1, ProductA2);
 
         using var scope = new AssertionScope();
         devices.Should().HaveCount(2);
-        devices.Should().OnlyContain(d => d.ProductId == ProductA1 || d.ProductId == ProductB1);
+        devices.Should().OnlyContain(d => d.ProductId == ProductA1 || d.ProductId == ProductA2);
     }
 
     [Fact]
@@ -217,7 +216,7 @@ public sealed class Given_fake_LibUsb_devices
             FakeHelper.CreateFakeDevice(VendorA, ProductA2, BusNumber, busAddress: 2)
         );
 
-        var devices = usb.GetDeviceList(VendorA, [ProductA1, 0x0099]);
+        var devices = usb.GetDeviceList(VendorA, ProductA1, 0x0099);
 
         using var scope = new AssertionScope();
         devices.Should().HaveCount(1);
