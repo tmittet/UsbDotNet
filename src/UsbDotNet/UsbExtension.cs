@@ -9,40 +9,28 @@ namespace UsbDotNet;
 public static class UsbExtension
 {
     /// <summary>
-    /// Returns a list of device descriptors for connected USB devices.
+    /// Returns a list of device descriptors for connected USB devices of the given vendor.
     /// It does not involve any requests being sent to the devices.
     /// </summary>
+    /// <remarks>
+    /// Use <see cref="IUsb.GetDeviceList(IUsbDeviceFilter?)"/> with a
+    /// <see cref="UsbDeviceFilter"/> for other filters, such as several vendor IDs.
+    /// </remarks>
     /// <param name="usb">Usb type instance.</param>
-    /// <param name="vendorId">Optional vendor ID filter.</param>
-    /// <param name="productId">Optional product ID filter.</param>
+    /// <param name="vendorId">The vendor ID of the devices to return.</param>
+    /// <param name="productIds">
+    /// The product IDs of the devices to return; all products of the vendor when none are given.
+    /// </param>
     /// <exception cref="UsbException">Thrown when the get device list operation fails.</exception>
     /// <exception cref="ObjectDisposedException">Thrown when the Usb type is disposed.</exception>
     /// <exception cref="InvalidOperationException">Thrown when the Usb type is not initialized.</exception>
     public static IReadOnlyCollection<IUsbDeviceDescriptor> GetDeviceList(
         this IUsb usb,
-        ushort? vendorId = default,
-        params ushort[] productId
-    ) => usb.GetDeviceList(vendorId, productId.Length == 0 ? null : productId.ToHashSet());
-
-    /// <summary>
-    /// Returns a list of device descriptors for connected USB devices.
-    /// It does not involve any requests being sent to the devices.
-    /// </summary>
-    /// <param name="usb">Usb type instance.</param>
-    /// <param name="vendorId">Optional vendor ID filter.</param>
-    /// <param name="productIds">Optional product ID filter.</param>
-    /// <exception cref="UsbException">Thrown when the get device list operation fails.</exception>
-    /// <exception cref="ObjectDisposedException">Thrown when the Usb type is disposed.</exception>
-    /// <exception cref="InvalidOperationException">Thrown when the Usb type is not initialized.</exception>
-    public static IReadOnlyCollection<IUsbDeviceDescriptor> GetDeviceList(
-        this IUsb usb,
-        ushort? vendorId = default,
-        IReadOnlyCollection<ushort>? productIds = default
+        ushort vendorId,
+        params ushort[] productIds
     ) =>
         usb.GetDeviceList(
-            vendorId is null
-                ? new UsbDeviceFilter(ProductIds: productIds)
-                : new UsbDeviceFilter([vendorId.Value], productIds)
+            new UsbDeviceFilter([vendorId], productIds.Length == 0 ? null : productIds.ToHashSet())
         );
 
     /// <summary>
