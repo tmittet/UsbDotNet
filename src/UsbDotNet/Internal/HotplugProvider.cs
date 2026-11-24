@@ -68,8 +68,10 @@ internal sealed class HotplugProvider : IUsbHotplugProvider
     // _dispatchLock, read without it by IsDispatchingOnCurrentThread.
     private int _dispatchThreadId;
 
-    // The managed thread that is inside the OnProviderDisposed notification, or 0. Guarded by
-    // _dispatchLock; DeregisterHotplug waits on the lock until it is 0 again.
+    // The listener that is inside the OnProviderDisposed notification, and the managed thread
+    // raising it; null and 0 otherwise. Guarded by _dispatchLock. DeregisterHotplug of that
+    // listener waits on the lock until the notification has returned.
+    private IUsbHotplugListener? _providerDisposedListener;
     private int _providerDisposedThreadId;
 
     /// <summary>
@@ -138,32 +140,35 @@ internal sealed class HotplugProvider : IUsbHotplugProvider
         // observes the cleared listener afterwards and drops the event.
         lock (_dispatchLock)
         {
-            if (!ReferenceEquals(_listener, listener))
+            // Nothing to release when the listener is not the registration owner (or nothing is
+            // registered).
+            if (ReferenceEquals(_listener, listener))
             {
-                // Not the registration owner (or nothing registered); nothing to release.
-                return;
+                // The lock is reentrant, so the owner gets here from inside its own notification.
+                // During the enumeration replay the callback handle is not stored yet: clearing
+                // the listener now would leave a live native registration that nobody owns.
+                if (_dispatchThreadId == Environment.CurrentManagedThreadId)
+                {
+                    throw new InvalidOperationException(
+                        "A hotplug listener cannot be deregistered from within its own "
+                            + "notification. Deregister it from another thread, after the "
+                            + "notification has returned."
+                    );
+                }
+                _listener = null;
+                // The exchange serializes handle ownership with Shutdown, which must not wait on
+                // _dispatchLock (an in-flight listener invocation may hold it).
+                var handle = Interlocked.Exchange(ref _callbackHandle, null);
+                handle?.Dispose();
+                ReleaseDeviceCache();
             }
-            // The lock is reentrant, so the owner gets here from inside its own notification.
-            // During the enumeration replay the callback handle is not stored yet: clearing the
-            // listener now would leave a live native registration that nobody owns.
-            if (_dispatchThreadId == Environment.CurrentManagedThreadId)
-            {
-                throw new InvalidOperationException(
-                    "A hotplug listener cannot be deregistered from within its own notification. "
-                        + "Deregister it from another thread, after the notification has returned."
-                );
-            }
-            _listener = null;
-            // The exchange serializes handle ownership with Shutdown, which must not wait on
-            // _dispatchLock (an in-flight listener invocation may hold it).
-            var handle = Interlocked.Exchange(ref _callbackHandle, null);
-            handle?.Dispose();
-            ReleaseDeviceCache();
-            // OnProviderDisposed is raised outside the lock, so it may still be running. Wait for
-            // it (the wait releases the lock), unless this is the listener deregistering from
-            // inside that notification.
+            // OnProviderDisposed is raised outside the lock, so it may still be running on this
+            // listener. Wait for it (the wait releases the lock), unless this is the listener
+            // deregistering from inside that notification. Checked for a listener that is no
+            // longer the owner too: an earlier deregistration that is still waiting here has
+            // already detached it.
             while (
-                _providerDisposedThreadId != 0
+                ReferenceEquals(_providerDisposedListener, listener)
                 && _providerDisposedThreadId != Environment.CurrentManagedThreadId
             )
             {
@@ -227,6 +232,7 @@ internal sealed class HotplugProvider : IUsbHotplugProvider
             {
                 return;
             }
+            _providerDisposedListener = listener;
             _providerDisposedThreadId = Environment.CurrentManagedThreadId;
         }
         try
@@ -237,6 +243,7 @@ internal sealed class HotplugProvider : IUsbHotplugProvider
         {
             lock (_dispatchLock)
             {
+                _providerDisposedListener = null;
                 _providerDisposedThreadId = 0;
                 Monitor.PulseAll(_dispatchLock);
             }

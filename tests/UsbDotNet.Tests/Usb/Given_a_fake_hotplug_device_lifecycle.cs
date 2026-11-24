@@ -292,6 +292,50 @@ public sealed class Given_a_fake_hotplug_device_lifecycle : IDisposable
     }
 
     [Fact]
+    public async Task Concurrent_DeregisterHotplug_calls_both_wait_for_the_provider_disposed_notification()
+    {
+        var timeout = TimeSpan.FromSeconds(5);
+        var provider = _usb.Hotplug;
+        using var notificationEntered = new ManualResetEventSlim(false);
+        using var notificationRelease = new ManualResetEventSlim(false);
+        var listener = new TestHotplugListener
+        {
+            ProviderDisposed = () =>
+            {
+                notificationEntered.Set();
+                notificationRelease.Wait();
+            },
+        };
+        provider.RegisterHotplug(listener).Should().Be(UsbHotplugRegistrationResult.Success);
+
+        var dispose = Task.Run(_usb.Dispose);
+        notificationEntered.Wait(timeout).Should().BeTrue();
+        try
+        {
+            // The first call detaches the listener and waits; the second finds it detached
+            var first = Task.Run(() => provider.DeregisterHotplug(listener));
+            (await Task.WhenAny(first, Task.Delay(250))).Should().NotBe(first);
+            var second = Task.Run(() => provider.DeregisterHotplug(listener));
+
+            _ = await Task.WhenAny(first, second, Task.Delay(250));
+            (first.IsCompleted || second.IsCompleted)
+                .Should()
+                .BeFalse(
+                    because: "every DeregisterHotplug must wait for the in-flight notification"
+                );
+
+            notificationRelease.Set();
+            await Task.WhenAll(first, second).WaitAsync(timeout);
+            await dispose.WaitAsync(timeout);
+        }
+        finally
+        {
+            // Release the gate so a failed assertion cannot hang the dispose and teardown.
+            notificationRelease.Set();
+        }
+    }
+
+    [Fact]
     public void A_listener_can_deregister_from_its_provider_disposed_notification()
     {
         var provider = _usb.Hotplug;
