@@ -248,6 +248,61 @@ public sealed class Given_a_fake_hotplug_device_lifecycle : IDisposable
     }
 
     [Fact]
+    public void DeregisterHotplug_throws_when_called_from_the_replay_of_connected_devices()
+    {
+        // The replay runs inside the native registration, before its handle is stored
+        _api.EnumeratedDevice = DevicePtr;
+        var provider = _usb.Hotplug;
+        var arrivals = 0;
+        Exception? thrown = null;
+        TestHotplugListener? listener = null;
+        listener = new TestHotplugListener
+        {
+            DeviceArrived = _ =>
+            {
+                arrivals++;
+                thrown = Record.Exception(() => provider.DeregisterHotplug(listener!));
+            },
+        };
+
+        provider.RegisterHotplug(listener).Should().Be(UsbHotplugRegistrationResult.Success);
+
+        arrivals.Should().Be(1);
+        thrown.Should().BeOfType<InvalidOperationException>();
+        // The listener still owns the registration, and can release it after the replay
+        _api.LastCallback.Should().NotBeNull();
+        provider
+            .RegisterHotplug(new TestHotplugListener())
+            .Should()
+            .Be(UsbHotplugRegistrationResult.AlreadyRegistered);
+        provider.DeregisterHotplug(listener);
+        _api.LastCallback.Should().BeNull();
+    }
+
+    [Fact]
+    public void RegisterHotplug_throws_when_disposed_with_a_listener_still_attached()
+    {
+        var provider = _usb.Hotplug;
+        Exception? thrownDuringDispose = null;
+        var listener = new TestHotplugListener
+        {
+            ProviderDisposed = () =>
+                thrownDuringDispose = Record.Exception(() =>
+                    provider.RegisterHotplug(new TestHotplugListener())
+                ),
+        };
+        provider.RegisterHotplug(listener).Should().Be(UsbHotplugRegistrationResult.Success);
+
+        _usb.Dispose();
+
+        thrownDuringDispose.Should().BeOfType<ObjectDisposedException>();
+        provider
+            .Invoking(p => p.RegisterHotplug(new TestHotplugListener()))
+            .Should()
+            .Throw<ObjectDisposedException>();
+    }
+
+    [Fact]
     public async Task DeregisterHotplug_waits_for_an_in_flight_provider_disposed_notification()
     {
         var timeout = TimeSpan.FromSeconds(5);

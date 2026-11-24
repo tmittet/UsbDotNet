@@ -22,7 +22,8 @@ public sealed class Given_a_hotplug_monitor_over_a_fake_provider
 
         monitor.Dispose();
 
-        A.CallTo(() => provider.DeregisterHotplug(monitor)).MustHaveHappenedOnceExactly();
+        A.CallTo(() => provider.DeregisterHotplug(monitor.HotplugListener))
+            .MustHaveHappenedOnceExactly();
         // Observe the cancellation: disposing an enumerator with a read still in flight is
         // undefined, so every primed read in this suite is awaited before the scope ends.
         var read = async () => await parked;
@@ -707,16 +708,16 @@ public sealed class Given_a_hotplug_monitor_over_a_fake_provider
             _ = await events.MoveNextAsync();
         };
 
-    // The monitor registers itself as the provider's IUsbHotplugListener on the first read of a
+    // The monitor registers its listener with the provider on the first read of a
     // subscription; tests invoke the listener directly to simulate the provider's libusb event
     // loop thread.
     private static void RaiseArrived(UsbHotplugMonitor monitor, UsbDeviceDescriptor descriptor) =>
-        ((IUsbHotplugListener)monitor).OnDeviceArrived(descriptor);
+        monitor.HotplugListener.OnDeviceArrived(descriptor);
 
     private static void RaiseLeft(UsbHotplugMonitor monitor, UsbDeviceDescriptor descriptor) =>
-        ((IUsbHotplugListener)monitor).OnDeviceLeft(descriptor);
+        monitor.HotplugListener.OnDeviceLeft(descriptor);
 
     /// <summary>Simulates the underlying Usb instance completing its Dispose.</summary>
     private static void RaiseDisposed(UsbHotplugMonitor monitor) =>
-        ((IUsbHotplugListener)monitor).OnProviderDisposed();
+        monitor.HotplugListener.OnProviderDisposed();
 }

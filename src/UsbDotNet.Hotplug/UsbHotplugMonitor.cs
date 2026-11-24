@@ -7,7 +7,7 @@ using UsbDotNet.Descriptor;
 namespace UsbDotNet.Hotplug;
 
 /// <inheritdoc/>
-public sealed class UsbHotplugMonitor : IUsbHotplugMonitor, IUsbHotplugListener
+public sealed class UsbHotplugMonitor : IUsbHotplugMonitor
 {
     private const string AlreadyRegisteredMessage =
         "Hotplug is already registered on this IUsb. Only one UsbHotplugMonitor may "
@@ -48,6 +48,11 @@ public sealed class UsbHotplugMonitor : IUsbHotplugMonitor, IUsbHotplugListener
     // Live subscriptions
     private readonly Dictionary<Channel<UsbHotplugEvent>, IUsbDeviceFilter> _subscribers = [];
 
+    // The listener registered with the provider. The monitor does not implement the listener
+    // interface itself: a caller could then register the monitor directly, behind _registered,
+    // or invoke its notifications.
+    private readonly Listener _listener;
+
     private bool _registered;
 
     // Volatile because a consumer reads these without _lock before yielding each event
@@ -70,6 +75,9 @@ public sealed class UsbHotplugMonitor : IUsbHotplugMonitor, IUsbHotplugListener
         ArgumentNullException.ThrowIfNull(usb);
         return new UsbHotplugMonitor(usb.Hotplug, loggerFactory);
     }
+
+    /// <summary>The listener this monitor registers with the provider.</summary>
+    internal IUsbHotplugListener HotplugListener => _listener;
 
     /// <summary>Live subscriptions.</summary>
     internal int SubscriptionCount
@@ -102,6 +110,7 @@ public sealed class UsbHotplugMonitor : IUsbHotplugMonitor, IUsbHotplugListener
             ? NullLogger<UsbHotplugMonitor>.Instance
             : loggerFactory.CreateLogger<UsbHotplugMonitor>();
         IsHotplugSupported = _provider.IsHotplugSupported;
+        _listener = new Listener(this);
     }
 
     /// <inheritdoc/>
@@ -184,7 +193,7 @@ public sealed class UsbHotplugMonitor : IUsbHotplugMonitor, IUsbHotplugListener
     }
 
     /// <summary>
-    /// Registers this monitor as the provider's hotplug listener on the first call. Serialized on
+    /// Registers the monitor's listener as the provider's hotplug listener on the first call. Serialized on
     /// _registerLock rather than _lock: the provider dispatches the LIBUSB_HOTPLUG_ENUMERATE
     /// replay synchronously during RegisterHotplug while holding its dispatch lock, and that
     /// dispatch takes _lock in Dispatch. Holding _lock across RegisterHotplug would invert the
@@ -205,7 +214,7 @@ public sealed class UsbHotplugMonitor : IUsbHotplugMonitor, IUsbHotplugListener
             }
             try
             {
-                _registered = _provider.RegisterHotplug(this) switch
+                _registered = _provider.RegisterHotplug(_listener) switch
                 {
                     UsbHotplugRegistrationResult.Success => true,
                     UsbHotplugRegistrationResult.NotSupported => throw new NotSupportedException(
@@ -228,12 +237,6 @@ public sealed class UsbHotplugMonitor : IUsbHotplugMonitor, IUsbHotplugListener
             }
         }
     }
-
-    void IUsbHotplugListener.OnDeviceArrived(IUsbDeviceDescriptor descriptor) =>
-        Dispatch(UsbHotplugEventType.Connected, descriptor);
-
-    void IUsbHotplugListener.OnDeviceLeft(IUsbDeviceDescriptor descriptor) =>
-        Dispatch(UsbHotplugEventType.Disconnected, descriptor);
 
     /// <summary>
     /// Runs inside the provider's hotplug dispatch: on the libusb event-loop thread for live
@@ -285,7 +288,7 @@ public sealed class UsbHotplugMonitor : IUsbHotplugMonitor, IUsbHotplugListener
     /// can no longer reach make no sense to deliver), and let a starting subscription throw
     /// instead of replaying stale devices.
     /// </summary>
-    void IUsbHotplugListener.OnProviderDisposed()
+    private void OnProviderDisposed()
     {
         List<Channel<UsbHotplugEvent>> channels;
         lock (_lock)
@@ -366,7 +369,7 @@ public sealed class UsbHotplugMonitor : IUsbHotplugMonitor, IUsbHotplugListener
             // Once it returns the provider never invokes this monitor again.
             if (_registered)
             {
-                _provider.DeregisterHotplug(this);
+                _provider.DeregisterHotplug(_listener);
             }
         }
         // Terminate rather than end quietly: parked consumers wake immediately, later reads throw,
@@ -389,5 +392,21 @@ public sealed class UsbHotplugMonitor : IUsbHotplugMonitor, IUsbHotplugListener
         {
             throw new InvalidOperationException(ProviderDisposedMessage);
         }
+    }
+
+    /// <summary>Forwards the provider's notifications to the monitor.</summary>
+    private sealed class Listener : IUsbHotplugListener
+    {
+        private readonly UsbHotplugMonitor _monitor;
+
+        public Listener(UsbHotplugMonitor monitor) => _monitor = monitor;
+
+        public void OnDeviceArrived(IUsbDeviceDescriptor descriptor) =>
+            _monitor.Dispatch(UsbHotplugEventType.Connected, descriptor);
+
+        public void OnDeviceLeft(IUsbDeviceDescriptor descriptor) =>
+            _monitor.Dispatch(UsbHotplugEventType.Disconnected, descriptor);
+
+        public void OnProviderDisposed() => _monitor.OnProviderDisposed();
     }
 }

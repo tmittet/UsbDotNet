@@ -163,8 +163,8 @@ public sealed class Given_a_hotplug_event_notifier
         };
 
     private static void RaiseArrived(UsbHotplugMonitor monitor, UsbDeviceDescriptor descriptor) =>
-        ((IUsbHotplugListener)monitor).OnDeviceArrived(descriptor);
+        monitor.HotplugListener.OnDeviceArrived(descriptor);
 
     private static void RaiseLeft(UsbHotplugMonitor monitor, UsbDeviceDescriptor descriptor) =>
-        ((IUsbHotplugListener)monitor).OnDeviceLeft(descriptor);
+        monitor.HotplugListener.OnDeviceLeft(descriptor);
 }
