@@ -33,7 +33,8 @@ public sealed class Usb : IUsb, IUsbInternal
     private LibUsbEventLoop? _eventLoop;
     private DisposeState _disposeState;
 
-    internal IHotplugProvider HotplugProvider => _hotplug;
+    /// <inheritdoc/>
+    public IUsbHotplugProvider Hotplug => _hotplug;
 
     /// <inheritdoc/>
     bool IUsbInternal.IsHotplugSupported =>
@@ -362,13 +363,20 @@ public sealed class Usb : IUsb, IUsbInternal
         // NOTE: Dispose must never run inside a hotplug dispatch. It would deadlock on either
         // dispatch source: live events run on the libusb event-loop thread, which teardown joins
         // (step 4), and the LIBUSB_HOTPLUG_ENUMERATE replay runs on the registering thread while
-        // holding a rundown token that Shutdown (step 2) waits out. No guard is needed because no
-        // user code can execute inside a dispatch: IHotplugListener is internal, its only
-        // implementation (UsbHotplugMonitor) only writes to channels whose readers resume on the
-        // thread pool, and transfer completions merely signal an event on the submitting thread.
-        //
-        // Reintroduce a guard covering BOTH dispatch sources if that ever changes; e.g. a public
-        // listener API or hotplug implementation with synchronous continuations.
+        // holding a rundown token that Shutdown (step 2) waits out. IUsbHotplugListener is public,
+        // so user code can run inside a dispatch; the guard covers both dispatch sources.
+        // Transfer completions merely signal an event on the submitting thread, they run no user
+        // code on the event-loop thread.
+        if (_hotplug.IsDispatchingOnCurrentThread)
+        {
+#pragma warning disable CA1065 // Do not raise exceptions in unexpected locations
+            // Deliberate: the alternative to throwing from Dispose here is a deadlock
+            throw new InvalidOperationException(
+                $"{nameof(Usb)} cannot be disposed from within a hotplug listener callback. "
+                    + "Dispose it from another thread, after the callback has returned."
+            );
+#pragma warning restore CA1065 // Do not raise exceptions in unexpected locations
+        }
 
         UsbDevice[] openDevices;
 

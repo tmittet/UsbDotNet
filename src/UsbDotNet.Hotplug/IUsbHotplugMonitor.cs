@@ -15,6 +15,13 @@ namespace UsbDotNet.Hotplug;
 public interface IUsbHotplugMonitor : IDisposable
 {
     /// <summary>
+    /// True when hotplug is supported on this platform. Enumerating
+    /// <see cref="Subscribe(IUsbDeviceFilter?, CancellationToken)"/> throws
+    /// <see cref="NotSupportedException"/> if hotplug is not supported.
+    /// </summary>
+    bool IsHotplugSupported { get; }
+
+    /// <summary>
     /// Subscribes to hotplug events matching <paramref name="filter"/> and returns them as an
     /// async stream. The stream begins with a <see cref="UsbHotplugEventType.Connected"/> event
     /// for every matching device connected at the moment enumeration starts, followed by live

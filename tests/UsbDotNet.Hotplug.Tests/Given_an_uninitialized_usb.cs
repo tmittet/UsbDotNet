@@ -23,7 +23,7 @@ public sealed class Given_an_uninitialized_usb : IDisposable
     [SkippableFact]
     public async Task Subscribe_throws_when_usb_is_not_initialized()
     {
-        using var monitor = new UsbHotplugMonitor(_usb.HotplugProvider, _loggerFactory);
+        using var monitor = new UsbHotplugMonitor(_usb.Hotplug, _loggerFactory);
         using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
 
         Exception? caught = null;

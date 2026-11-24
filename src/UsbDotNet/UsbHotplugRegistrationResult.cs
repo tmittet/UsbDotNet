@@ -1,6 +1,9 @@
-namespace UsbDotNet.Internal;
+namespace UsbDotNet;
 
-internal enum HotplugRegistrationResult
+/// <summary>
+/// The outcome of <see cref="IUsbHotplugProvider.RegisterHotplug"/>.
+/// </summary>
+public enum UsbHotplugRegistrationResult
 {
     /// <summary>Hotplug was registered successfully.</summary>
     Success,

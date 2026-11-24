@@ -2,7 +2,6 @@ using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Logging;
 using UsbDotNet;
 using UsbDotNet.Hotplug;
-using UsbDotNet.Internal;
 
 #pragma warning disable IDE0130 // Namespace does not match folder structure
 namespace Microsoft.Extensions.DependencyInjection;
@@ -25,7 +24,7 @@ public static class UsbHotplugServiceCollectionExtensions
         ArgumentNullException.ThrowIfNull(services);
         _ = services.AddLogging();
         services.TryAddSingleton<IUsbHotplugMonitor>(sp => new UsbHotplugMonitor(
-            sp.GetRequiredService<IHotplugProvider>(),
+            sp.GetRequiredService<IUsb>().Hotplug,
             sp.GetService<ILoggerFactory>()
         ));
         return services;

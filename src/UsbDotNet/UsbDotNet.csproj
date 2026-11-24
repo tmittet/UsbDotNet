@@ -5,7 +5,6 @@
         <Description>USB library for .NET</Description>
     </PropertyGroup>
     <ItemGroup>
-        <InternalsVisibleTo Include="UsbDotNet.Hotplug" />
         <InternalsVisibleTo Include="UsbDotNet.Extensions.Tests" />
         <InternalsVisibleTo Include="UsbDotNet.Hotplug.Tests" />
         <InternalsVisibleTo Include="UsbDotNet.Tests" />

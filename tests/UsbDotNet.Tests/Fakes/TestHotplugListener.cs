@@ -1,12 +1,11 @@
 using UsbDotNet.Descriptor;
-using UsbDotNet.Internal;
 
 namespace UsbDotNet.Tests.Fakes;
 
 /// <summary>
-/// Forwarding <see cref="IHotplugListener"/> for tests; callbacks left unset are no-ops.
+/// Forwarding <see cref="IUsbHotplugListener"/> for tests; callbacks left unset are no-ops.
 /// </summary>
-internal sealed class TestHotplugListener : IHotplugListener
+internal sealed class TestHotplugListener : IUsbHotplugListener
 {
     public Action<IUsbDeviceDescriptor>? DeviceArrived { get; init; }
     public Action<IUsbDeviceDescriptor>? DeviceLeft { get; init; }

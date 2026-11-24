@@ -34,6 +34,12 @@ internal sealed class FakeHotplugLibUsbApi : IDisposable
     public ManualResetEventSlim EventLoopEntered { get; } = new(false);
     public ManualResetEventSlim EventLoopRelease { get; } = new(false);
 
+    /// <summary>
+    /// When set, libusb_hotplug_register_callback invokes the callback with the arrival of this
+    /// device before it returns, as real libusb does for LIBUSB_HOTPLUG_ENUMERATE.
+    /// </summary>
+    public IntPtr? EnumeratedDevice { get; set; }
+
     /// <summary>The last hotplug callback registered; null once deregistered.</summary>
     public libusb_hotplug_callback_fn? LastCallback { get; private set; }
 
@@ -108,7 +114,17 @@ internal sealed class FakeHotplugLibUsbApi : IDisposable
             )
             .ReturnsLazily(call =>
             {
-                LastCallback = call.GetArgument<libusb_hotplug_callback_fn>(6);
+                var callback = call.GetArgument<libusb_hotplug_callback_fn>(6)!;
+                LastCallback = callback;
+                if (EnumeratedDevice is { } device)
+                {
+                    _ = callback(
+                        IntPtr.Zero,
+                        device,
+                        libusb_hotplug_event.LIBUSB_HOTPLUG_EVENT_DEVICE_ARRIVED,
+                        IntPtr.Zero
+                    );
+                }
                 return libusb_error.LIBUSB_SUCCESS;
             })
             .AssignsOutAndRefParameters(new IntPtr(42));

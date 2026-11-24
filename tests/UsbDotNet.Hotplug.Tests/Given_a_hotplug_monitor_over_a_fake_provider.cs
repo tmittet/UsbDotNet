@@ -1,6 +1,5 @@
 using FakeItEasy;
 using UsbDotNet.Descriptor;
-using UsbDotNet.Internal;
 
 namespace UsbDotNet.Hotplug.Tests;
 
@@ -23,7 +22,8 @@ public sealed class Given_a_hotplug_monitor_over_a_fake_provider
 
         monitor.Dispose();
 
-        A.CallTo(() => provider.DeregisterHotplug(monitor)).MustHaveHappenedOnceExactly();
+        A.CallTo(() => provider.DeregisterHotplug(monitor.HotplugListener))
+            .MustHaveHappenedOnceExactly();
         // Observe the cancellation: disposing an enumerator with a read still in flight is
         // undefined, so every primed read in this suite is awaited before the scope ends.
         var read = async () => await parked;
@@ -38,7 +38,7 @@ public sealed class Given_a_hotplug_monitor_over_a_fake_provider
 
         monitor.Dispose();
 
-        A.CallTo(() => provider.DeregisterHotplug(A<IHotplugListener>._)).MustNotHaveHappened();
+        A.CallTo(() => provider.DeregisterHotplug(A<IUsbHotplugListener>._)).MustNotHaveHappened();
     }
 
     [Fact]
@@ -56,7 +56,7 @@ public sealed class Given_a_hotplug_monitor_over_a_fake_provider
         monitor
             .SubscriptionCount.Should()
             .Be(0, because: "enumeration, not the call, is what joins the fan-out");
-        A.CallTo(() => provider.RegisterHotplug(A<IHotplugListener>._)).MustNotHaveHappened();
+        A.CallTo(() => provider.RegisterHotplug(A<IUsbHotplugListener>._)).MustNotHaveHappened();
     }
 
     [Fact]
@@ -631,10 +631,10 @@ public sealed class Given_a_hotplug_monitor_over_a_fake_provider
         // at the end; in that window RegisterHotplug throws ObjectDisposedException. The monitor
         // must surface its documented contract (InvalidOperationException for a dead provider),
         // reserving ObjectDisposedException for a disposed monitor.
-        var provider = A.Fake<IHotplugProvider>();
+        var provider = A.Fake<IUsbHotplugProvider>();
         A.CallTo(() => provider.IsHotplugSupported).Returns(true);
-        A.CallTo(() => provider.RegisterHotplug(A<IHotplugListener>._))
-            .Throws(new ObjectDisposedException(nameof(IHotplugProvider)));
+        A.CallTo(() => provider.RegisterHotplug(A<IUsbHotplugListener>._))
+            .Throws(new ObjectDisposedException(nameof(IUsbHotplugProvider)));
         using var monitor = new UsbHotplugMonitor(provider);
         using var cts = new CancellationTokenSource(Timeout);
 
@@ -653,16 +653,16 @@ public sealed class Given_a_hotplug_monitor_over_a_fake_provider
                 .Should()
                 .ThrowAsync<InvalidOperationException>()
         ).WithMessage("*IUsb instance is disposed*");
-        A.CallTo(() => provider.RegisterHotplug(A<IHotplugListener>._))
+        A.CallTo(() => provider.RegisterHotplug(A<IUsbHotplugListener>._))
             .MustHaveHappenedOnceExactly();
     }
 
-    private static IHotplugProvider CreateFakeProvider()
+    private static IUsbHotplugProvider CreateFakeProvider()
     {
-        var provider = A.Fake<IHotplugProvider>();
+        var provider = A.Fake<IUsbHotplugProvider>();
         A.CallTo(() => provider.IsHotplugSupported).Returns(true);
-        A.CallTo(() => provider.RegisterHotplug(A<IHotplugListener>._))
-            .Returns(HotplugRegistrationResult.Success);
+        A.CallTo(() => provider.RegisterHotplug(A<IUsbHotplugListener>._))
+            .Returns(UsbHotplugRegistrationResult.Success);
         return provider;
     }
 
@@ -708,16 +708,16 @@ public sealed class Given_a_hotplug_monitor_over_a_fake_provider
             _ = await events.MoveNextAsync();
         };
 
-    // The monitor registers itself as the provider's IHotplugListener on the first read of a
+    // The monitor registers its listener with the provider on the first read of a
     // subscription; tests invoke the listener directly to simulate the provider's libusb event
     // loop thread.
     private static void RaiseArrived(UsbHotplugMonitor monitor, UsbDeviceDescriptor descriptor) =>
-        ((IHotplugListener)monitor).OnDeviceArrived(descriptor);
+        monitor.HotplugListener.OnDeviceArrived(descriptor);
 
     private static void RaiseLeft(UsbHotplugMonitor monitor, UsbDeviceDescriptor descriptor) =>
-        ((IHotplugListener)monitor).OnDeviceLeft(descriptor);
+        monitor.HotplugListener.OnDeviceLeft(descriptor);
 
     /// <summary>Simulates the underlying Usb instance completing its Dispose.</summary>
     private static void RaiseDisposed(UsbHotplugMonitor monitor) =>
-        ((IHotplugListener)monitor).OnProviderDisposed();
+        monitor.HotplugListener.OnProviderDisposed();
 }

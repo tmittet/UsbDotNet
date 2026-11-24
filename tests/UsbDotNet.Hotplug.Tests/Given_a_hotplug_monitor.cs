@@ -26,7 +26,7 @@ public sealed class Given_a_hotplug_monitor : IDisposable
         try
         {
             _usb.Initialize();
-            _monitor = new UsbHotplugMonitor(_usb.HotplugProvider, _loggerFactory);
+            _monitor = new UsbHotplugMonitor(_usb.Hotplug, _loggerFactory);
         }
         catch
         {
@@ -214,7 +214,7 @@ public sealed class Given_a_hotplug_monitor : IDisposable
         await using var first = _monitor.Subscribe().GetAsyncEnumerator(cts.Token);
         var parked = first.MoveNextAsync();
 
-        using var secondMonitor = new UsbHotplugMonitor(_usb.HotplugProvider, _loggerFactory);
+        using var secondMonitor = new UsbHotplugMonitor(_usb.Hotplug, _loggerFactory);
         await using var second = secondMonitor.Subscribe().GetAsyncEnumerator(cts.Token);
         var read = async () => await second.MoveNextAsync();
         (await read.Should().ThrowAsync<InvalidOperationException>()).WithMessage(
@@ -251,7 +251,7 @@ public sealed class Given_a_hotplug_monitor : IDisposable
         // Disposing the monitor releases its hotplug registration on the IUsb.
         _monitor.Dispose();
 
-        using var secondMonitor = new UsbHotplugMonitor(_usb.HotplugProvider, _loggerFactory);
+        using var secondMonitor = new UsbHotplugMonitor(_usb.Hotplug, _loggerFactory);
 
         // The new registration re-enumerates with a cleared device cache, so the connected
         // devices are replayed rather than suppressed as duplicate arrivals.
