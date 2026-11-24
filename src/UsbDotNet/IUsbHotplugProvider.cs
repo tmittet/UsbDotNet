@@ -53,5 +53,10 @@ public interface IUsbHotplugProvider
     /// notification handling takes.
     /// </para>
     /// </summary>
+    /// <exception cref="InvalidOperationException">
+    /// Thrown when the attached listener is deregistered from within its own
+    /// <see cref="IUsbHotplugListener.OnDeviceArrived"/> or
+    /// <see cref="IUsbHotplugListener.OnDeviceLeft"/> notification; the listener stays registered.
+    /// </exception>
     void DeregisterHotplug(IUsbHotplugListener listener);
 }

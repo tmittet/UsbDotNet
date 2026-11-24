@@ -68,6 +68,10 @@ internal sealed class HotplugProvider : IUsbHotplugProvider
     // _dispatchLock, read without it by IsDispatchingOnCurrentThread.
     private int _dispatchThreadId;
 
+    // The managed thread that is inside the OnProviderDisposed notification, or 0. Guarded by
+    // _dispatchLock; DeregisterHotplug waits on the lock until it is 0 again.
+    private int _providerDisposedThreadId;
+
     /// <summary>
     /// True when the calling thread is inside an <see cref="IUsbHotplugListener.OnDeviceArrived"/>
     /// or <see cref="IUsbHotplugListener.OnDeviceLeft"/> notification of this provider. Covers
@@ -139,12 +143,32 @@ internal sealed class HotplugProvider : IUsbHotplugProvider
                 // Not the registration owner (or nothing registered); nothing to release.
                 return;
             }
+            // The lock is reentrant, so the owner gets here from inside its own notification.
+            // During the enumeration replay the callback handle is not stored yet: clearing the
+            // listener now would leave a live native registration that nobody owns.
+            if (_dispatchThreadId == Environment.CurrentManagedThreadId)
+            {
+                throw new InvalidOperationException(
+                    "A hotplug listener cannot be deregistered from within its own notification. "
+                        + "Deregister it from another thread, after the notification has returned."
+                );
+            }
             _listener = null;
             // The exchange serializes handle ownership with Shutdown, which must not wait on
             // _dispatchLock (an in-flight listener invocation may hold it).
             var handle = Interlocked.Exchange(ref _callbackHandle, null);
             handle?.Dispose();
             ReleaseDeviceCache();
+            // OnProviderDisposed is raised outside the lock, so it may still be running. Wait for
+            // it (the wait releases the lock), unless this is the listener deregistering from
+            // inside that notification.
+            while (
+                _providerDisposedThreadId != 0
+                && _providerDisposedThreadId != Environment.CurrentManagedThreadId
+            )
+            {
+                _ = Monitor.Wait(_dispatchLock);
+            }
         }
     }
 
@@ -188,9 +212,10 @@ internal sealed class HotplugProvider : IUsbHotplugProvider
 
     /// <summary>
     /// Raises <see cref="IUsbHotplugListener.OnProviderDisposed"/> on the attached listener, if any.
-    /// Called at the end of <see cref="Usb.Dispose"/>, after teardown completed. The listener read
-    /// is serialized with DeregisterHotplug via the dispatch lock; the callback is raised outside
-    /// the lock.
+    /// Called at the end of <see cref="Usb.Dispose"/>, after teardown completed. The callback is
+    /// raised outside the dispatch lock, as the listener contract promises that no locks are held.
+    /// A DeregisterHotplug of the listener either detaches it before it is read here, so it is
+    /// not notified, or waits until the notification has returned.
     /// </summary>
     internal void NotifyProviderDisposed()
     {
@@ -198,10 +223,23 @@ internal sealed class HotplugProvider : IUsbHotplugProvider
         lock (_dispatchLock)
         {
             listener = _listener;
+            if (listener is null)
+            {
+                return;
+            }
+            _providerDisposedThreadId = Environment.CurrentManagedThreadId;
         }
-        if (listener is not null)
+        try
         {
             EventDispatch.RaiseSafely(listener.OnProviderDisposed, _logger);
+        }
+        finally
+        {
+            lock (_dispatchLock)
+            {
+                _providerDisposedThreadId = 0;
+                Monitor.PulseAll(_dispatchLock);
+            }
         }
     }
 

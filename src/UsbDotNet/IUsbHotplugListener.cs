@@ -24,6 +24,11 @@ namespace UsbDotNet;
 /// <see cref="InvalidOperationException"/>.
 /// </item>
 /// <item>
+/// It must not deregister the listener with
+/// <see cref="IUsbHotplugProvider.DeregisterHotplug"/>; doing so throws
+/// <see cref="InvalidOperationException"/>.
+/// </item>
+/// <item>
 /// An exception it throws is caught and logged, so that it cannot interrupt the event handling.
 /// </item>
 /// </list>

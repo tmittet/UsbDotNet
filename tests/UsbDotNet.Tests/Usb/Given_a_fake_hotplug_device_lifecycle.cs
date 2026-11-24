@@ -220,6 +220,101 @@ public sealed class Given_a_fake_hotplug_device_lifecycle : IDisposable
     }
 
     [Fact]
+    public void DeregisterHotplug_throws_when_called_from_a_listener_callback()
+    {
+        // The callback runs on the calling thread, like the replay of connected devices does on
+        // the thread that registers
+        var provider = _usb.Hotplug;
+        Exception? thrown = null;
+        TestHotplugListener? listener = null;
+        listener = new TestHotplugListener
+        {
+            DeviceArrived = _ =>
+                thrown = Record.Exception(() => provider.DeregisterHotplug(listener!)),
+        };
+        provider.RegisterHotplug(listener).Should().Be(UsbHotplugRegistrationResult.Success);
+
+        Raise(libusb_hotplug_event.LIBUSB_HOTPLUG_EVENT_DEVICE_ARRIVED);
+
+        thrown.Should().BeOfType<InvalidOperationException>();
+        // The listener still owns the registration, and can release it after the callback
+        _api.LastCallback.Should().NotBeNull();
+        provider
+            .RegisterHotplug(new TestHotplugListener())
+            .Should()
+            .Be(UsbHotplugRegistrationResult.AlreadyRegistered);
+        provider.DeregisterHotplug(listener);
+        _api.LastCallback.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task DeregisterHotplug_waits_for_an_in_flight_provider_disposed_notification()
+    {
+        var timeout = TimeSpan.FromSeconds(5);
+        var provider = _usb.Hotplug;
+        using var notificationEntered = new ManualResetEventSlim(false);
+        using var notificationRelease = new ManualResetEventSlim(false);
+        var listener = new TestHotplugListener
+        {
+            ProviderDisposed = () =>
+            {
+                notificationEntered.Set();
+                notificationRelease.Wait();
+            },
+        };
+        provider.RegisterHotplug(listener).Should().Be(UsbHotplugRegistrationResult.Success);
+
+        var dispose = Task.Run(_usb.Dispose);
+        notificationEntered.Wait(timeout).Should().BeTrue();
+        try
+        {
+            var deregister = Task.Run(() => provider.DeregisterHotplug(listener));
+
+            // DeregisterHotplug promises the listener is never invoked after it returns, so it
+            // must block until the notification that is already running has returned.
+            var completedEarly = await Task.WhenAny(deregister, Task.Delay(250));
+            completedEarly
+                .Should()
+                .NotBe(
+                    deregister,
+                    because: "DeregisterHotplug must wait for the in-flight notification"
+                );
+
+            notificationRelease.Set();
+            await deregister.WaitAsync(timeout);
+            await dispose.WaitAsync(timeout);
+        }
+        finally
+        {
+            // Release the gate so a failed assertion cannot hang the dispose and teardown.
+            notificationRelease.Set();
+        }
+    }
+
+    [Fact]
+    public void A_listener_can_deregister_from_its_provider_disposed_notification()
+    {
+        var provider = _usb.Hotplug;
+        Exception? thrown = null;
+        var notified = false;
+        TestHotplugListener? listener = null;
+        listener = new TestHotplugListener
+        {
+            ProviderDisposed = () =>
+            {
+                notified = true;
+                thrown = Record.Exception(() => provider.DeregisterHotplug(listener!));
+            },
+        };
+        provider.RegisterHotplug(listener).Should().Be(UsbHotplugRegistrationResult.Success);
+
+        _usb.Dispose();
+
+        notified.Should().BeTrue();
+        thrown.Should().BeNull();
+    }
+
+    [Fact]
     public void Dispose_throws_when_called_from_a_listener_callback()
     {
         // The callback runs on the calling thread, like the replay of connected devices does on
